@@ -1,5 +1,8 @@
 use crate::mind::abstract_layer::AbstractLayer;
 use crate::mind::abstract_layer::Blob;
+use crate::mind::abstract_layer::DataVec;
+
+use super::activation::sigmoid_on_vec;
 
 use std::mem::replace;
 use std::vec::Vec;
@@ -7,26 +10,28 @@ use std::vec::Vec;
 pub struct InputDataLayer {
     pub next_layers: Vec< Box< dyn AbstractLayer > >,
     pub cur_data: Option<Blob>,
-    pub input_size: i32
+    pub input_size: usize,
+    pub output: Blob,
 }
 
 impl AbstractLayer for InputDataLayer {
-    fn forward(&mut self, input: Blob) -> Blob
+    fn forward(&mut self, input: &Blob) -> &Blob
     {
-        if self.cur_data.is_none() {
-            return input.clone();
+        if let Some(d) = &self.cur_data {
+            let in_vec = &d[0];
+            let out_vec = &mut self.output[0];
+            sigmoid_on_vec(in_vec,out_vec);
         }
-
-        let s = std::mem::replace(&mut self.cur_data, None);
-        return s.unwrap();
+        
+        &self.output
     }
-    fn backward(&mut self, input: Blob) -> Blob
+    fn backward(&mut self, input: &Blob, weights: &Blob) -> (&Blob, &Blob)
     {
         // dummy
-        return Blob::new();
+        (&self.output, &self.output)
     }
 
-    fn layer_name(&mut self) -> &str
+    fn layer_name(&self) -> &str
     {
         "InputDataLayer"
     }
@@ -44,6 +49,10 @@ impl AbstractLayer for InputDataLayer {
     {
         self.next_layers.push(layer);
     }
+
+    fn size(&self) -> usize {
+        self.input_size
+    }
 }
 
 impl InputDataLayer {
@@ -52,11 +61,15 @@ impl InputDataLayer {
         self.cur_data = Some(input);
     }
 
-    pub fn new(input_size: i32) -> Self {
+    pub fn new(input_size: usize) -> Self {
+        let mut vec_outp = DataVec::new();
+        vec_outp.resize(input_size, 0.0);
+
         Self {
             next_layers: Vec::new(),
             cur_data: None,
-            input_size
+            input_size,
+            output: vec![vec_outp]
         }
     }
 }

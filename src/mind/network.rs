@@ -1,80 +1,79 @@
 use std::vec::Vec;
 
 use crate::mind::abstract_layer::AbstractLayer;
+use crate::mind::abstract_layer::Blob;
+use crate::mind::dataset::DataLoader;
 use crate::mind::dummy_layer::DummyLayer;
-use crate::mind::input_data_layer::InputDataLayer;
 use crate::mind::error_layer::ErrorLayer;
 use crate::mind::hidden_layer::HiddenLayer;
-use crate::mind::dataset::DataLoader;
+use crate::mind::input_data_layer::InputDataLayer;
 
-use super::{dataset::{SimpleDataLoader, DataBatch}, input_data_layer};
+use super::{
+    dataset::{DataBatch, SimpleDataLoader},
+    input_data_layer,
+};
 
 /// Neural-Network
 pub struct Network {
-    input_layer: Box<dyn AbstractLayer>,
-    output_layer: Box<dyn AbstractLayer>,
     dataloader: Box<dyn DataLoader>,
+    layers: Vec<Box<dyn AbstractLayer>>,
 }
 
 impl Network {
-    pub fn new(dataloader: Box<dyn DataLoader>) -> Self 
-    {   
+    pub fn new(dataloader: Box<dyn DataLoader>) -> Self {
         Network {
-            input_layer: Box::new(DummyLayer::new()),
-            output_layer: Box::new(DummyLayer::new()),
-            dataloader
+            dataloader,
+            layers: Vec::new(),
         }
     }
 
     /// Setup the network with [0] - input size, [...] - hidden neurons, [N] - output size
-    pub fn setupNetwork(&mut self, layers: &Vec<i32>)
-    {
+    pub fn setup_network(&mut self, layers: &Vec<usize>) {
         if layers.len() < 3 {
             eprintln!("Invalid layers length !!!");
             return;
         }
 
-        let mut cur_layer: &mut Box<dyn AbstractLayer> = &mut self.input_layer;
+        // let mut cur_layer: &mut Box<dyn AbstractLayer> = &mut self.input_layer;
 
-        for (idx,val) in layers.iter().enumerate() {
+        for (idx, val) in layers.iter().enumerate() {
             if idx == 0 {
-                let l : Box<dyn AbstractLayer> = Box::new(InputDataLayer::new(*val));
-                self.input_layer = l;
-                cur_layer = &mut self.input_layer;
+                let l: Box<dyn AbstractLayer> = Box::new(InputDataLayer::new(*val));
+                self.layers.push(l);
+                continue;
             }
             if idx == layers.len() - 1 {
-                let mut l = Box::new(ErrorLayer::new(*val));
-                self.output_layer = l;
+                let mut l = Box::new(ErrorLayer::new(*val, layers[idx - 1]));
+                self.layers.push(l);
+                continue;
             }
 
-            let mut l : Box<dyn AbstractLayer> = Box::new(HiddenLayer::new(*val));
-            cur_layer.add_next_layer(l);
-            
-            cur_layer = cur_layer.next_layer(0).unwrap();
+            let mut l: Box<dyn AbstractLayer> = Box::new(HiddenLayer::new(*val, layers[idx - 1]));
+            self.layers.push(l);
         }
     }
 
-    fn perform_step(&mut self)
-    {
+    pub fn perform_step(&mut self) {
         let data = self.dataloader.next();
         let input_data = data.input.clone();
         let expected_data = data.expected.clone();
 
-        let mut cur_layer = self.input_layer.next_layer(0).unwrap();
-        let mut out = cur_layer.forward(input_data);
+        let mut out = None;
 
-        loop {
-            if cur_layer.next_layer(0).is_none() {
-                break;
+        for (idx, l) in self.layers.iter_mut().enumerate() {
+            // handle input layer
+            if (idx == 0) {
+                out = Some(l.forward(&input_data));
+                continue;
             }
 
-            let next_layer = cur_layer.next_layer(0).unwrap();
-
-            out = next_layer.forward(out);
-            cur_layer = next_layer;
+            out = Some(l.forward(out.unwrap()));
         }
 
+        let out_val = &out.unwrap()[0];
+
+        for i in out_val.iter() {
+            println!("out val : {}", i);
+        }
     }
-
-
 }

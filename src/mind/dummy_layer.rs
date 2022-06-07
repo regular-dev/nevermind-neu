@@ -4,17 +4,17 @@ use crate::mind::abstract_layer::AbstractLayer;
 use crate::mind::abstract_layer::Blob;
 
 pub struct DummyLayer {
-
+    output: Blob,
 }
 
 impl AbstractLayer for DummyLayer {
-    fn forward(&mut self, input: Blob) -> Blob
+    fn forward(&mut self, input: &Blob) -> &Blob
     {
-        Blob::new()
+        &self.output
     }
-    fn backward(&mut self, input: Blob) -> Blob
+    fn backward(&mut self, input: &Blob, weights: &Blob) -> (&Blob, &Blob)
     {
-        Blob::new()
+        (&self.output, &self.output)
     }
 
     fn next_layer(&mut self, idx: usize) -> Option< &mut Box< dyn AbstractLayer > >
@@ -26,7 +26,7 @@ impl AbstractLayer for DummyLayer {
         return None;
     }
 
-    fn layer_name(&mut self) -> &str {
+    fn layer_name(&self) -> &str {
         return "DummyLayer";
     }
 
@@ -34,10 +34,17 @@ impl AbstractLayer for DummyLayer {
     {
 
     }
+
+    fn size(&self) -> usize 
+    {
+        0
+    }
 }
 
 impl DummyLayer {
     pub fn new() -> Self {
-        DummyLayer{}
+        DummyLayer{
+            output: Blob::new()
+        }
     }
 }
