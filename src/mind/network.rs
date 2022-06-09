@@ -17,6 +17,7 @@ use super::{
 pub struct Network {
     dataloader: Box<dyn DataLoader>,
     layers: Vec<Box<dyn AbstractLayer>>,
+    test_val: f32,
 }
 
 impl Network {
@@ -24,6 +25,7 @@ impl Network {
         Network {
             dataloader,
             layers: Vec::new(),
+            test_val: 54.0,
         }
     }
 
@@ -53,10 +55,19 @@ impl Network {
         }
     }
 
+    fn get_train_step_data(&mut self) -> DataBatch {
+        return self.dataloader.next().clone();
+    }
+
     pub fn perform_step(&mut self) {
-        let data = self.dataloader.next();
-        let input_data = data.input.clone();
-        let expected_data = data.expected.clone();
+        let data = self.get_train_step_data();
+
+        self.feedforward(&data);
+        self.backpropagate(&data);
+    }
+
+    fn feedforward(&mut self, train_data: &DataBatch) {
+        let input_data = train_data.input.clone();
 
         let mut out = None;
 
@@ -75,5 +86,8 @@ impl Network {
         for i in out_val.iter() {
             println!("out val : {}", i);
         }
+    }
+
+    fn backpropagate(&mut self, train_data: &DataBatch) {
     }
 }

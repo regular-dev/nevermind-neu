@@ -1,5 +1,6 @@
 use crate::mind::abstract_layer::Blob;
 
+#[derive(Clone)]
 pub struct DataBatch {
     pub input: Blob,
     pub expected: Blob,
