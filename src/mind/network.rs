@@ -1,3 +1,4 @@
+use std::error::Error;
 use std::vec::Vec;
 
 use crate::mind::abstract_layer::AbstractLayer;
@@ -17,7 +18,6 @@ use super::{
 pub struct Network {
     dataloader: Box<dyn DataLoader>,
     layers: Vec<Box<dyn AbstractLayer>>,
-    test_val: f32,
 }
 
 impl Network {
@@ -25,7 +25,6 @@ impl Network {
         Network {
             dataloader,
             layers: Vec::new(),
-            test_val: 54.0,
         }
     }
 
@@ -36,21 +35,19 @@ impl Network {
             return;
         }
 
-        // let mut cur_layer: &mut Box<dyn AbstractLayer> = &mut self.input_layer;
-
         for (idx, val) in layers.iter().enumerate() {
             if idx == 0 {
-                let l: Box<dyn AbstractLayer> = Box::new(InputDataLayer::new(*val));
+                let l= Box::new(InputDataLayer::new(*val));
                 self.layers.push(l);
                 continue;
             }
             if idx == layers.len() - 1 {
-                let mut l = Box::new(ErrorLayer::new(*val, layers[idx - 1]));
+                let l = Box::new(ErrorLayer::new(*val, layers[idx - 1]));
                 self.layers.push(l);
                 continue;
             }
 
-            let mut l: Box<dyn AbstractLayer> = Box::new(HiddenLayer::new(*val, layers[idx - 1]));
+            let l: Box<dyn AbstractLayer> = Box::new(HiddenLayer::new(*val, layers[idx - 1]));
             self.layers.push(l);
         }
     }
@@ -62,18 +59,26 @@ impl Network {
     pub fn perform_step(&mut self) {
         let data = self.get_train_step_data();
 
-        self.feedforward(&data);
+        self.feedforward(&data, false);
         self.backpropagate(&data);
+        self.feedforward(&data, false);
+        self.correct_weights();
     }
 
-    fn feedforward(&mut self, train_data: &DataBatch) {
-        let input_data = train_data.input.clone();
+    pub fn train_for_n_times(&mut self, times: i64) {
+        for _i in 0..times {
+            self.perform_step();
+        }
+    }
+
+    pub fn feedforward(&mut self, train_data: &DataBatch, print_out: bool) {
+        let input_data = &train_data.input;
 
         let mut out = None;
 
         for (idx, l) in self.layers.iter_mut().enumerate() {
             // handle input layer
-            if (idx == 0) {
+            if idx == 0 {
                 out = Some(l.forward(&input_data));
                 continue;
             }
@@ -83,11 +88,37 @@ impl Network {
 
         let out_val = &out.unwrap()[0];
 
-        for i in out_val.iter() {
-            println!("out val : {}", i);
+        if print_out {
+            for i in out_val.iter() {
+                println!("out val : {}", i);
+            }
         }
     }
 
     fn backpropagate(&mut self, train_data: &DataBatch) {
+        let expected_data = &train_data.expected;
+
+        let mut out = None;
+
+        for (idx, l) in self.layers.iter_mut().rev().enumerate() {
+            if idx == 0 {
+                out = Some(l.backward(expected_data, &Blob::new()));
+                continue;
+            }
+
+            out = Some(l.backward(out.unwrap().0, out.unwrap().1));
+        }
+    }
+
+    fn correct_weights(&mut self) {
+        let mut out = None;
+
+        for (idx, l) in self.layers.iter_mut().enumerate() {
+            if idx == 0 {
+                out = Some(l.optimize(&Blob::new()));
+                continue;
+            }
+            out = Some(l.optimize(&out.unwrap()));
+        }
     }
 }

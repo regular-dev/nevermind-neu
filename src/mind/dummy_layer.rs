@@ -3,6 +3,7 @@ use std::option::Option;
 use crate::mind::abstract_layer::AbstractLayer;
 use crate::mind::abstract_layer::Blob;
 
+// not used
 pub struct DummyLayer {
     output: Blob,
 }
@@ -17,22 +18,12 @@ impl AbstractLayer for DummyLayer {
         (&self.output, &self.output)
     }
 
-    fn next_layer(&mut self, idx: usize) -> Option< &mut Box< dyn AbstractLayer > >
-    {
-        return None;
-    }
-    fn previous_layer(&mut self, idx: usize) -> Option < &mut Box< dyn AbstractLayer > >
-    {
-        return None;
+    fn optimize(&mut self, _prev_out: &Blob) -> &Blob {
+        &self.output
     }
 
     fn layer_name(&self) -> &str {
         return "DummyLayer";
-    }
-
-    fn add_next_layer(&mut self, layer: Box< dyn AbstractLayer >)
-    {
-
     }
 
     fn size(&self) -> usize 

@@ -1,18 +1,16 @@
 use crate::mind::abstract_layer::AbstractLayer;
 use crate::mind::abstract_layer::Blob;
-use crate::mind::activation;
+use crate::mind::activation::{sigmoid, sigmoid_deriv};
 
 use rand::Rng;
 
-use super::activation::sigmoid_prime;
-
 pub struct HiddenLayer {
     pub ws: Blob,
-    pub next_layer: Option<Box<dyn AbstractLayer>>,
-    pub prev_layer: Option<Box<dyn AbstractLayer>>,
-    pub neu_count: usize,
+    pub ws_delta: Blob,
+    pub size: usize,
     pub output: Blob,
     pub err_vals: Blob,
+    pub prev_size: usize,
 }
 
 impl AbstractLayer for HiddenLayer {
@@ -25,7 +23,7 @@ impl AbstractLayer for HiddenLayer {
             for (idx_in, val_in) in inp_vec.iter().enumerate() {
                 sum += val_in * self.ws[0][idx_out * inp_vec.len() + idx_in];
             }
-            let mut activated_val = activation::sigmoid(sum);
+            let activated_val = sigmoid(sum);
             out_vec[idx_out] = activated_val;
         }
 
@@ -36,44 +34,43 @@ impl AbstractLayer for HiddenLayer {
         let ws_vec = &weights[0];
         let err_vec = &mut self.err_vals[0];
 
-        for idx in 0..self.neu_count {
+        for idx in 0..self.size {
             let mut sum: f32 = 0.0;
             for inp_idx in 0..inp_vec.len() {
-                sum += inp_vec[inp_idx] * ws_vec[inp_idx*inp_vec.len()+idx];
+                sum += inp_vec[inp_idx] * ws_vec[inp_idx*self.size+idx];
             }
 
-            err_vec[idx] = sigmoid_prime(self.output[0][idx] * sum);
+            err_vec[idx] = sigmoid_deriv(self.output[0][idx] ) * sum;
         }
 
         (&self.err_vals, &self.ws)
+    }
+
+    fn optimize(&mut self, prev_out: &Blob) -> &Blob {
+        let prev_vec = &prev_out[0];
+
+        for neu_idx in 0..self.size {
+            for prev_idx in 0..self.prev_size {
+                let ws_idx = neu_idx * self.prev_size + prev_idx;
+
+                // 0.2 - ALPHA
+                self.ws[0][ws_idx] += 0.2 * self.ws_delta[0][ws_idx];
+                // 0.2 - LEARNING RATE
+                self.ws_delta[0][ws_idx] = 0.2 * self.err_vals[0][neu_idx] * prev_vec[prev_idx];
+
+                self.ws[0][ws_idx] += self.ws_delta[0][ws_idx];
+            }
+        }
+
+        &self.output
     }
 
     fn layer_name(&self) -> &str {
         "HiddenLayer"
     }
 
-    fn next_layer(&mut self, _idx: usize) -> Option<&mut Box<dyn AbstractLayer>> {
-        if let Some(l) = &mut self.next_layer {
-            return Some(l);
-        } else {
-            return None;
-        }
-    }
-
-    fn previous_layer(&mut self, idx: usize) -> Option<&mut Box<dyn AbstractLayer>> {
-        if let Some(l) = &mut self.prev_layer {
-            return Some(l);
-        } else {
-            return None;
-        }
-    }
-
-    fn add_next_layer(&mut self, layer: Box<dyn AbstractLayer>) {
-        self.next_layer = Some(layer);
-    }
-
     fn size(&self) -> usize {
-        self.neu_count
+        self.size
     }
 }
 
@@ -84,9 +81,12 @@ impl HiddenLayer {
 
         for i in &mut ws {
             i.resize_with(prev_size * size, || {
-                rand::thread_rng().gen_range(0.01, 0.55)
+                rand::thread_rng().gen_range(-0.55, 0.55)
             });
         }
+
+        let mut ws_delta = Vec::new();
+        ws_delta.resize(prev_size*size, 0.0);
 
         let mut out_vec = Vec::new();
         out_vec.resize(size, 0.0);
@@ -94,10 +94,10 @@ impl HiddenLayer {
         let err_vec = out_vec.clone();
 
         Self {
-            neu_count: size,
+            size,
+            prev_size,
             ws,
-            next_layer: None,
-            prev_layer: None,
+            ws_delta: vec![ws_delta],
             output: vec![out_vec],
             err_vals: vec![err_vec]
         }

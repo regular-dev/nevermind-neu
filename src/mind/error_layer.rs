@@ -1,7 +1,7 @@
 use crate::mind::abstract_layer::AbstractLayer;
 use crate::mind::abstract_layer::Blob;
 use crate::mind::abstract_layer::DataVec;
-use crate::mind::activation::{sigmoid, sigmoid_prime};
+use crate::mind::activation::{sigmoid, sigmoid_deriv};
 
 use rand::Rng;
 
@@ -10,7 +10,9 @@ pub struct ErrorLayer {
     pub error: f32,
     pub error_vals: Blob,
     pub ws: Blob,
+    pub ws_delta: Blob,
     pub size: usize,
+    pub prev_size: usize,
     pub output: Blob,
 }
 
@@ -20,53 +22,54 @@ impl AbstractLayer for ErrorLayer {
         let inp_vec = &input[0];
         let out_vec = &mut self.output[0];
 
-        for out_idx in 0..out_vec.len() {
+        for idx_out in 0..out_vec.len() {
             let mut sum: f32 = 0.0;
-
-            for (inp_idx, inp_iter) in inp_vec.iter().enumerate() {
-                sum += inp_iter * self.ws[0][out_idx*inp_vec.len()+inp_idx];
+            for (idx_in, val_in) in inp_vec.iter().enumerate() {
+                sum += val_in * self.ws[0][idx_out * inp_vec.len() + idx_in];
             }
-
-            let activated = sigmoid(sum);
-            out_vec[out_idx] = activated;
+            let activated_val = sigmoid(sum);
+            out_vec[idx_out] = activated_val;
         }
 
         &self.output
     }
-    fn backward(&mut self, input: &Blob, weights: &Blob) -> (&Blob, &Blob)
+    fn backward(&mut self, input: &Blob, _weights: &Blob) -> (&Blob, &Blob)
     {
         let expected_vec = &input[0];
+        //self.count_euclidean_error(&expected_vec);
+
         let out_vec = &self.output[0];
         let err_vec = &mut self.error_vals[0];
         
         for (idx, _out_iter) in out_vec.iter().enumerate() {
-            err_vec[idx] = (expected_vec[idx] - out_vec[idx]) * sigmoid_prime(out_vec[idx]);
+            err_vec[idx] = (expected_vec[idx] - out_vec[idx]) * sigmoid_deriv(out_vec[idx]);
         }
 
         (&self.error_vals, &self.ws)
     }
 
+    fn optimize(&mut self, prev_out: &Blob) -> &Blob {
+        let prev_vec = &prev_out[0];
+
+        for neu_idx in 0..self.size {
+            for prev_idx in 0..self.prev_size {
+                let ws_idx = neu_idx * self.prev_size + prev_idx;
+
+                // 0.2 - ALPHA
+                self.ws[0][ws_idx] += 0.2 * self.ws_delta[0][ws_idx];
+                // 0.2 - LEARNING RATE
+                self.ws_delta[0][ws_idx] = 0.2 * self.error_vals[0][neu_idx] * prev_vec[prev_idx];
+
+                self.ws[0][ws_idx] += self.ws_delta[0][ws_idx];
+            }
+        }
+
+        &self.output
+    }
+
     fn layer_name(&self) -> &str
     {
         "ErrorLayer"
-    }
-
-    fn next_layer(&mut self, _idx: usize) -> Option< &mut Box< dyn AbstractLayer > >
-    {
-        if let Some(l) = &mut self.next_layer {
-            return Some(l);
-        } else {
-            return None;
-        }
-    }
-    fn previous_layer(&mut self, idx: usize) -> Option< &mut Box< dyn AbstractLayer > >
-    {
-        None
-    }
-
-    fn add_next_layer(&mut self, layer: Box< dyn AbstractLayer >)
-    {
-
     }
 
     fn size(&self) -> usize 
@@ -87,17 +90,34 @@ impl ErrorLayer {
         ws.resize(1, Vec::new());
 
         for i in &mut ws {
-            i.resize_with(prev_size*size, || { rand::thread_rng().gen_range(0.01, 0.55) } );
+            i.resize_with(prev_size*size, || { rand::thread_rng().gen_range(-0.55, 0.55) } );
         }
 
+        let mut ws_delta = Vec::new();
+        ws_delta.resize(prev_size * size, 0.0);
 
         Self {
             size,
+            prev_size,
             next_layer: None,
             error: 0.0,
             output: vec![out_vec],
-            ws: ws,
+            ws,
+            ws_delta: vec![ws_delta],
             error_vals: vec![err_vals]
         }
+    }
+
+    fn count_euclidean_error(&mut self, expected_vals: &Vec<f32>) {
+        let mut err: f32 = 0.0;
+        let out_vec = &self.output[0];
+
+        for (idx, val) in out_vec.iter().enumerate() {
+            err += (expected_vals[idx] - val) * (expected_vals[idx] - val); // TODO : pow(val, 2)
+        }
+
+        println!("Euclidean loss : {}", err);
+
+        self.error = err;
     }
 }

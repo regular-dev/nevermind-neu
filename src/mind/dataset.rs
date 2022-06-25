@@ -28,7 +28,9 @@ pub struct SimpleDataLoader {
 impl DataLoader for SimpleDataLoader {
     fn next(&mut self) -> &DataBatch {
         if self.cur_idx < self.data.len() {
-            return &self.data[ self.cur_idx ];
+            let ret = &self.data[ self.cur_idx ];
+            self.cur_idx += 1;
+            return ret;
         } else {
             self.cur_idx = 0;
             return self.next();
