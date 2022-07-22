@@ -1,7 +1,7 @@
 use std::option::Option;
 
-use crate::mind::abstract_layer::AbstractLayer;
-use crate::mind::abstract_layer::Blob;
+use crate::mind::abstract_layer::{AbstractLayer, LayerForwardResult, LayerBackwardResult};
+use super::util::{Blob, Variant, DataVec};
 
 // not used
 pub struct DummyLayer {
@@ -9,20 +9,20 @@ pub struct DummyLayer {
 }
 
 impl AbstractLayer for DummyLayer {
-    fn forward(&mut self, input: &Blob) -> &Blob
+    fn forward(&mut self, input: &Blob) -> LayerForwardResult
     {
-        &self.output
+        Ok(&self.output)
     }
-    fn backward(&mut self, input: &Blob, weights: &Blob) -> (&Blob, &Blob)
+    fn backward(&mut self, input: &Blob, weights: &Blob) -> LayerBackwardResult
     {
-        (&self.output, &self.output)
+        Ok((&self.output, &self.output))
     }
 
     fn optimize(&mut self, _prev_out: &Blob) -> &Blob {
         &self.output
     }
 
-    fn layer_name(&self) -> &str {
+    fn layer_type(&self) -> &str {
         return "DummyLayer";
     }
 

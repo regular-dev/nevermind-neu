@@ -1,6 +1,9 @@
-use crate::mind::abstract_layer::AbstractLayer;
-use crate::mind::abstract_layer::Blob;
-use crate::mind::activation::{sigmoid, sigmoid_deriv};
+use std::collections::HashMap;
+
+use super::abstract_layer::{AbstractLayer, LayerForwardResult, LayerBackwardResult};
+use super::activation::{sigmoid, sigmoid_deriv};
+
+use super::util::{Blob, Variant, DataVec};
 
 use rand::Rng;
 
@@ -14,7 +17,7 @@ pub struct HiddenLayer {
 }
 
 impl AbstractLayer for HiddenLayer {
-    fn forward(&mut self, input: &Blob) -> &Blob {
+    fn forward(&mut self, input: &Blob) -> LayerForwardResult {
         let inp_vec = &input[0];
         let out_vec = &mut self.output[0];
 
@@ -27,9 +30,9 @@ impl AbstractLayer for HiddenLayer {
             out_vec[idx_out] = activated_val;
         }
 
-        &self.output
+        Ok(&self.output)
     }
-    fn backward(&mut self, input: &Blob, weights: &Blob) -> (&Blob, &Blob) {
+    fn backward(&mut self, input: &Blob, weights: &Blob) -> LayerBackwardResult {
         let inp_vec = &input[0];
         let ws_vec = &weights[0];
         let err_vec = &mut self.err_vals[0];
@@ -43,7 +46,7 @@ impl AbstractLayer for HiddenLayer {
             err_vec[idx] = sigmoid_deriv(self.output[0][idx] ) * sum;
         }
 
-        (&self.err_vals, &self.ws)
+        Ok((&self.err_vals, &self.ws))
     }
 
     fn optimize(&mut self, prev_out: &Blob) -> &Blob {
@@ -65,8 +68,17 @@ impl AbstractLayer for HiddenLayer {
         &self.output
     }
 
-    fn layer_name(&self) -> &str {
+    fn layer_type(&self) -> &str {
         "HiddenLayer"
+    }
+
+    fn layer_cfg(&self) -> HashMap< &str, Variant > { 
+        let mut cfg: HashMap<&str, Variant> = HashMap::new();
+
+        cfg.insert("layer_type", Variant::String(String::from(self.layer_type())));
+        cfg.insert("size", Variant::Int(self.size as i32));
+
+        cfg
     }
 
     fn size(&self) -> usize {

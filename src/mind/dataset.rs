@@ -1,4 +1,4 @@
-use crate::mind::abstract_layer::Blob;
+use super::util::{Blob, Variant, DataVec};
 
 #[derive(Clone)]
 pub struct DataBatch {

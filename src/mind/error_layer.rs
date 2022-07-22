@@ -1,12 +1,14 @@
-use crate::mind::abstract_layer::AbstractLayer;
-use crate::mind::abstract_layer::Blob;
-use crate::mind::abstract_layer::DataVec;
-use crate::mind::activation::{sigmoid, sigmoid_deriv};
+use std::collections::HashMap;
+
+use super::abstract_layer::{
+    AbstractLayer, LayerBackwardResult, LayerForwardResult,
+};
+use super::activation::{sigmoid, sigmoid_deriv};
+use super::util::{Blob, Variant, DataVec};
 
 use rand::Rng;
 
 pub struct ErrorLayer {
-    pub next_layer: Option< Box< dyn AbstractLayer > >,
     pub error: f32,
     pub error_vals: Blob,
     pub ws: Blob,
@@ -17,8 +19,7 @@ pub struct ErrorLayer {
 }
 
 impl AbstractLayer for ErrorLayer {
-    fn forward(&mut self, input: &Blob) -> &Blob
-    {
+    fn forward(&mut self, input: &Blob) -> LayerForwardResult {
         let inp_vec = &input[0];
         let out_vec = &mut self.output[0];
 
@@ -31,21 +32,19 @@ impl AbstractLayer for ErrorLayer {
             out_vec[idx_out] = activated_val;
         }
 
-        &self.output
+        Ok(&self.output)
     }
-    fn backward(&mut self, input: &Blob, _weights: &Blob) -> (&Blob, &Blob)
-    {
+    fn backward(&mut self, input: &Blob, _weights: &Blob) -> LayerBackwardResult {
         let expected_vec = &input[0];
         //self.count_euclidean_error(&expected_vec);
 
         let out_vec = &self.output[0];
         let err_vec = &mut self.error_vals[0];
-        
         for (idx, _out_iter) in out_vec.iter().enumerate() {
             err_vec[idx] = (expected_vec[idx] - out_vec[idx]) * sigmoid_deriv(out_vec[idx]);
         }
 
-        (&self.error_vals, &self.ws)
+        Ok((&self.error_vals, &self.ws))
     }
 
     fn optimize(&mut self, prev_out: &Blob) -> &Blob {
@@ -67,30 +66,38 @@ impl AbstractLayer for ErrorLayer {
         &self.output
     }
 
-    fn layer_name(&self) -> &str
-    {
+    fn layer_type(&self) -> &str {
         "ErrorLayer"
     }
 
-    fn size(&self) -> usize 
-    {
+    fn layer_cfg(&self) -> HashMap< &str, Variant > { 
+        let mut cfg: HashMap<&str, Variant> = HashMap::new();
+
+        cfg.insert("layer_type", Variant::String(String::from(self.layer_type())));
+        cfg.insert("size", Variant::Int(self.size as i32));
+
+        cfg
+    }
+
+    fn size(&self) -> usize {
         self.size
     }
 }
 
 impl ErrorLayer {
-    pub fn new(size: usize, prev_size: usize) -> Self 
-    {
+    pub fn new(size: usize, prev_size: usize) -> Self {
         let mut out_vec: Vec<f32> = Vec::new();
         out_vec.resize(size, 0.0);
 
         let err_vals = out_vec.clone();
 
-        let mut ws: Vec< Vec< f32 > > = Vec::new();
+        let mut ws: Vec<Vec<f32>> = Vec::new();
         ws.resize(1, Vec::new());
 
         for i in &mut ws {
-            i.resize_with(prev_size*size, || { rand::thread_rng().gen_range(-0.55, 0.55) } );
+            i.resize_with(prev_size * size, || {
+                rand::thread_rng().gen_range(-0.55, 0.55)
+            });
         }
 
         let mut ws_delta = Vec::new();
@@ -99,12 +106,11 @@ impl ErrorLayer {
         Self {
             size,
             prev_size,
-            next_layer: None,
             error: 0.0,
             output: vec![out_vec],
             ws,
             ws_delta: vec![ws_delta],
-            error_vals: vec![err_vals]
+            error_vals: vec![err_vals],
         }
     }
 

@@ -1,4 +1,4 @@
-use super::abstract_layer::DataVec;
+use super::util::{Blob, Variant, DataVec};
 
 
 pub fn sigmoid(val: f32) -> f32 {

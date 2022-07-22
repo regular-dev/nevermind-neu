@@ -1,40 +1,54 @@
-use crate::mind::abstract_layer::AbstractLayer;
-use crate::mind::abstract_layer::Blob;
-use crate::mind::abstract_layer::DataVec;
+use std::vec::Vec;
+use std::collections::HashMap;
 
+use serde::{Serialize, Serializer};
+use serde::ser::{SerializeStruct};
+
+use super::abstract_layer::{
+    AbstractLayer, LayerBackwardResult, LayerError, LayerForwardResult,
+};
+
+use super::util::{Blob, Variant, DataVec};
 use super::activation::sigmoid_on_vec;
 
-use std::mem::replace;
-use std::vec::Vec;
 
 pub struct InputDataLayer {
-    pub next_layers: Vec< Box< dyn AbstractLayer > >,
     pub input_size: usize,
     pub output: Blob,
 }
 
 impl AbstractLayer for InputDataLayer {
-    fn forward(&mut self, input: &Blob) -> &Blob
-    {
+    fn forward(&mut self, input: &Blob) -> LayerForwardResult {
         let in_vec = &input[0];
         let out_vec = &mut self.output[0];
 
-       sigmoid_on_vec(in_vec, out_vec);
-        
-        &self.output
+        if in_vec.len() != self.input_size {
+            eprintln!("Invalid input size for InputDataLayer : {}", in_vec.len());
+            return Err(LayerError::InvalidSize);
+        }
+
+        sigmoid_on_vec(in_vec, out_vec);
+        Ok(&self.output)
     }
-    fn backward(&mut self, input: &Blob, weights: &Blob) -> (&Blob, &Blob)
-    {
-        (&self.output, &self.output)
+    fn backward(&mut self, input: &Blob, weights: &Blob) -> LayerBackwardResult {
+        Ok((&self.output, &self.output))
     }
 
     fn optimize(&mut self, _prev_out: &Blob) -> &Blob {
         &self.output
     }
 
-    fn layer_name(&self) -> &str
-    {
+    fn layer_type(&self) -> &str {
         "InputDataLayer"
+    }
+
+    fn layer_cfg(&self) -> HashMap< &str, Variant > { 
+        let mut cfg: HashMap<&str, Variant> = HashMap::new();
+
+        cfg.insert("layer_type", Variant::String(String::from(self.layer_type())));
+        cfg.insert("size", Variant::Int(self.input_size as i32));
+
+        cfg
     }
 
     fn size(&self) -> usize {
@@ -43,18 +57,15 @@ impl AbstractLayer for InputDataLayer {
 }
 
 impl InputDataLayer {
-    pub fn load_data(&mut self, input: Blob) 
-    {
-    }
+    pub fn load_data(&mut self, input: Blob) {}
 
     pub fn new(input_size: usize) -> Self {
         let mut vec_outp = DataVec::new();
         vec_outp.resize(input_size, 0.0);
 
         Self {
-            next_layers: Vec::new(),
             input_size,
-            output: vec![vec_outp]
+            output: vec![vec_outp],
         }
     }
 }
