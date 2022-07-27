@@ -6,6 +6,8 @@ use serde::ser::{SerializeStruct, SerializeSeq};
 use serde_json;
 use serde_yaml;
 
+use log::{ info, error, debug, warn };
+
 use std::fs::File;
 use std::io::{Write, BufReader, BufRead, Error, ErrorKind};
 
@@ -42,6 +44,8 @@ struct Solver {
 
 impl Network {
     pub fn new(dataloader: Box<dyn DataLoader>) -> Self {
+        debug!("Created an neural network!");
+
         Network {
             dataloader,
             solver: Solver::new()
