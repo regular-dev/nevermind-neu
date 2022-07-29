@@ -8,13 +8,14 @@ use super::abstract_layer::{
     AbstractLayer, LayerBackwardResult, LayerError, LayerForwardResult,
 };
 
-use super::util::{Blob, Variant, DataVec};
+use super::util::{Blob, Variant, DataVec, WsBlob, WsMat};
 use super::activation::sigmoid_on_vec;
 
 
 pub struct InputDataLayer {
     pub input_size: usize,
     pub output: Blob,
+    pub fake_ws: WsBlob,
 }
 
 impl AbstractLayer for InputDataLayer {
@@ -30,8 +31,8 @@ impl AbstractLayer for InputDataLayer {
         sigmoid_on_vec(in_vec, out_vec);
         Ok(&self.output)
     }
-    fn backward(&mut self, input: &Blob, weights: &Blob) -> LayerBackwardResult {
-        Ok((&self.output, &self.output))
+    fn backward(&mut self, input: &Blob, weights: &WsBlob) -> LayerBackwardResult {
+        Ok((&self.output, &self.fake_ws))
     }
 
     fn optimize(&mut self, _prev_out: &Blob) -> &Blob {
@@ -60,12 +61,12 @@ impl InputDataLayer {
     pub fn load_data(&mut self, input: Blob) {}
 
     pub fn new(input_size: usize) -> Self {
-        let mut vec_outp = DataVec::new();
-        vec_outp.resize(input_size, 0.0);
+        let mut vec_outp = DataVec::zeros(input_size);
 
         Self {
             input_size,
             output: vec![vec_outp],
+            fake_ws: vec![WsMat::zeros((0, 0))],
         }
     }
 }

@@ -1,4 +1,4 @@
-use super::util::{Blob, Variant, DataVec};
+use super::util::{DataVec};
 
 
 pub fn sigmoid(val: f32) -> f32 {
@@ -22,7 +22,7 @@ pub fn sigmoid_on_vec(input: &DataVec, output: &mut DataVec) {
         panic!("ERROR: input length vector != output length vector!!!");
     }
 
-    for (idx, val) in input.iter().enumerate() {
+    for (idx, val) in input.indexed_iter() {
         output[idx] = sigmoid(*val);
     }
 }

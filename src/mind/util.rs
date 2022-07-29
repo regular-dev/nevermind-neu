@@ -1,13 +1,18 @@
 use serde::{Serialize};
 use serde::ser::{Serializer};
 
+use ndarray::{Array1, Array2};
+
 pub enum Variant {
     Int(i32),
     Float(f32),
     String(String)
 }
 
-pub type DataVec = Vec< f32 >;
+pub type Num = f32;
+pub type DataVec = Array1< Num >;
+pub type WsMat = Array2< Num >;
+pub type WsBlob = Vec< WsMat >;  
 pub type Blob = Vec< DataVec >;
 
 impl Serialize for Variant {

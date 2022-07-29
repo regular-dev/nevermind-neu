@@ -78,7 +78,7 @@ fn main() {
     net.simple_setup_network(&net_cfg);
 
     net.save_network_cfg("network.cfg");
-    //net.train_for_n_times(150000);
+    net.train_for_n_times(150000);
 
     // test dataset
     let mut dataset_test: Vec<DataBatch> = Vec::new();

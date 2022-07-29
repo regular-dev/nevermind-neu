@@ -1,4 +1,6 @@
-use super::util::{Blob, Variant, DataVec};
+use ndarray::Array;
+
+use super::util::{Blob};
 
 #[derive(Clone)]
 pub struct DataBatch {
@@ -9,8 +11,8 @@ pub struct DataBatch {
 impl DataBatch {
     pub fn new(input: Vec<f32>, expected: Vec<f32>) -> Self {
         Self {
-            input: vec![input],
-            expected: vec![expected]
+            input: vec![Array::from_vec(input)],
+            expected: vec![Array::from_vec(expected)]
         }
     }
 }

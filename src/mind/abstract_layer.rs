@@ -1,10 +1,12 @@
 use std::vec::Vec;
 use std::collections::HashMap;
 
+use ndarray::Array2;
+
 use serde::{Serialize, Deserialize, Serializer};
 use serde::ser::{SerializeSeq, SerializeStruct};
 
-use crate::mind::util::{Blob, DataVec, Variant};
+use super::util::{Blob, DataVec, Variant, Num, WsBlob};
 
 pub enum LayerError {
     InvalidSize,
@@ -12,12 +14,12 @@ pub enum LayerError {
 }
 
 pub type LayerForwardResult<'a> = Result< &'a Blob, LayerError >;
-pub type LayerBackwardResult<'a> = Result< (&'a Blob, &'a Blob), LayerError >;
+pub type LayerBackwardResult<'a> = Result< (&'a Blob, &'a WsBlob), LayerError >;
 
 pub trait AbstractLayer {
     fn forward(&mut self, input: &Blob) -> LayerForwardResult;
     /// returns out_values and array of weights
-    fn backward(&mut self, input: &Blob, weights: &Blob) -> LayerBackwardResult;
+    fn backward(&mut self, input: &Blob, weights: &WsBlob) -> LayerBackwardResult;
     fn optimize(&mut self, prev_out: &Blob) -> &Blob;
 
     fn layer_type(&self) -> &str;
