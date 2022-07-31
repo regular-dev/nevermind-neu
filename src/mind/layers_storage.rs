@@ -20,6 +20,14 @@ impl LayersStorage {
     pub fn add_layer(&mut self, l: Box<dyn AbstractLayer>) {
         self.layers.push(l);
     }
+
+    pub fn len(&self) -> usize {
+        self.layers.len()
+    }
+
+    pub fn at(&mut self, id: usize) -> &mut Box<dyn AbstractLayer> {
+        &mut self.layers[id]
+    }
 }
 
 impl Serialize for LayersStorage {

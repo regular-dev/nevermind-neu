@@ -6,6 +6,7 @@ pub mod hidden_layer;
 pub mod error_layer;
 pub mod dataset;
 pub mod activation;
+pub mod learn_params;
 pub mod layers_storage;
 pub mod solver;
 pub mod network;

@@ -8,20 +8,20 @@ use super::abstract_layer::{
     AbstractLayer, LayerBackwardResult, LayerError, LayerForwardResult,
 };
 
+use super::learn_params::LearnParams;
 use super::util::{Blob, Variant, DataVec, WsBlob, WsMat};
 use super::activation::sigmoid_on_vec;
 
 
 pub struct InputDataLayer {
     pub input_size: usize,
-    pub output: Blob,
-    pub fake_ws: WsBlob,
+    pub lr: LearnParams,
 }
 
 impl AbstractLayer for InputDataLayer {
     fn forward(&mut self, input: &Blob) -> LayerForwardResult {
         let in_vec = &input[0];
-        let out_vec = &mut self.output[0];
+        let out_vec = &mut self.lr.output[0];
 
         if in_vec.len() != self.input_size {
             eprintln!("Invalid input size for InputDataLayer : {}", in_vec.len());
@@ -29,18 +29,19 @@ impl AbstractLayer for InputDataLayer {
         }
 
         sigmoid_on_vec(in_vec, out_vec);
-        Ok(&self.output)
-    }
-    fn backward(&mut self, input: &Blob, weights: &WsBlob) -> LayerBackwardResult {
-        Ok((&self.output, &self.fake_ws))
+        Ok(&self.lr.output)
     }
 
-    fn optimize(&mut self, _prev_out: &Blob) -> &Blob {
-        &self.output
+    fn backward(&mut self, input: &Blob, weights: &WsBlob) -> LayerBackwardResult {
+        Ok((&self.lr.output, &self.lr.ws))
     }
 
     fn layer_type(&self) -> &str {
         "InputDataLayer"
+    }
+
+    fn learn_params(&mut self) -> Option< &mut LearnParams > {
+        Some(&mut self.lr)
     }
 
     fn layer_cfg(&self) -> HashMap< &str, Variant > { 
@@ -61,12 +62,9 @@ impl InputDataLayer {
     pub fn load_data(&mut self, input: Blob) {}
 
     pub fn new(input_size: usize) -> Self {
-        let mut vec_outp = DataVec::zeros(input_size);
-
         Self {
             input_size,
-            output: vec![vec_outp],
-            fake_ws: vec![WsMat::zeros((0, 0))],
+            lr: LearnParams::new_only_output(input_size),
         }
     }
 }

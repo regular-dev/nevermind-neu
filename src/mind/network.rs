@@ -46,7 +46,7 @@ impl Network {
 
     /// Setup the network with [0] - input size, [...] - hidden neurons, [N] - output size
     /// TODO : make this function static and make static constructor for Network class
-    pub fn simple_setup_network(&mut self, layers: &Vec<usize>) {
+    pub fn setup_simple_network(&mut self, layers: &Vec<usize>) {
         self.solver.setup_simple_network(layers);
     }
 

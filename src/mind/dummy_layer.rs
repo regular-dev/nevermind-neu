@@ -2,11 +2,12 @@ use std::option::Option;
 
 use crate::mind::abstract_layer::{AbstractLayer, LayerForwardResult, LayerBackwardResult};
 use super::util::{Blob, Variant, DataVec, WsBlob, WsMat};
+use super::learn_params::LearnParams;
 
 // not used
 pub struct DummyLayer {
     output: Blob,
-    fake_ws: WsBlob,
+    fake_lr: LearnParams,
 }
 
 impl AbstractLayer for DummyLayer {
@@ -16,11 +17,11 @@ impl AbstractLayer for DummyLayer {
     }
     fn backward(&mut self, input: &Blob, weights: &WsBlob) -> LayerBackwardResult
     {
-        Ok((&self.output, &self.fake_ws))
+        Ok((&self.output, &self.fake_lr.ws))
     }
 
-    fn optimize(&mut self, _prev_out: &Blob) -> &Blob {
-        &self.output
+    fn learn_params(&mut self) -> Option< &mut LearnParams > {
+        Some(&mut self.fake_lr)
     }
 
     fn layer_type(&self) -> &str {
@@ -37,7 +38,7 @@ impl DummyLayer {
     pub fn new() -> Self {
         DummyLayer{
             output: Blob::new(),
-            fake_ws: vec![WsMat::zeros((0, 0))],
+            fake_lr: LearnParams::new(0, 0),
         }
     }
 }

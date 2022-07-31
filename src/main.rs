@@ -1,6 +1,6 @@
 mod mind;
 
-use log::{LevelFilter, SetLoggerError};
+use log::{LevelFilter, SetLoggerError, info};
 use log4rs::append::console::ConsoleAppender;
 use log4rs::append::file::FileAppender;
 use log4rs::encode::pattern::PatternEncoder;
@@ -56,7 +56,7 @@ fn init_logger() {
 
 #[cfg(feature = "log_env_logger")]
 fn init_logger() {
-    env_logger::from_env(Env::default().default_filter_or("debug")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("warn")).init();
 }
 
 fn main() {
@@ -75,10 +75,10 @@ fn main() {
     // create a network
     let mut net = Network::new(dataloader);
     let net_cfg = vec![2, 10, 1];
-    net.simple_setup_network(&net_cfg);
+    net.setup_simple_network(&net_cfg);
 
     net.save_network_cfg("network.cfg");
-    net.train_for_n_times(150000);
+    net.train_for_n_times(150_000);
 
     // test dataset
     let mut dataset_test: Vec<DataBatch> = Vec::new();
@@ -87,7 +87,7 @@ fn main() {
     dataset_test.push(DataBatch::new(vec![1.0, 0.0], vec![1.0]));
     dataset_test.push(DataBatch::new(vec![1.0, 1.0], vec![0.0]));
 
-    println!("Now testing net !!!");
+    info!("Now testing net !!!");
 
     net.feedforward(&dataset_test[0], true);
     net.feedforward(&dataset_test[1], true);
