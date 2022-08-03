@@ -11,13 +11,8 @@ use log::{debug, error, info, warn};
 use std::fs::File;
 use std::io::{BufRead, BufReader, Error, ErrorKind, Write};
 
-use crate::mind::abstract_layer::AbstractLayer;
-use crate::mind::dataset::DataLoader;
-use crate::mind::dummy_layer::DummyLayer;
-use crate::mind::error_layer::ErrorLayer;
-use crate::mind::hidden_layer::HiddenLayer;
-use crate::mind::input_data_layer::InputDataLayer;
-use crate::mind::util::{Blob, DataVec, Variant, WsBlob};
+use super::dataset::DataLoader;
+use super::layers_storage::LayersStorage;
 
 use super::{
     dataset::{DataBatch, SimpleDataLoader},
@@ -25,29 +20,36 @@ use super::{
 };
 
 use super::solver::Solver;
-
+use super::solver_sgd::SolverSGD;
 
 
 /// Neural-Network
-pub struct Network {
+pub struct Network<T> 
+where 
+    T: Solver + Serialize
+{
     dataloader: Box<dyn DataLoader>,
-    solver: Solver,
+    solver: T,
 }
 
-impl Network {
-    pub fn new(dataloader: Box<dyn DataLoader>) -> Self {
+impl<T> Network<T>
+where
+    T: Solver + Serialize
+{
+    pub fn new(dataloader: Box<dyn DataLoader>, solver: T) -> Self {
         debug!("Created an neural network!");
 
         Network {
             dataloader,
-            solver: Solver::new(),
+            solver,
         }
     }
 
     /// Setup the network with [0] - input size, [...] - hidden neurons, [N] - output size
     /// TODO : make this function static and make static constructor for Network class
     pub fn setup_simple_network(&mut self, layers: &Vec<usize>) {
-        self.solver.setup_simple_network(layers);
+        let ls = LayersStorage::new_simple_network(layers);
+        self.solver.setup_network(ls);
     }
 
     // pub fn load_network_cfg(&mut self, path: &str) -> Result<()> {

@@ -11,7 +11,7 @@ use super::util::Num;
 
 use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
 use super::activation::{sigmoid, sigmoid_deriv};
-
+use super::bias::ConstBias;
 use super::util::{Blob, DataVec, Variant, WsBlob, WsMat};
 
 use rand::Rng;
@@ -20,6 +20,7 @@ pub struct HiddenLayer {
     pub lr_params: LearnParams,
     pub size: usize,
     pub prev_size: usize,
+    pub bias: ConstBias,
 }
 
 impl AbstractLayer for HiddenLayer {
@@ -30,8 +31,12 @@ impl AbstractLayer for HiddenLayer {
 
         let mul_res = inp_m * ws_mat;
 
+        let fake_blob = Blob::new();
+
+        let bias_out = &self.bias.forward(&fake_blob).unwrap()[0];
+
         for (idx, el) in out_m.indexed_iter_mut() {
-            *el = sigmoid(mul_res.row(idx).sum());
+            *el = sigmoid(mul_res.row(idx).sum() + bias_out[idx]);
         }
 
         debug!("[ok] HiddenLayer forward()");
@@ -52,32 +57,26 @@ impl AbstractLayer for HiddenLayer {
             *val = sigmoid_deriv(self.lr_params.output[0][idx]) * err_mul.column(idx).sum();
         }
 
+        self.bias.lr.err_vals = self.lr_params.err_vals.clone();
+
         debug!("[ok] HiddenLayer backward()");
 
         Ok((&self.lr_params.err_vals, &self.lr_params.ws))
     }
 
-    fn learn_params(&mut self) -> Option< &mut LearnParams > {
-        Some(&mut self.lr_params)
+    fn optimize(
+        &mut self,
+        f: &mut dyn FnMut(&mut LearnParams, Option<&LearnParams>),
+        prev_lr: &LearnParams,
+    ) {
+
+        f(self.learn_params().unwrap(), Some(prev_lr));
+        f(self.bias.learn_params().unwrap(), None);
     }
 
-    // fn optimize(&mut self, prev_out: &Blob) -> &Blob {
-    //     let prev_vec = &prev_out[0];
-
-    //     for neu_idx in 0..self.size {
-    //         for prev_idx in 0..self.prev_size {
-    //             let cur_ws_idx = [neu_idx, prev_idx];
-    //             // 0.2 - ALPHA
-    //             self.ws[0][cur_ws_idx] += 0.2 * self.ws_delta[0][cur_ws_idx];
-    //             // 0.2 - LEARNING RATE
-    //             self.ws_delta[0][cur_ws_idx] = 0.2 * self.err_vals[0][neu_idx] * prev_vec[prev_idx];
-
-    //             self.ws[0][cur_ws_idx] += self.ws_delta[0][cur_ws_idx];
-    //         }
-    //     }
-
-    //     &self.output
-    // }
+    fn learn_params(&mut self) -> Option<&mut LearnParams> {
+        Some(&mut self.lr_params)
+    }
 
     fn layer_type(&self) -> &str {
         "HiddenLayer"
@@ -106,6 +105,7 @@ impl HiddenLayer {
             size,
             prev_size,
             lr_params: LearnParams::new(size, prev_size),
+            bias: ConstBias::new(size, 1.0),
         }
     }
 }

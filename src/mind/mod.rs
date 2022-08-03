@@ -9,4 +9,6 @@ pub mod activation;
 pub mod learn_params;
 pub mod layers_storage;
 pub mod solver;
+pub mod solver_sgd;
 pub mod network;
+pub mod bias;

@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize, Serializer};
 use super::learn_params::LearnParams;
 use super::util::{Blob, DataVec, Num, Variant, WsBlob};
 
+#[derive(Debug)]
 pub enum LayerError {
     InvalidSize,
     OtherError,
@@ -40,8 +41,13 @@ pub trait AbstractLayer {
         cfg
     }
 
-    fn optimize(&mut self, f: &dyn Fn(&mut LearnParams, &LearnParams), prev_lr: &LearnParams) {
-        f(self.learn_params().unwrap(), prev_lr);
+    fn optimize(
+        &mut self,
+        f: &mut dyn FnMut(&mut LearnParams, Option<&LearnParams>),
+        prev_lr: &LearnParams,
+    ) {
+        f(self.learn_params().unwrap(), Some(prev_lr));
+        
     }
 
     fn set_layers_cfg(&self, _cfg: HashMap<String, Variant>) {}
