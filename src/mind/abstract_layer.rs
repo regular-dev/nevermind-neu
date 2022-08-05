@@ -15,8 +15,8 @@ pub enum LayerError {
     OtherError,
 }
 
-pub type LayerForwardResult<'a> = Result<&'a Blob, LayerError>;
-pub type LayerBackwardResult<'a> = Result<(&'a Blob, &'a WsBlob), LayerError>;
+pub type LayerForwardResult<'a> = Result<&'a DataVec, LayerError>;
+pub type LayerBackwardResult<'a> = Result<(&'a DataVec, &'a WsBlob), LayerError>;
 
 pub trait AbstractLayer {
     fn forward(&mut self, input: &Blob) -> LayerForwardResult;

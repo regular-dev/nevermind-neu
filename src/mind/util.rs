@@ -13,7 +13,7 @@ pub type Num = f32;
 pub type DataVec = Array1< Num >;
 pub type WsMat = Array2< Num >;
 pub type WsBlob = Vec< WsMat >;  
-pub type Blob = Vec< DataVec >;
+pub type Blob<'a> = Vec< &'a DataVec >;
 
 impl Serialize for Variant {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

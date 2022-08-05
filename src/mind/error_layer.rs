@@ -24,8 +24,8 @@ pub struct ErrorLayer {
 
 impl AbstractLayer for ErrorLayer {
     fn forward(&mut self, input: &Blob) -> LayerForwardResult {
-        let inp_m = &input[0];
-        let out_m = &mut self.lr_params.output[0];
+        let inp_m = input[0];
+        let out_m = &mut self.lr_params.output;
         let ws_mat = &self.lr_params.ws[0];
 
         let mul_res = inp_m * ws_mat;
@@ -39,11 +39,11 @@ impl AbstractLayer for ErrorLayer {
         Ok(&self.lr_params.output)
     }
     fn backward(&mut self, input: &Blob, _weights: &WsBlob) -> LayerBackwardResult {
-        let expected_vec = &input[0];
+        let expected_vec = input[0];
         //self.count_euclidean_error(&expected_vec);
 
-        let out_vec = &self.lr_params.output[0];
-        let err_vec = &mut self.lr_params.err_vals[0];
+        let out_vec = &self.lr_params.output;
+        let err_vec = &mut self.lr_params.err_vals;
         for (idx, _out_iter) in out_vec.iter().enumerate() {
             err_vec[idx] = (expected_vec[idx] - out_vec[idx]) * sigmoid_deriv(out_vec[idx]);
         }
@@ -87,7 +87,7 @@ impl ErrorLayer {
 
     fn count_euclidean_error(&mut self, expected_vals: &Vec<f32>) {
         let mut err: f32 = 0.0;
-        let out_vec = &self.lr_params.output[0];
+        let out_vec = &self.lr_params.output;
 
         for (idx, val) in out_vec.iter().enumerate() {
             err += (expected_vals[idx] - val).powf(2.0);

@@ -8,8 +8,8 @@ use super::util::{WsBlob, Blob, WsMat, DataVec};
 
 pub struct LearnParams {
     pub ws: WsBlob,
-    pub err_vals: Blob,
-    pub output: Blob,
+    pub err_vals: DataVec,
+    pub output: DataVec,
     pub uuid: Uuid,
 }
 
@@ -17,8 +17,8 @@ impl LearnParams {
     pub fn new(size: usize, prev_size: usize) -> Self {
         Self {
             ws: vec![WsMat::random((size, prev_size), Uniform::new(-0.5, 0.5))],
-            err_vals: vec![DataVec::zeros(size)],
-            output: vec![DataVec::zeros(size)],
+            err_vals: DataVec::zeros(size),
+            output: DataVec::zeros(size),
             uuid: Uuid::new_v4()
         }
     }

@@ -56,7 +56,7 @@ impl Solver for SolverSGD {
         for (idx, l) in self.layers.iter_mut().enumerate() {
             // handle input layer
             if idx == 0 {
-                let result_out = l.forward(&input_data);
+                let result_out = l.forward(vec![&input_data]);
 
                 match result_out {
                     Err(_reason) => {
@@ -69,7 +69,7 @@ impl Solver for SolverSGD {
                 continue;
             }
 
-            let result_out = l.forward(out.unwrap());
+            let result_out = l.forward(vec![out.unwrap()]);
 
             match result_out {
                 Err(_reason) => {
@@ -81,7 +81,7 @@ impl Solver for SolverSGD {
             };
         }
 
-        let out_val = &out.unwrap()[0];
+        let out_val = &out.unwrap();
 
         if print_out {
             for i in out_val.iter() {
@@ -97,7 +97,7 @@ impl Solver for SolverSGD {
 
         for (idx, l) in self.layers.iter_mut().rev().enumerate() {
             if idx == 0 {
-                let result_out = l.backward(expected_data, &WsBlob::new());
+                let result_out = l.backward(vec![expected_data], &WsBlob::new());
 
                 match result_out {
                     Err(reason) => {
@@ -110,7 +110,7 @@ impl Solver for SolverSGD {
                 continue;
             }
 
-            let result_out = l.backward(out.unwrap().0, out.unwrap().1);
+            let result_out = l.backward(vec![out.unwrap().0], out.unwrap().1);
 
             match result_out {
                 Err(_reason) => {
@@ -140,7 +140,7 @@ impl Solver for SolverSGD {
                     let prev_vec = |idx: usize| -> Num {
                         match prev_lr {
                             Some(data) => {
-                                return data.output[0][idx];
+                                return data.output[idx];
                             }
                             None => {
                                 return 1.0;
@@ -162,7 +162,7 @@ impl Solver for SolverSGD {
                             lr.ws[0][cur_ws_idx] += self.alpha * ws_delta[0][cur_ws_idx];
                             // LEARNING RATE
                             ws_delta[0][cur_ws_idx] =
-                                self.learn_rate * lr.err_vals[0][neu_idx] * prev_vec(prev_idx);
+                                self.learn_rate * lr.err_vals[neu_idx] * prev_vec(prev_idx);
 
                             lr.ws[0][cur_ws_idx] += ws_delta[0][cur_ws_idx];
                         }

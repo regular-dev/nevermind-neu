@@ -6,7 +6,7 @@ use super::learn_params::LearnParams;
 
 // not used
 pub struct DummyLayer {
-    output: Blob,
+    output: DataVec,
     fake_lr: LearnParams,
 }
 
@@ -37,7 +37,7 @@ impl AbstractLayer for DummyLayer {
 impl DummyLayer {
     pub fn new() -> Self {
         DummyLayer{
-            output: Blob::new(),
+            output: DataVec::zeros(0),
             fake_lr: LearnParams::new(0, 0),
         }
     }

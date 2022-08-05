@@ -11,7 +11,7 @@ use super::util::Num;
 
 use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
 use super::activation::{sigmoid, sigmoid_deriv};
-use super::bias::ConstBias;
+use super::bias::{ConstBias, Bias};
 use super::util::{Blob, DataVec, Variant, WsBlob, WsMat};
 
 use rand::Rng;
@@ -25,18 +25,19 @@ pub struct HiddenLayer {
 
 impl AbstractLayer for HiddenLayer {
     fn forward(&mut self, input: &Blob) -> LayerForwardResult {
-        let inp_m = &input[0];
-        let out_m = &mut self.lr_params.output[0];
+        let inp_m = input[0];
+        let out_m = &mut self.lr_params.output;
         let ws_mat = &self.lr_params.ws[0];
+        let ws_bias = &self.lr_params.ws[1];
 
         let mul_res = inp_m * ws_mat;
 
         let fake_blob = Blob::new();
 
-        let bias_out = &self.bias.forward(&fake_blob).unwrap()[0];
+        let bias_out = &self.bias.forward(&ws_bias);
 
         for (idx, el) in out_m.indexed_iter_mut() {
-            *el = sigmoid(mul_res.row(idx).sum() + bias_out[idx]);
+            *el = sigmoid(mul_res.row(idx).sum() /*+ bias_out[idx]*/);
         }
 
         debug!("[ok] HiddenLayer forward()");
@@ -45,8 +46,8 @@ impl AbstractLayer for HiddenLayer {
     }
 
     fn backward(&mut self, input: &Blob, weights: &WsBlob) -> LayerBackwardResult {
-        let inp_vec = &input[0];
-        let err_vec = &mut self.lr_params.err_vals[0];
+        let inp_vec = input[0];
+        let err_vec = &mut self.lr_params.err_vals;
         let ws_vec = &weights[0];
 
         let err_mul = ws_vec * inp_vec;
@@ -54,10 +55,8 @@ impl AbstractLayer for HiddenLayer {
         debug!("err mul row_count() - {}", err_mul.shape()[1]);
 
         for (idx, val) in err_vec.indexed_iter_mut() {
-            *val = sigmoid_deriv(self.lr_params.output[0][idx]) * err_mul.column(idx).sum();
+            *val = sigmoid_deriv(self.lr_params.output[idx]) * err_mul.column(idx).sum();
         }
-
-        self.bias.lr.err_vals = self.lr_params.err_vals.clone();
 
         debug!("[ok] HiddenLayer backward()");
 
@@ -71,7 +70,8 @@ impl AbstractLayer for HiddenLayer {
     ) {
 
         f(self.learn_params().unwrap(), Some(prev_lr));
-        f(self.bias.learn_params().unwrap(), None);
+        // TODO : impl bias optimize function !!!
+        // f(self.bias.learn_params().unwrap(), None);
     }
 
     fn learn_params(&mut self) -> Option<&mut LearnParams> {

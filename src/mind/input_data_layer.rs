@@ -21,7 +21,7 @@ pub struct InputDataLayer {
 impl AbstractLayer for InputDataLayer {
     fn forward(&mut self, input: &Blob) -> LayerForwardResult {
         let in_vec = &input[0];
-        let out_vec = &mut self.lr.output[0];
+        let out_vec = &mut self.lr.output;
 
         if in_vec.len() != self.input_size {
             eprintln!("Invalid input size for InputDataLayer : {}", in_vec.len());
