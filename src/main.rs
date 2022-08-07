@@ -75,7 +75,7 @@ fn main() {
 
     // create a network
     let mut net = Network::new(dataloader, SolverSGD::new());
-    let net_cfg = vec![2, 8, 1];
+    let net_cfg = vec![2, 15, 1];
     net.setup_simple_network(&net_cfg);
 
     net.save_network_cfg("network.cfg");

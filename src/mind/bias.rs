@@ -2,10 +2,11 @@ use std::collections::HashMap;
 
 use ndarray::{ArrayViewMut1, Axis};
 
+use log::debug;
+
 use super::abstract_layer::*;
 use super::learn_params::LearnParams;
 use super::util::{Blob, DataVec, Num, WsBlob, WsMat};
-
 
 pub trait Bias {
     fn forward(&mut self, ws: &WsMat) -> &DataVec;
@@ -29,15 +30,18 @@ impl ConstBias {
 
 impl Bias for ConstBias {
     fn forward(&mut self, ws: &WsMat) -> &DataVec {
+        let mul = (self.val * ws).into_shape(self.output.len()).unwrap();
+        // .map_axis_mut(Axis(0), &|arr_view: ArrayViewMut1<Num>| arr_view.sum());
 
-        let mul = (self.val * ws)
-            .map_axis_mut(Axis(0), &|arr_view: ArrayViewMut1<Num>| arr_view.sum());
-
-        self.output = mul;
+        // self.output = mul.slice(1);
 
         // for (idx, val) in out_vec.indexed_iter_mut() {
         // *val = mul.column(idx).sum();
         // }
+
+        self.output = mul;
+
+        debug!("self.output : {}", &self.output);
 
         &self.output
     }

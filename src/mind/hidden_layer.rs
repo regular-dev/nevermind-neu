@@ -32,12 +32,10 @@ impl AbstractLayer for HiddenLayer {
 
         let mul_res = inp_m * ws_mat;
 
-        let fake_blob = Blob::new();
-
-        let bias_out = &self.bias.forward(&ws_bias);
+        let bias_out = self.bias.forward(&ws_bias);
 
         for (idx, el) in out_m.indexed_iter_mut() {
-            *el = sigmoid(mul_res.row(idx).sum() /*+ bias_out[idx]*/);
+            *el = sigmoid(mul_res.row(idx).sum() + bias_out[idx]);
         }
 
         debug!("[ok] HiddenLayer forward()");
@@ -65,11 +63,11 @@ impl AbstractLayer for HiddenLayer {
 
     fn optimize(
         &mut self,
-        f: &mut dyn FnMut(&mut LearnParams, Option<&LearnParams>),
-        prev_lr: &LearnParams,
+        f: &mut dyn FnMut(&mut LearnParams, Vec<&LearnParams>),
+        prev_lr: Vec<&LearnParams>,
     ) {
 
-        f(self.learn_params().unwrap(), Some(prev_lr));
+        f(self.learn_params().unwrap(), prev_lr);
         // TODO : impl bias optimize function !!!
         // f(self.bias.learn_params().unwrap(), None);
     }
@@ -104,7 +102,7 @@ impl HiddenLayer {
         Self {
             size,
             prev_size,
-            lr_params: LearnParams::new(size, prev_size),
+            lr_params: LearnParams::new_with_const_bias(size, prev_size),
             bias: ConstBias::new(size, 1.0),
         }
     }

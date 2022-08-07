@@ -23,11 +23,23 @@ impl LearnParams {
         }
     }
 
+    pub fn new_with_const_bias(size: usize, prev_size: usize) -> Self {
+        let ws = WsMat::random((size, prev_size), Uniform::new(-0.5, 0.5));
+        let ws_bias = WsMat::random( (size, 1), Uniform::new(-0.5, 0.5));
+
+        Self {
+            ws: vec![ws, ws_bias],
+            err_vals: DataVec::zeros(size),
+            output: DataVec::zeros(size),
+            uuid: Uuid::new_v4()
+        }
+    }
+
     pub fn new_only_output(size: usize) -> Self {
         Self {
             ws: vec![WsMat::zeros((0, 0))],
-            err_vals: vec![DataVec::zeros(0)],
-            output: vec![DataVec::zeros(size)],
+            err_vals: DataVec::zeros(0),
+            output: DataVec::zeros(size),
             uuid: Uuid::new_v4()
         }
     }

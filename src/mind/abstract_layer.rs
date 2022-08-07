@@ -43,10 +43,10 @@ pub trait AbstractLayer {
 
     fn optimize(
         &mut self,
-        f: &mut dyn FnMut(&mut LearnParams, Option<&LearnParams>),
-        prev_lr: &LearnParams,
+        f: &mut dyn FnMut(&mut LearnParams, Vec<&LearnParams>),
+        prev_lr: Vec<&LearnParams>,
     ) {
-        f(self.learn_params().unwrap(), Some(prev_lr));
+        f(self.learn_params().unwrap(), prev_lr);
         
     }
 
