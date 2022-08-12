@@ -13,6 +13,8 @@ use crate::mind::dataset::DataBatch;
 use crate::mind::dataset::SimpleDataLoader;
 use crate::mind::network::Network;
 use crate::mind::solver_sgd::SolverSGD;
+use crate::mind::solver_rmsprop::SolverRMS;
+
 
 #[cfg(feature = "log_log4rs")]
 fn init_logger() {
@@ -74,8 +76,8 @@ fn main() {
     let dataloader = Box::new(SimpleDataLoader::new(dataset_train));
 
     // create a network
-    let mut net = Network::new(dataloader, SolverSGD::new());
-    let net_cfg = vec![2, 15, 1];
+    let mut net = Network::new(dataloader, SolverRMS::new());
+    let net_cfg = vec![2, 7, 1];
     net.setup_simple_network(&net_cfg);
 
     net.save_network_cfg("network.cfg");

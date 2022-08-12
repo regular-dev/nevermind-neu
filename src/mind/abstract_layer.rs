@@ -47,7 +47,6 @@ pub trait AbstractLayer {
         prev_lr: Vec<&LearnParams>,
     ) {
         f(self.learn_params().unwrap(), prev_lr);
-        
     }
 
     fn set_layers_cfg(&self, _cfg: HashMap<String, Variant>) {}

@@ -1,36 +1,38 @@
 use std::collections::HashMap;
 
-use serde::ser::SerializeStruct;
-use serde::{Serialize, Serializer};
-
 use log::debug;
-use uuid::Uuid;
 
-use ndarray::{Array, Array2}; // test purpose @xion
+use serde::ser::SerializeStruct;
+use serde::ser::{Serialize, Serializer};
 
-use super::abstract_layer::AbstractLayer;
 use super::dataset::DataBatch;
 use super::layers_storage::LayersStorage;
 use super::learn_params::LearnParams;
 use super::solver::Solver;
 use super::solver_helper;
-use super::util::{DataVec, Num, WsBlob, WsMat};
+use super::util::{Num, WsBlob, WsMat, DataVec};
+use uuid::Uuid;
 
-// Train/Test Impl
-pub struct SolverSGD {
+pub struct SolverRMS {
     learn_rate: f32,
+    momentum: f32,
     alpha: f32,
+    theta: f32,
     layers: LayersStorage,
     ws_delta: HashMap<Uuid, WsBlob>,
+    err_rms: HashMap<Uuid, DataVec>
 }
 
-impl SolverSGD {
+impl SolverRMS {
     pub fn new() -> Self {
-        SolverSGD {
-            layers: LayersStorage::new(),
+        SolverRMS {
             learn_rate: 0.2,
-            alpha: 0.2,
+            momentum: 0.2,
+            alpha: 0.9,
+            theta: 0.00000001,
+            layers: LayersStorage::new(),
             ws_delta: HashMap::new(),
+            err_rms: HashMap::new()
         }
     }
 
@@ -38,8 +40,11 @@ impl SolverSGD {
         lr: &mut LearnParams,
         prev_lr: Vec<&mut LearnParams>,
         ws_delta: &mut HashMap<Uuid, WsBlob>,
+        err_rms: &mut HashMap<Uuid, DataVec>,
         learn_rate: &f32,
+        momentum: &f32,
         alpha: &f32,
+        theta: &f32
     ) {
         // prev_lr could be empty for bias
 
@@ -61,17 +66,25 @@ impl SolverSGD {
                 let ws_init = WsMat::zeros(i.raw_dim());
                 vec_init.push(ws_init);
             }
+
+            let err_rms_dv = DataVec::zeros(lr.err_vals.len());
+
             ws_delta.insert(lr.uuid, vec_init);
+            err_rms.insert(lr.uuid, err_rms_dv);
         }
 
         let ws_delta = ws_delta.get_mut(&lr.uuid).unwrap();
+        let err_rms = err_rms.get_mut(&lr.uuid).unwrap();
 
         for (ws_idx, ws_iter) in lr.ws.iter_mut().enumerate() {
-            SolverSGD::optimize_layer_sgd(
+            SolverRMS::optimize_layer_sgd(
                 ws_iter,
                 &mut ws_delta[ws_idx],
+                err_rms,
                 learn_rate,
+                momentum,
                 alpha,
+                theta,
                 &lr.err_vals,
                 ws_idx,
                 &mut prev_vec,
@@ -82,8 +95,11 @@ impl SolverSGD {
     fn optimize_layer_sgd(
         ws: &mut WsMat,
         ws_delta: &mut WsMat,
+        err_rms: &mut DataVec,
         learn_rate: &f32,
+        momentum: &f32,
         alpha: &f32,
+        theta: &f32,
         err_vals: &DataVec,
         idx_ws: usize,
         fn_prev: &mut dyn FnMut(usize, usize) -> Num,
@@ -91,18 +107,22 @@ impl SolverSGD {
         for neu_idx in 0..ws.shape()[0] {
             for prev_idx in 0..ws.shape()[1] {
                 let cur_ws_idx = [neu_idx, prev_idx];
-                // ALPHA
-                ws[cur_ws_idx] += alpha * ws_delta[cur_ws_idx];
-                // LEARNING RATE
-                ws_delta[cur_ws_idx] = learn_rate * err_vals[neu_idx] * fn_prev(idx_ws, prev_idx);
+                
+               // ws[cur_ws_idx] += momentum * ws_delta[cur_ws_idx];
+                ws_delta[cur_ws_idx] = alpha * ws_delta[cur_ws_idx] +
+                                       (1.0 - alpha) * (err_vals[neu_idx] * fn_prev(idx_ws, prev_idx)).powf(2.0);
+                ws[cur_ws_idx] += ( learn_rate / (ws_delta[cur_ws_idx] + theta) ) *
+                                   err_vals[neu_idx] * fn_prev(idx_ws, prev_idx);
+                // ws[cur_ws_idx] += alpha * ws_delta[cur_ws_idx];
+                // ws_delta[cur_ws_idx] = learn_rate * err_vals[neu_idx] * fn_prev(idx_ws, prev_idx);
 
-                ws[cur_ws_idx] += ws_delta[cur_ws_idx];
+                // ws[cur_ws_idx] += ws_delta[cur_ws_idx];
             }
         }
     }
 }
 
-impl Solver for SolverSGD {
+impl Solver for SolverRMS {
     fn setup_network(&mut self, layers: LayersStorage) {
         self.layers = layers;
     }
@@ -139,12 +159,15 @@ impl Solver for SolverSGD {
                 None => (),
             }
 
-            SolverSGD::optimizer_functor(
+            SolverRMS::optimizer_functor(
                 l.learn_params().unwrap(),
                 prev_lr_vec,
                 &mut self.ws_delta,
+                &mut self.err_rms,
                 &self.learn_rate,
+                &self.momentum,
                 &self.alpha,
+                &self.theta
             );
 
             prev_lr = l.learn_params();
@@ -152,14 +175,14 @@ impl Solver for SolverSGD {
     }
 }
 
-impl Serialize for SolverSGD {
+impl Serialize for SolverRMS {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        let mut solver_cfg = serializer.serialize_struct("SolverSGD Configuration", 3)?;
+        let mut solver_cfg = serializer.serialize_struct("SolverRMS Configuration", 3)?;
         solver_cfg.serialize_field("learning_rate", &self.learn_rate)?;
-        solver_cfg.serialize_field("alpha", &self.alpha)?;
+        solver_cfg.serialize_field("alpha", &self.momentum)?;
         solver_cfg.serialize_field("layers_cfg", &self.layers)?;
         solver_cfg.end()
     }
