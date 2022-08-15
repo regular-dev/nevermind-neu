@@ -26,7 +26,7 @@ pub struct SolverRMS {
 impl SolverRMS {
     pub fn new() -> Self {
         SolverRMS {
-            learn_rate: 0.2,
+            learn_rate: 0.02,
             momentum: 0.2,
             alpha: 0.9,
             theta: 0.00000001,
@@ -107,16 +107,10 @@ impl SolverRMS {
         for neu_idx in 0..ws.shape()[0] {
             for prev_idx in 0..ws.shape()[1] {
                 let cur_ws_idx = [neu_idx, prev_idx];
-                
-               // ws[cur_ws_idx] += momentum * ws_delta[cur_ws_idx];
                 ws_delta[cur_ws_idx] = alpha * ws_delta[cur_ws_idx] +
-                                       (1.0 - alpha) * (err_vals[neu_idx] * fn_prev(idx_ws, prev_idx)).powf(2.0);
-                ws[cur_ws_idx] += ( learn_rate / (ws_delta[cur_ws_idx] + theta) ) *
+                                       (1.0 - alpha) * (err_vals[neu_idx] * fn_prev(idx_ws, prev_idx) ).powf(2.0);
+                ws[cur_ws_idx] += ( learn_rate / (ws_delta[cur_ws_idx] + theta).sqrt() ) *
                                    err_vals[neu_idx] * fn_prev(idx_ws, prev_idx);
-                // ws[cur_ws_idx] += alpha * ws_delta[cur_ws_idx];
-                // ws_delta[cur_ws_idx] = learn_rate * err_vals[neu_idx] * fn_prev(idx_ws, prev_idx);
-
-                // ws[cur_ws_idx] += ws_delta[cur_ws_idx];
             }
         }
     }
