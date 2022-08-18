@@ -8,7 +8,7 @@ use serde::ser::{Serialize, Serializer};
 use super::dataset::DataBatch;
 use super::layers_storage::LayersStorage;
 use super::learn_params::LearnParams;
-use super::solver::Solver;
+use super::solver::{Solver, BatchCounter};
 use super::solver_helper;
 use super::util::{Num, WsBlob, WsMat, DataVec};
 use uuid::Uuid;
@@ -19,8 +19,7 @@ pub struct SolverRMS {
     alpha: f32,
     theta: f32,
     layers: LayersStorage,
-    batch_id: usize,
-    batch_size: usize,
+    batch_cnt: BatchCounter,
     rms: HashMap<Uuid, WsBlob>,
     ws_batch: HashMap<Uuid, WsBlob>
 }
@@ -31,8 +30,7 @@ impl SolverRMS {
             learn_rate: 0.02,
             momentum: 0.2,
             alpha: 0.9,
-            batch_id: 0,
-            batch_size: 1,
+            batch_cnt: BatchCounter::new(1),
             theta: 0.00000001,
             layers: LayersStorage::new(),
             rms: HashMap::new(),
@@ -41,7 +39,7 @@ impl SolverRMS {
     }
 
     pub fn batch(mut self, batch_size: usize) -> Self {
-        self.batch_size = batch_size;
+        self.batch_cnt.batch_size = batch_size;
         self
     }
 
@@ -149,7 +147,7 @@ impl Solver for SolverRMS {
     }
 
     fn optimize_network(&mut self) {
-        let is_upd = self.batch_id == (self.batch_size - 1);
+        let is_upd = self.batch_cnt.is_update();
 
         let mut prev_lr = None;
 
@@ -182,10 +180,7 @@ impl Solver for SolverRMS {
             prev_lr = l.learn_params();
         }
 
-        self.batch_id += 1;
-        if is_upd {
-            self.batch_id = 0;
-        }
+        self.batch_cnt.increment();
     }
 }
 
