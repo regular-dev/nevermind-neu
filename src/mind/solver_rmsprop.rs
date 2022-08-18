@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use log::debug;
+use log::{debug, error};
 
 use serde::ser::SerializeStruct;
 use serde::ser::{Serialize, Serializer};
@@ -19,8 +19,10 @@ pub struct SolverRMS {
     alpha: f32,
     theta: f32,
     layers: LayersStorage,
-    ws_delta: HashMap<Uuid, WsBlob>,
-    err_rms: HashMap<Uuid, DataVec>
+    batch_id: usize,
+    batch_size: usize,
+    rms: HashMap<Uuid, WsBlob>,
+    ws_batch: HashMap<Uuid, WsBlob>
 }
 
 impl SolverRMS {
@@ -29,22 +31,29 @@ impl SolverRMS {
             learn_rate: 0.02,
             momentum: 0.2,
             alpha: 0.9,
+            batch_id: 0,
+            batch_size: 1,
             theta: 0.00000001,
             layers: LayersStorage::new(),
-            ws_delta: HashMap::new(),
-            err_rms: HashMap::new()
+            rms: HashMap::new(),
+            ws_batch: HashMap::new()
         }
+    }
+
+    pub fn batch(mut self, batch_size: usize) -> Self {
+        self.batch_size = batch_size;
+        self
     }
 
     fn optimizer_functor(
         lr: &mut LearnParams,
         prev_lr: Vec<&mut LearnParams>,
-        ws_delta: &mut HashMap<Uuid, WsBlob>,
-        err_rms: &mut HashMap<Uuid, DataVec>,
+        rms: &mut HashMap<Uuid, WsBlob>,
+        ws_batch: &mut HashMap<Uuid, WsBlob>,
         learn_rate: &f32,
-        momentum: &f32,
         alpha: &f32,
-        theta: &f32
+        theta: &f32,
+        update_ws: bool
     ) {
         // prev_lr could be empty for bias
 
@@ -60,59 +69,61 @@ impl SolverRMS {
             return 1.0;
         };
 
-        if !ws_delta.contains_key(&lr.uuid) {
+        if !rms.contains_key(&lr.uuid) {
             let mut vec_init = Vec::new();
             for i in &lr.ws {
                 let ws_init = WsMat::zeros(i.raw_dim());
                 vec_init.push(ws_init);
             }
 
-            let err_rms_dv = DataVec::zeros(lr.err_vals.len());
-
-            ws_delta.insert(lr.uuid, vec_init);
-            err_rms.insert(lr.uuid, err_rms_dv);
+            ws_batch.insert(lr.uuid, vec_init.clone());
+            rms.insert(lr.uuid, vec_init);
         }
 
-        let ws_delta = ws_delta.get_mut(&lr.uuid).unwrap();
-        let err_rms = err_rms.get_mut(&lr.uuid).unwrap();
+        let rms_mat = rms.get_mut(&lr.uuid).unwrap();
+        let batch_mat = ws_batch.get_mut(&lr.uuid).unwrap();
 
         for (ws_idx, ws_iter) in lr.ws.iter_mut().enumerate() {
-            SolverRMS::optimize_layer_sgd(
+            SolverRMS::optimize_layer_rms(
                 ws_iter,
-                &mut ws_delta[ws_idx],
-                err_rms,
+                &mut rms_mat[ws_idx],
+                &mut batch_mat[ws_idx],
                 learn_rate,
-                momentum,
                 alpha,
                 theta,
                 &lr.err_vals,
                 ws_idx,
                 &mut prev_vec,
+                update_ws,
             );
         }
     }
 
-    fn optimize_layer_sgd(
+    fn optimize_layer_rms(
         ws: &mut WsMat,
-        ws_delta: &mut WsMat,
-        err_rms: &mut DataVec,
+        rms: &mut WsMat,
+        ws_batch: &mut WsMat,
         learn_rate: &f32,
-        momentum: &f32,
         alpha: &f32,
         theta: &f32,
         err_vals: &DataVec,
         idx_ws: usize,
         fn_prev: &mut dyn FnMut(usize, usize) -> Num,
+        is_upd: bool,
     ) {
         for neu_idx in 0..ws.shape()[0] {
             for prev_idx in 0..ws.shape()[1] {
                 let cur_ws_idx = [neu_idx, prev_idx];
                 let grad = err_vals[neu_idx] * fn_prev(idx_ws, prev_idx);
+                rms[cur_ws_idx] = alpha * rms[cur_ws_idx] +
+                                    (1.0 - alpha) * grad.powf(2.0);
+                ws_batch[cur_ws_idx] += ( learn_rate / (rms[cur_ws_idx] + theta).sqrt() ) *
+                                    grad;
 
-                ws_delta[cur_ws_idx] = alpha * ws_delta[cur_ws_idx] +
-                                       (1.0 - alpha) * grad.powf(2.0);
-                ws[cur_ws_idx] += ( learn_rate / (ws_delta[cur_ws_idx] + theta).sqrt() ) *
-                                   grad;
+                if is_upd {
+                    ws[cur_ws_idx] += ws_batch[cur_ws_idx];
+                    ws_batch[cur_ws_idx] = 0.0;
+                }
             }
         }
     }
@@ -138,6 +149,8 @@ impl Solver for SolverRMS {
     }
 
     fn optimize_network(&mut self) {
+        let is_upd = self.batch_id == (self.batch_size - 1);
+
         let mut prev_lr = None;
 
         for (idx, l) in self.layers.iter_mut().enumerate() {
@@ -158,15 +171,20 @@ impl Solver for SolverRMS {
             SolverRMS::optimizer_functor(
                 l.learn_params().unwrap(),
                 prev_lr_vec,
-                &mut self.ws_delta,
-                &mut self.err_rms,
+                &mut self.rms,
+                &mut self.ws_batch,
                 &self.learn_rate,
-                &self.momentum,
                 &self.alpha,
-                &self.theta
+                &self.theta,
+                is_upd
             );
 
             prev_lr = l.learn_params();
+        }
+
+        self.batch_id += 1;
+        if is_upd {
+            self.batch_id = 0;
         }
     }
 }

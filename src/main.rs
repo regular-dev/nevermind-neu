@@ -76,12 +76,12 @@ fn main() {
     let dataloader = Box::new(SimpleDataLoader::new(dataset_train));
 
     // create a network
-    let mut net = Network::new(dataloader, SolverRMS::new());
+    let mut net = Network::new(dataloader, SolverRMS::new().batch(4));
     let net_cfg = vec![2, 10, 1];
     net.setup_simple_network(&net_cfg);
 
     net.save_network_cfg("network.cfg");
-    net.train_for_n_times(150000);
+    net.train_for_n_times(30000);
 
     // test dataset
     let mut dataset_test: Vec<DataBatch> = Vec::new();
