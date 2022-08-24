@@ -1,17 +1,15 @@
 use std::collections::HashMap;
 
-use ndarray::{Array2, Array1, Array};
-use ndarray_rand::RandomExt;
+use ndarray::{Array, Array1, Array2};
 use ndarray_rand::rand_distr::Uniform;
+use ndarray_rand::RandomExt;
 
-use log::{debug};
+use log::debug;
 
-use super::abstract_layer::{
-    AbstractLayer, LayerBackwardResult, LayerForwardResult,
-};
+use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
 use super::activation::{sigmoid, sigmoid_deriv};
 use super::learn_params::LearnParams;
-use super::util::{Blob, Variant, DataVec, WsBlob, WsMat, Num};
+use super::util::{Blob, DataVec, Num, Variant, WsBlob, WsMat};
 
 use rand::Rng;
 
@@ -31,16 +29,21 @@ impl AbstractLayer for ErrorLayer {
         let mul_res = inp_m * ws_mat;
 
         for (idx, el) in out_m.indexed_iter_mut() {
-            *el = sigmoid( mul_res.row(idx).sum() );
+            *el = sigmoid(mul_res.row(idx).sum());
         }
 
         debug!("[ok] ErrorLayer forward()");
 
-        Ok(&self.lr_params.output)
+        Ok(vec![&self.lr_params.output])
     }
-    fn backward(&mut self, input: &Blob, _weights: &WsBlob) -> LayerBackwardResult {
-        let expected_vec = input[0];
-        //self.count_euclidean_error(&expected_vec);
+
+    fn backward(
+        &mut self,
+        prev_input: Option<&Blob>,
+        expected: Option<&Blob>,
+        _weights: Option<&WsBlob>,
+    ) -> LayerBackwardResult {
+        let expected_vec = expected.unwrap()[0];
 
         let out_vec = &self.lr_params.output;
         let err_vec = &mut self.lr_params.err_vals;
@@ -57,14 +60,17 @@ impl AbstractLayer for ErrorLayer {
         "ErrorLayer"
     }
 
-    fn learn_params(&mut self) -> Option< &mut LearnParams > {
+    fn learn_params(&mut self) -> Option<&mut LearnParams> {
         Some(&mut self.lr_params)
     }
 
-    fn layer_cfg(&self) -> HashMap< &str, Variant > { 
+    fn layer_cfg(&self) -> HashMap<&str, Variant> {
         let mut cfg: HashMap<&str, Variant> = HashMap::new();
 
-        cfg.insert("layer_type", Variant::String(String::from(self.layer_type())));
+        cfg.insert(
+            "layer_type",
+            Variant::String(String::from(self.layer_type())),
+        );
         cfg.insert("size", Variant::Int(self.size as i32));
 
         cfg
@@ -81,7 +87,7 @@ impl ErrorLayer {
             size,
             prev_size,
             error: 0.0,
-            lr_params: LearnParams::new(size, prev_size)
+            lr_params: LearnParams::new(size, prev_size),
         }
     }
 

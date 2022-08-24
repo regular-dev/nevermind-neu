@@ -15,13 +15,19 @@ pub enum LayerError {
     OtherError,
 }
 
-pub type LayerForwardResult<'a> = Result<&'a DataVec, LayerError>;
+pub type LayerForwardResult<'a> = Result< Blob<'a> , LayerError>;
 pub type LayerBackwardResult<'a> = Result<(&'a DataVec, &'a WsBlob), LayerError>;
 
 pub trait AbstractLayer {
     fn forward(&mut self, input: &Blob) -> LayerForwardResult;
+
     /// returns out_values and array of weights
-    fn backward(&mut self, input: &Blob, weights: &WsBlob) -> LayerBackwardResult;
+    fn backward(
+        &mut self,
+        prev_input: Option<&Blob>,
+        input: Option<&Blob>,
+        weights: Option<&WsBlob>,
+    ) -> LayerBackwardResult;
     //fn optimize(&mut self, prev_out: &Blob) -> &Blob;
 
     fn layer_type(&self) -> &str;

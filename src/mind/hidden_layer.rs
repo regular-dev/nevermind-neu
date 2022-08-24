@@ -11,7 +11,7 @@ use super::util::Num;
 
 use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
 use super::activation::{sigmoid, sigmoid_deriv};
-use super::bias::{ConstBias, Bias};
+use super::bias::{Bias, ConstBias};
 use super::util::{Blob, DataVec, Variant, WsBlob, WsMat};
 
 use rand::Rng;
@@ -40,13 +40,18 @@ impl AbstractLayer for HiddenLayer {
 
         debug!("[ok] HiddenLayer forward()");
 
-        Ok(&self.lr_params.output)
+        Ok(vec![&self.lr_params.output])
     }
 
-    fn backward(&mut self, input: &Blob, weights: &WsBlob) -> LayerBackwardResult {
-        let inp_vec = input[0];
+    fn backward(
+        &mut self,
+        prev_input: Option<&Blob>,
+        input: Option<&Blob>,
+        weights: Option<&WsBlob>,
+    ) -> LayerBackwardResult {
+        let inp_vec = input.unwrap()[0];
         let err_vec = &mut self.lr_params.err_vals;
-        let ws_vec = &weights[0];
+        let ws_vec = &weights.unwrap()[0];
 
         let err_mul = ws_vec * inp_vec;
 
@@ -66,7 +71,6 @@ impl AbstractLayer for HiddenLayer {
         f: &mut dyn FnMut(&mut LearnParams, Vec<&LearnParams>),
         prev_lr: Vec<&LearnParams>,
     ) {
-
         f(self.learn_params().unwrap(), prev_lr);
         // TODO : impl bias optimize function !!!
         // f(self.bias.learn_params().unwrap(), None);

@@ -54,10 +54,9 @@ impl SolverRMS {
         update_ws: bool
     ) {
         // prev_lr could be empty for bias
-
-        let mut prev_vec = |idx_vec: usize, idx_err: usize| -> Num {
+        let mut prev_vec = |idx_vec: usize, idx_output: usize| -> Num {
             if let Some(prev_lr_vec) = prev_lr.get(idx_vec) {
-                if let Some(prev_lr_val) = prev_lr_vec.output.get(idx_err) {
+                if let Some(prev_lr_val) = prev_lr_vec.output.get(idx_output) {
                     return *prev_lr_val;
                 }
             } else {

@@ -1,8 +1,8 @@
 use std::option::Option;
 
-use crate::mind::abstract_layer::{AbstractLayer, LayerForwardResult, LayerBackwardResult};
-use super::util::{Blob, Variant, DataVec, WsBlob, WsMat};
 use super::learn_params::LearnParams;
+use super::util::{Blob, DataVec, Variant, WsBlob, WsMat};
+use crate::mind::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
 
 // not used
 pub struct DummyLayer {
@@ -11,16 +11,20 @@ pub struct DummyLayer {
 }
 
 impl AbstractLayer for DummyLayer {
-    fn forward(&mut self, input: &Blob) -> LayerForwardResult
-    {
-        Ok(&self.output)
-    }
-    fn backward(&mut self, input: &Blob, weights: &WsBlob) -> LayerBackwardResult
-    {
-        Ok((&self.output, &self.fake_lr.ws))
+    fn forward(&mut self, input: &Blob) -> LayerForwardResult {
+        Ok(vec![&self.output])
     }
 
-    fn learn_params(&mut self) -> Option< &mut LearnParams > {
+    fn backward(
+        &mut self,
+        prev_input: Option<&Blob>,
+        input: Option<&Blob>,
+        weights: Option<&WsBlob>,
+    ) -> LayerBackwardResult {
+        Ok((&self.fake_lr.output, &self.fake_lr.ws))
+    }
+
+    fn learn_params(&mut self) -> Option<&mut LearnParams> {
         Some(&mut self.fake_lr)
     }
 
@@ -28,15 +32,14 @@ impl AbstractLayer for DummyLayer {
         return "DummyLayer";
     }
 
-    fn size(&self) -> usize 
-    {
+    fn size(&self) -> usize {
         0
     }
 }
 
 impl DummyLayer {
     pub fn new() -> Self {
-        DummyLayer{
+        DummyLayer {
             output: DataVec::zeros(0),
             fake_lr: LearnParams::new(0, 0),
         }
