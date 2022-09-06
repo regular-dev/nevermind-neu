@@ -10,7 +10,7 @@ pub mod learn_params;
 pub mod layers_storage;
 pub mod solver;
 pub mod solver_helper;
-pub mod solver_sgd;
+//pub mod solver_sgd;
 pub mod solver_rmsprop;
 pub mod network;
 pub mod bias;

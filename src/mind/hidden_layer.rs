@@ -1,12 +1,14 @@
 use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
 
+use ndarray::Zip;
 use ndarray::{Array, Array1, Array2};
 use ndarray_rand::rand_distr::Uniform;
 use ndarray_rand::RandomExt;
 
 use log::debug;
 
-use super::learn_params::LearnParams;
+use super::learn_params::{LearnParams, ParamsBlob};
 use super::util::Num;
 
 use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
@@ -24,15 +26,14 @@ pub struct HiddenLayer {
 }
 
 impl AbstractLayer for HiddenLayer {
-    fn forward(&mut self, input: &Blob) -> LayerForwardResult {
-        let inp_m = input[0];
-        let out_m = &mut self.lr_params.output;
-        let ws_mat = &self.lr_params.ws[0];
-        let ws_bias = &self.lr_params.ws[1];
+    fn forward(&mut self, input: ParamsBlob) -> LayerForwardResult {
+        let inp_m = input[0].output.borrow();
+        let mut out_m = self.lr_params.output.borrow_mut();
+        let ws = self.lr_params.ws.borrow();
 
-        let mul_res = inp_m * ws_mat;
+        let mul_res = inp_m.deref() * &ws[0];
 
-        let bias_out = self.bias.forward(&ws_bias);
+        let bias_out = self.bias.forward(&ws[1]);
 
         for (idx, el) in out_m.indexed_iter_mut() {
             *el = sigmoid(mul_res.row(idx).sum() + bias_out[idx]);
@@ -40,44 +41,52 @@ impl AbstractLayer for HiddenLayer {
 
         debug!("[ok] HiddenLayer forward()");
 
-        Ok(vec![&self.lr_params.output])
+        Ok(vec![self.lr_params.clone()])
     }
 
-    fn backward(
-        &mut self,
-        prev_input: Option<&Blob>,
-        input: Option<&Blob>,
-        weights: Option<&WsBlob>,
-    ) -> LayerBackwardResult {
-        let inp_vec = input.unwrap()[0];
-        let err_vec = &mut self.lr_params.err_vals;
-        let ws_vec = &weights.unwrap()[0];
+    fn backward(&mut self, prev_input: ParamsBlob, next_input: ParamsBlob) -> LayerBackwardResult {
+        let next_err_vals = next_input[0].err_vals.borrow();
+        let next_ws = next_input[0].ws.borrow();
+        let mut self_err_vals = self.lr_params.err_vals.borrow_mut();
+        let self_output = self.lr_params.output.borrow();
 
-        let err_mul = ws_vec * inp_vec;
+        let err_mul = &next_ws[0] * next_err_vals[0];
 
-        debug!("err mul row_count() - {}", err_mul.shape()[1]);
+        Zip::from(self_err_vals.deref_mut())
+            .and(self_output.deref())
+            .and(err_mul.columns())
+            .for_each(|err_val, output, col| {
+                *err_val = sigmoid_deriv(*output) * col.sum();
+            });
 
-        for (idx, val) in err_vec.indexed_iter_mut() {
-            *val = sigmoid_deriv(self.lr_params.output[idx]) * err_mul.column(idx).sum();
+        // calc per-weight gradient, TODO : refactor code below
+        // for prev_layer :
+        let prev_input = prev_input[0].output.borrow();
+        let ws = self.lr_params.ws.borrow();
+        let mut ws_grad = self.lr_params.ws_grad.borrow_mut();
+
+        for neu_idx in 0..ws[0].shape()[0] {
+            for prev_idx in 0..ws[0].shape()[1] {
+                let cur_ws_idx = [neu_idx, prev_idx];
+                ws_grad[0][cur_ws_idx] = prev_input[prev_idx] * self_err_vals[neu_idx];
+            }
+        }
+
+        // for bias :
+        for neu_idx in 0..ws[1].shape()[0] {
+            for prev_idx in 0..ws[1].shape()[1] {
+                let cur_ws_idx = [neu_idx, prev_idx];
+                ws_grad[1][cur_ws_idx] = self.bias.val * self_err_vals[neu_idx];
+            }
         }
 
         debug!("[ok] HiddenLayer backward()");
 
-        Ok((&self.lr_params.err_vals, &self.lr_params.ws))
+        Ok(vec![self.lr_params.clone()])
     }
 
-    fn optimize(
-        &mut self,
-        f: &mut dyn FnMut(&mut LearnParams, Vec<&LearnParams>),
-        prev_lr: Vec<&LearnParams>,
-    ) {
-        f(self.learn_params().unwrap(), prev_lr);
-        // TODO : impl bias optimize function !!!
-        // f(self.bias.learn_params().unwrap(), None);
-    }
-
-    fn learn_params(&mut self) -> Option<&mut LearnParams> {
-        Some(&mut self.lr_params)
+    fn learn_params(&mut self) -> Option<LearnParams> {
+        Some(self.lr_params.clone())
     }
 
     fn layer_type(&self) -> &str {

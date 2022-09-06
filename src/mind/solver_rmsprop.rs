@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::ops::Deref;
 
 use log::{debug, error};
 
@@ -45,7 +46,6 @@ impl SolverRMS {
 
     fn optimizer_functor(
         lr: &mut LearnParams,
-        prev_lr: Vec<&mut LearnParams>,
         rms: &mut HashMap<Uuid, WsBlob>,
         ws_batch: &mut HashMap<Uuid, WsBlob>,
         learn_rate: &f32,
@@ -53,22 +53,9 @@ impl SolverRMS {
         theta: &f32,
         update_ws: bool
     ) {
-        // prev_lr could be empty for bias
-        let mut prev_vec = |idx_vec: usize, idx_output: usize| -> Num {
-            if let Some(prev_lr_vec) = prev_lr.get(idx_vec) {
-                if let Some(prev_lr_val) = prev_lr_vec.output.get(idx_output) {
-                    return *prev_lr_val;
-                }
-            } else {
-                return 1.0;
-            }
-
-            return 1.0;
-        };
-
         if !rms.contains_key(&lr.uuid) {
             let mut vec_init = Vec::new();
-            for i in &lr.ws {
+            for i in lr.ws.borrow().deref() {
                 let ws_init = WsMat::zeros(i.raw_dim());
                 vec_init.push(ws_init);
             }
@@ -80,17 +67,17 @@ impl SolverRMS {
         let rms_mat = rms.get_mut(&lr.uuid).unwrap();
         let batch_mat = ws_batch.get_mut(&lr.uuid).unwrap();
 
-        for (ws_idx, ws_iter) in lr.ws.iter_mut().enumerate() {
+        for (ws_idx, ws_iter) in lr.ws.borrow_mut().iter_mut().enumerate() {
             SolverRMS::optimize_layer_rms(
                 ws_iter,
+                &lr.ws_grad.borrow()[ws_idx],
                 &mut rms_mat[ws_idx],
                 &mut batch_mat[ws_idx],
                 learn_rate,
                 alpha,
                 theta,
-                &lr.err_vals,
+                lr.err_vals.borrow().deref(),
                 ws_idx,
-                &mut prev_vec,
                 update_ws,
             );
         }
@@ -98,6 +85,7 @@ impl SolverRMS {
 
     fn optimize_layer_rms(
         ws: &mut WsMat,
+        ws_grad: &WsMat,
         rms: &mut WsMat,
         ws_batch: &mut WsMat,
         learn_rate: &f32,
@@ -105,17 +93,16 @@ impl SolverRMS {
         theta: &f32,
         err_vals: &DataVec,
         idx_ws: usize,
-        fn_prev: &mut dyn FnMut(usize, usize) -> Num,
         is_upd: bool,
     ) {
         for neu_idx in 0..ws.shape()[0] {
             for prev_idx in 0..ws.shape()[1] {
                 let cur_ws_idx = [neu_idx, prev_idx];
-                let grad = err_vals[neu_idx] * fn_prev(idx_ws, prev_idx);
+                // let grad = err_vals[neu_idx] * fn_prev(idx_ws, prev_idx);
                 rms[cur_ws_idx] = alpha * rms[cur_ws_idx] +
-                                    (1.0 - alpha) * grad.powf(2.0);
+                                    (1.0 - alpha) * ws_grad[cur_ws_idx].powf(2.0);
                 ws_batch[cur_ws_idx] += ( learn_rate / (rms[cur_ws_idx] + theta).sqrt() ) *
-                                    grad;
+                                    ws_grad[cur_ws_idx];
 
                 if is_upd {
                     ws[cur_ws_idx] += ws_batch[cur_ws_idx];
@@ -158,16 +145,10 @@ impl Solver for SolverRMS {
 
             debug!("current optimizing layer : {}", l.layer_type());
 
-            let mut prev_lr_vec = Vec::new();
-
-            match prev_lr {
-                Some(val) => prev_lr_vec.push(val),
-                None => (),
-            }
+            let mut lr_params = l.learn_params().unwrap();
 
             SolverRMS::optimizer_functor(
-                l.learn_params().unwrap(),
-                prev_lr_vec,
+                &mut lr_params,
                 &mut self.rms,
                 &mut self.ws_batch,
                 &self.learn_rate,

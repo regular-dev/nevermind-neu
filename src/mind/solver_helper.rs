@@ -10,7 +10,7 @@ pub fn feedforward(layers: &mut LayersStorage, train_data: &DataBatch, print_out
     for (idx, l) in layers.iter_mut().enumerate() {
         // handle input layer
         if idx == 0 {
-            let result_out = l.forward(&vec![input_data]);
+            let result_out = l.forward_input(&input_data);
 
             match result_out {
                 Err(_reason) => {
@@ -23,7 +23,7 @@ pub fn feedforward(layers: &mut LayersStorage, train_data: &DataBatch, print_out
             continue;
         }
 
-        let result_out = l.forward(&out.unwrap());
+        let result_out = l.forward(out.unwrap());
 
         match result_out {
             Err(_reason) => {
@@ -35,10 +35,11 @@ pub fn feedforward(layers: &mut LayersStorage, train_data: &DataBatch, print_out
         };
     }
 
-    let out_val = &out.unwrap();
+    let out_v = out.as_ref().unwrap()[0].output.borrow();
+    // let out_val = out_v.output.borrow();
 
     if print_out {
-        for i in out_val.iter() {
+        for i in out_v.iter() {
             println!("out val : {}", i);
         }
     }
@@ -47,13 +48,15 @@ pub fn feedforward(layers: &mut LayersStorage, train_data: &DataBatch, print_out
 pub fn backpropagate(layers: &mut LayersStorage, train_data: &DataBatch) {
     let expected_data = &train_data.expected;
 
+    let mut prev_out = None;
     let mut out = None;
 
     for idx in 0..layers.len() {
         if idx == 0 {
-            let prev_out = &layers.at(layers.len() - 2).learn_params().unwrap().output;
+            prev_out = layers.at(layers.len() - 2).learn_params();
 
-            let result_out = layers.at(idx).backward(Some(&vec![prev_out]), Some(&vec![expected_data]), None);
+            let result_out = layers.at(layers.len() - 1).backward_output(vec![prev_out.unwrap()],
+                                                            expected_data);
 
             match result_out {
                 Err(reason) => {
@@ -66,16 +69,16 @@ pub fn backpropagate(layers: &mut LayersStorage, train_data: &DataBatch) {
             continue;
         }
 
-        let prev_out = &layers
-            .at(layers.len() - 2 - idx)
-            .learn_params()
-            .unwrap()
-            .output;
+        if idx == layers.len() - 1 {
+            continue;
+        }
+
+        let prev_out = layers.at(layers.len() - 2 - idx).learn_params();
+        let next_out = layers.at(layers.len() - idx).learn_params();
 
         let result_out = layers.at(idx).backward(
-            Some(&vec![prev_out]),
-            Some(&vec![out.unwrap().0]),
-            Some(out.unwrap().1),
+            vec![prev_out.unwrap()],
+            vec![next_out.unwrap()] 
         );
 
         match result_out {

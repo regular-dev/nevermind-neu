@@ -12,7 +12,7 @@ use env_logger::Env;
 use crate::mind::dataset::DataBatch;
 use crate::mind::dataset::SimpleDataLoader;
 use crate::mind::network::Network;
-use crate::mind::solver_sgd::SolverSGD;
+// use crate::mind::solver_sgd::SolverSGD;
 use crate::mind::solver_rmsprop::SolverRMS;
 
 

@@ -6,35 +6,49 @@ use ndarray::Array2;
 use serde::ser::{SerializeSeq, SerializeStruct};
 use serde::{Deserialize, Serialize, Serializer};
 
-use super::learn_params::LearnParams;
+use std::cell::RefCell;
+
+use super::learn_params::{LearnParams, LearnParamsPtr, ParamsBlob};
 use super::util::{Blob, DataVec, Num, Variant, WsBlob};
 
 #[derive(Debug)]
 pub enum LayerError {
     InvalidSize,
     OtherError,
+    NotImpl,
 }
 
-pub type LayerForwardResult<'a> = Result< Blob<'a> , LayerError>;
-pub type LayerBackwardResult<'a> = Result<(&'a DataVec, &'a WsBlob), LayerError>;
+pub type LayerForwardResult = Result<ParamsBlob, LayerError>;
+pub type LayerBackwardResult = Result<ParamsBlob, LayerError>;
 
 pub trait AbstractLayer {
-    fn forward(&mut self, input: &Blob) -> LayerForwardResult;
+    // for signature for input layers
+    fn forward_input(&mut self, input_data: &DataVec) -> LayerForwardResult {
+        Err(LayerError::NotImpl)
+    }
+
+    fn forward(&mut self, input: ParamsBlob) -> LayerForwardResult {
+        Err(LayerError::NotImpl)
+    }
 
     /// returns out_values and array of weights
-    fn backward(
+    fn backward(&mut self, prev_input: ParamsBlob, input: ParamsBlob) -> LayerBackwardResult {
+        Err(LayerError::NotImpl)
+    }
+
+    fn backward_output(
         &mut self,
-        prev_input: Option<&Blob>,
-        input: Option<&Blob>,
-        weights: Option<&WsBlob>,
-    ) -> LayerBackwardResult;
-    //fn optimize(&mut self, prev_out: &Blob) -> &Blob;
+        prev_input: ParamsBlob,
+        expected: &DataVec,
+    ) -> LayerBackwardResult {
+        Err(LayerError::NotImpl)
+    }
 
     fn layer_type(&self) -> &str;
 
     fn size(&self) -> usize;
 
-    fn learn_params(&mut self) -> Option<&mut LearnParams>;
+    fn learn_params(&mut self) -> Option<LearnParams>;
 
     fn layer_cfg(&self) -> HashMap<&str, Variant> {
         let mut cfg: HashMap<&str, Variant> = HashMap::new();
@@ -52,7 +66,7 @@ pub trait AbstractLayer {
         f: &mut dyn FnMut(&mut LearnParams, Vec<&LearnParams>),
         prev_lr: Vec<&LearnParams>,
     ) {
-        f(self.learn_params().unwrap(), prev_lr);
+        // f(self.learn_params().unwrap(), prev_lr);
     }
 
     fn set_layers_cfg(&self, _cfg: HashMap<String, Variant>) {}

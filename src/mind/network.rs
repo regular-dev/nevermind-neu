@@ -20,7 +20,7 @@ use super::{
 };
 
 use super::solver::Solver;
-use super::solver_sgd::SolverSGD;
+//use super::solver_sgd::SolverSGD;
 
 
 /// Neural-Network

@@ -1,6 +1,8 @@
 use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
 
-use ndarray::{Array, Array1, Array2};
+use ndarray::Zip;
+use ndarray::{array, Array, Array1, Array2};
 use ndarray_rand::rand_distr::Uniform;
 use ndarray_rand::RandomExt;
 
@@ -8,7 +10,7 @@ use log::debug;
 
 use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
 use super::activation::{sigmoid, sigmoid_deriv};
-use super::learn_params::LearnParams;
+use super::learn_params::{LearnParams, ParamsBlob};
 use super::util::{Blob, DataVec, Num, Variant, WsBlob, WsMat};
 
 use rand::Rng;
@@ -21,12 +23,12 @@ pub struct ErrorLayer {
 }
 
 impl AbstractLayer for ErrorLayer {
-    fn forward(&mut self, input: &Blob) -> LayerForwardResult {
-        let inp_m = input[0];
-        let out_m = &mut self.lr_params.output;
-        let ws_mat = &self.lr_params.ws[0];
+    fn forward(&mut self, input: ParamsBlob) -> LayerForwardResult {
+        let inp_m = input[0].output.borrow();
+        let mut out_m = self.lr_params.output.borrow_mut();
+        let ws_mat = &self.lr_params.ws.borrow()[0];
 
-        let mul_res = inp_m * ws_mat;
+        let mul_res = inp_m.deref() * ws_mat;
 
         for (idx, el) in out_m.indexed_iter_mut() {
             *el = sigmoid(mul_res.row(idx).sum());
@@ -34,34 +36,50 @@ impl AbstractLayer for ErrorLayer {
 
         debug!("[ok] ErrorLayer forward()");
 
-        Ok(vec![&self.lr_params.output])
+        Ok(vec![self.lr_params.clone()])
     }
 
-    fn backward(
+    fn backward_output(
         &mut self,
-        prev_input: Option<&Blob>,
-        expected: Option<&Blob>,
-        _weights: Option<&WsBlob>,
+        prev_input: ParamsBlob,
+        expected_vec: &DataVec,
     ) -> LayerBackwardResult {
-        let expected_vec = expected.unwrap()[0];
+        let prev_input = &prev_input[0].output.borrow();
+        // let mut self_err_vals = self.lr_params.err_vals.borrow_mut();
+        // let self_output = self.lr_params.output.borrow();
+        let mut self_err_vals = self.lr_params.err_vals.borrow_mut();
+        let self_output = self.lr_params.output.borrow();
 
-        let out_vec = &self.lr_params.output;
-        let err_vec = &mut self.lr_params.err_vals;
-        for (idx, _out_iter) in out_vec.iter().enumerate() {
-            err_vec[idx] = (expected_vec[idx] - out_vec[idx]) * sigmoid_deriv(out_vec[idx]);
+        Zip::from(self_err_vals.deref_mut())
+            .and(self_output.deref())
+            .and(expected_vec)
+            .for_each(|err_val, output, expected| {
+                *err_val = (expected - output) * sigmoid_deriv(*output);
+            });
+
+        // calc per-weight gradient, TODO : refactor code below
+        // for prev_layer :
+        let ws = self.lr_params.ws.borrow();
+        let mut ws_grad = self.lr_params.ws_grad.borrow_mut();
+
+        for neu_idx in 0..ws[0].shape()[0] {
+            for prev_idx in 0..ws[0].shape()[1] {
+                let cur_ws_idx = [neu_idx, prev_idx];
+                ws_grad[0][cur_ws_idx] = prev_input[prev_idx] * self_err_vals[neu_idx];
+            }
         }
 
         debug!("[ok] ErrorLayer backward()");
 
-        Ok((&self.lr_params.err_vals, &self.lr_params.ws))
+        Ok(vec![self.lr_params.clone()])
     }
 
     fn layer_type(&self) -> &str {
         "ErrorLayer"
     }
 
-    fn learn_params(&mut self) -> Option<&mut LearnParams> {
-        Some(&mut self.lr_params)
+    fn learn_params(&mut self) -> Option<LearnParams> {
+        Some(self.lr_params.clone())
     }
 
     fn layer_cfg(&self) -> HashMap<&str, Variant> {
@@ -92,15 +110,17 @@ impl ErrorLayer {
     }
 
     fn count_euclidean_error(&mut self, expected_vals: &Vec<f32>) {
-        let mut err: f32 = 0.0;
-        let out_vec = &self.lr_params.output;
+        // let self_lr_params = self.lr
 
-        for (idx, val) in out_vec.iter().enumerate() {
-            err += (expected_vals[idx] - val).powf(2.0);
-        }
+        // let mut err: f32 = 0.0;
+        // let out_vec = &self.lr_params.output;
 
-        println!("Euclidean loss : {}", err);
+        // for (idx, val) in out_vec.iter().enumerate() {
+        //     err += (expected_vals[idx] - val).powf(2.0);
+        // }
 
-        self.error = err;
+        // println!("Euclidean loss : {}", err);
+
+        // self.error = err;
     }
 }
