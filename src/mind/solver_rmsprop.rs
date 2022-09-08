@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 use std::ops::Deref;
+use std::error::Error;
+use std::fs::File;
 
 use log::{debug, error};
 
@@ -53,9 +55,12 @@ impl SolverRMS {
         theta: &f32,
         update_ws: bool
     ) {
+        let lr_grad = lr.ws_grad.borrow();
+        let mut lr_ws = lr.ws.borrow_mut();
+
         if !rms.contains_key(&lr.uuid) {
             let mut vec_init = Vec::new();
-            for i in lr.ws.borrow().deref() {
+            for i in lr_ws.deref() {
                 let ws_init = WsMat::zeros(i.raw_dim());
                 vec_init.push(ws_init);
             }
@@ -67,17 +72,15 @@ impl SolverRMS {
         let rms_mat = rms.get_mut(&lr.uuid).unwrap();
         let batch_mat = ws_batch.get_mut(&lr.uuid).unwrap();
 
-        for (ws_idx, ws_iter) in lr.ws.borrow_mut().iter_mut().enumerate() {
+        for (ws_idx, ws_iter) in lr_ws.iter_mut().enumerate() {
             SolverRMS::optimize_layer_rms(
                 ws_iter,
-                &lr.ws_grad.borrow()[ws_idx],
+                &lr_grad[ws_idx],
                 &mut rms_mat[ws_idx],
                 &mut batch_mat[ws_idx],
                 learn_rate,
                 alpha,
                 theta,
-                lr.err_vals.borrow().deref(),
-                ws_idx,
                 update_ws,
             );
         }
@@ -91,9 +94,7 @@ impl SolverRMS {
         learn_rate: &f32,
         alpha: &f32,
         theta: &f32,
-        err_vals: &DataVec,
-        idx_ws: usize,
-        is_upd: bool,
+        update_ws: bool,
     ) {
         for neu_idx in 0..ws.shape()[0] {
             for prev_idx in 0..ws.shape()[1] {
@@ -104,7 +105,7 @@ impl SolverRMS {
                 ws_batch[cur_ws_idx] += ( learn_rate / (rms[cur_ws_idx] + theta).sqrt() ) *
                                     ws_grad[cur_ws_idx];
 
-                if is_upd {
+                if update_ws {
                     ws[cur_ws_idx] += ws_batch[cur_ws_idx];
                     ws_batch[cur_ws_idx] = 0.0;
                 }
@@ -161,6 +162,20 @@ impl Solver for SolverRMS {
         }
 
         self.batch_cnt.increment();
+    }
+
+    fn save_state(&self, filepath: &str) -> Result<(), Box<dyn Error>>
+    {
+        let f = File::create(filepath)?;
+
+        
+
+        Ok(())
+    }
+
+    fn load_state(&self, filepath: &str) -> Result<(), Box<dyn Error>>
+    {
+        Ok(())
     }
 }
 

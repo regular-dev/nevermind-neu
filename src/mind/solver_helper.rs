@@ -55,8 +55,9 @@ pub fn backpropagate(layers: &mut LayersStorage, train_data: &DataBatch) {
         if idx == 0 {
             prev_out = layers.at(layers.len() - 2).learn_params();
 
-            let result_out = layers.at(layers.len() - 1).backward_output(vec![prev_out.unwrap()],
-                                                            expected_data);
+            let result_out = layers
+                .at(layers.len() - 1)
+                .backward_output(vec![prev_out.unwrap()], expected_data);
 
             match result_out {
                 Err(reason) => {
@@ -76,10 +77,9 @@ pub fn backpropagate(layers: &mut LayersStorage, train_data: &DataBatch) {
         let prev_out = layers.at(layers.len() - 2 - idx).learn_params();
         let next_out = layers.at(layers.len() - idx).learn_params();
 
-        let result_out = layers.at(idx).backward(
-            vec![prev_out.unwrap()],
-            vec![next_out.unwrap()] 
-        );
+        let result_out = layers
+            .at(idx)
+            .backward(vec![prev_out.unwrap()], vec![next_out.unwrap()]);
 
         match result_out {
             Err(_reason) => {
