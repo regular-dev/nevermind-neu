@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package mind.serial_pb;
+
+
+message PbBatchCounter {
+  int32 id = 1;
+  int32 max = 2;
+}
+
+message PbWsBlob {
+  repeated float vals = 1;
+}
+
+message PbSolverRMS {
+  float learn_rate = 1;
+  float momentum = 2;
+  float alpha = 3;
+  float theta = 4;
+  PbBatchCounter batch_cnt = 5;
+  map< string, WsBlob > rms = 6; // uuid - blob
+  map< string, WsBlob > ws_batch = 7;
+
+  repeated PbWsBlob layers = 8;  
+}
+
+message PbSolverSGD {
+  float learn_rate = 1;
+  float alpha = 2;
+  PbBatchCounter batch_cnt = 3;
+  map< string, WsBlob > ws_delta = 4; // uuid - blob
+  map< string, WsBlob > ws_batch = 5;
+
+  repeated PbWsBlob layers = 6;
+}

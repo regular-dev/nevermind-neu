@@ -12,7 +12,7 @@ use env_logger::Env;
 use crate::mind::dataset::DataBatch;
 use crate::mind::dataset::SimpleDataLoader;
 use crate::mind::network::Network;
-// use crate::mind::solver_sgd::SolverSGD;
+use crate::mind::solver_sgd::SolverSGD;
 use crate::mind::solver_rmsprop::SolverRMS;
 
 
@@ -81,7 +81,7 @@ fn main() {
     net.setup_simple_network(&net_cfg);
 
     net.save_network_cfg("network.cfg");
-    net.train_for_n_times(30000);
+    net.train_for_n_times(100_000);
 
     // test dataset
     let mut dataset_test: Vec<DataBatch> = Vec::new();
