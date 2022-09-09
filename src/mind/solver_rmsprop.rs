@@ -181,7 +181,7 @@ impl Solver for SolverRMS {
             vec_lr.push(solver_helper::convert_ws_blob_to_pb(ws.deref()));
         }
 
-        let mut pb_solver = PbSolverRms {
+        let pb_solver = PbSolverRms {
             learn_rate: self.learn_rate,
             momentum: self.momentum,
             alpha: self.alpha,
@@ -196,14 +196,9 @@ impl Solver for SolverRMS {
         };
 
         // encode
-        let mut buf = Vec::new();
-        buf.reserve(pb_solver.encoded_len());
-
-        pb_solver.encode(&mut buf)?;
-
         let mut file = File::create(filepath)?;
 
-        file.write_all(buf.as_slice());
+        file.write_all(pb_solver.encode_to_vec().as_slice())?;
 
         Ok(())
     }
