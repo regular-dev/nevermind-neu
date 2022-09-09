@@ -10,6 +10,7 @@ use log::{debug, error, info, warn};
 
 use std::fs::File;
 use std::io::{BufRead, BufReader, Error, ErrorKind, Write};
+use std::error::*;
 
 use super::dataset::DataLoader;
 use super::layers_storage::LayersStorage;
@@ -72,6 +73,11 @@ where
             }
         }
 
+        Ok(())
+    }
+
+    pub fn save_solver_state(&self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
+        self.solver.save_state(path)?;
         Ok(())
     }
 

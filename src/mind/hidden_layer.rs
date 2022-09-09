@@ -85,7 +85,7 @@ impl AbstractLayer for HiddenLayer {
         Ok(vec![self.lr_params.clone()])
     }
 
-    fn learn_params(&mut self) -> Option<LearnParams> {
+    fn learn_params(&self) -> Option<LearnParams> {
         Some(self.lr_params.clone())
     }
 

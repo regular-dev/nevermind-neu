@@ -77,11 +77,13 @@ fn main() {
 
     // create a network
     let mut net = Network::new(dataloader, SolverRMS::new().batch(4));
-    let net_cfg = vec![2, 10, 1];
+    let net_cfg = vec![2, 15, 1];
     net.setup_simple_network(&net_cfg);
 
     net.save_network_cfg("network.cfg");
-    net.train_for_n_times(100_000);
+    net.train_for_n_times(120_000);
+
+    net.save_solver_state("solver_state.proto");
 
     // test dataset
     let mut dataset_test: Vec<DataBatch> = Vec::new();

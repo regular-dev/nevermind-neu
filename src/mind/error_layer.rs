@@ -78,7 +78,7 @@ impl AbstractLayer for ErrorLayer {
         "ErrorLayer"
     }
 
-    fn learn_params(&mut self) -> Option<LearnParams> {
+    fn learn_params(&self) -> Option<LearnParams> {
         Some(self.lr_params.clone())
     }
 

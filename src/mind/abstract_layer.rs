@@ -48,7 +48,7 @@ pub trait AbstractLayer {
 
     fn size(&self) -> usize;
 
-    fn learn_params(&mut self) -> Option<LearnParams>;
+    fn learn_params(&self) -> Option<LearnParams>;
 
     fn layer_cfg(&self) -> HashMap<&str, Variant> {
         let mut cfg: HashMap<&str, Variant> = HashMap::new();

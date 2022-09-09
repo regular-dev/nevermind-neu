@@ -1,19 +1,25 @@
 use std::collections::HashMap;
-use std::ops::Deref;
 use std::error::Error;
 use std::fs::File;
+use std::io::prelude::*;
+use std::ops::Deref;
 
 use log::{debug, error};
 
 use serde::ser::SerializeStruct;
 use serde::ser::{Serialize, Serializer};
 
+use prost::Message;
+
 use super::dataset::DataBatch;
 use super::layers_storage::LayersStorage;
 use super::learn_params::LearnParams;
-use super::solver::{Solver, BatchCounter};
+use super::solver::{
+    pb::{PbBatchCounter, PbFloatVec, PbSolverRms, PbWsBlob},
+    BatchCounter, Solver,
+};
 use super::solver_helper;
-use super::util::{Num, WsBlob, WsMat, DataVec};
+use super::util::{DataVec, Num, WsBlob, WsMat};
 use uuid::Uuid;
 
 pub struct SolverRMS {
@@ -24,7 +30,7 @@ pub struct SolverRMS {
     layers: LayersStorage,
     batch_cnt: BatchCounter,
     rms: HashMap<Uuid, WsBlob>,
-    ws_batch: HashMap<Uuid, WsBlob>
+    ws_batch: HashMap<Uuid, WsBlob>,
 }
 
 impl SolverRMS {
@@ -37,7 +43,7 @@ impl SolverRMS {
             theta: 0.00000001,
             layers: LayersStorage::new(),
             rms: HashMap::new(),
-            ws_batch: HashMap::new()
+            ws_batch: HashMap::new(),
         }
     }
 
@@ -53,7 +59,7 @@ impl SolverRMS {
         learn_rate: &f32,
         alpha: &f32,
         theta: &f32,
-        update_ws: bool
+        update_ws: bool,
     ) {
         let lr_grad = lr.ws_grad.borrow();
         let mut lr_ws = lr.ws.borrow_mut();
@@ -100,10 +106,10 @@ impl SolverRMS {
             for prev_idx in 0..ws.shape()[1] {
                 let cur_ws_idx = [neu_idx, prev_idx];
                 // let grad = err_vals[neu_idx] * fn_prev(idx_ws, prev_idx);
-                rms[cur_ws_idx] = alpha * rms[cur_ws_idx] +
-                                    (1.0 - alpha) * ws_grad[cur_ws_idx].powf(2.0);
-                ws_batch[cur_ws_idx] += ( learn_rate / (rms[cur_ws_idx] + theta).sqrt() ) *
-                                    ws_grad[cur_ws_idx];
+                rms[cur_ws_idx] =
+                    alpha * rms[cur_ws_idx] + (1.0 - alpha) * ws_grad[cur_ws_idx].powf(2.0);
+                ws_batch[cur_ws_idx] +=
+                    (learn_rate / (rms[cur_ws_idx] + theta).sqrt()) * ws_grad[cur_ws_idx];
 
                 if update_ws {
                     ws[cur_ws_idx] += ws_batch[cur_ws_idx];
@@ -155,7 +161,7 @@ impl Solver for SolverRMS {
                 &self.learn_rate,
                 &self.alpha,
                 &self.theta,
-                is_upd
+                is_upd,
             );
 
             prev_lr = l.learn_params();
@@ -164,17 +170,45 @@ impl Solver for SolverRMS {
         self.batch_cnt.increment();
     }
 
-    fn save_state(&self, filepath: &str) -> Result<(), Box<dyn Error>>
-    {
+    fn save_state(&self, filepath: &str) -> Result<(), Box<dyn Error>> {
         let f = File::create(filepath)?;
 
-        
+        // create vector of layers learn_params
+        let mut vec_lr = Vec::new();
+        for l in 0..self.layers.len() {
+            let lr_params = self.layers.at(l).learn_params().unwrap();
+            let ws = lr_params.ws.borrow();
+            vec_lr.push(solver_helper::convert_ws_blob_to_pb(ws.deref()));
+        }
+
+        let mut pb_solver = PbSolverRms {
+            learn_rate: self.learn_rate,
+            momentum: self.momentum,
+            alpha: self.alpha,
+            theta: self.theta,
+            batch_cnt: Some(PbBatchCounter {
+                id: self.batch_cnt.batch_id() as i32,
+                max: self.batch_cnt.batch_size as i32,
+            }),
+            rms: solver_helper::convert_hash_ws_blob_to_pb(&self.rms),
+            ws_batch: solver_helper::convert_hash_ws_blob_to_pb(&self.ws_batch),
+            layers: vec_lr,
+        };
+
+        // encode
+        let mut buf = Vec::new();
+        buf.reserve(pb_solver.encoded_len());
+
+        pb_solver.encode(&mut buf)?;
+
+        let mut file = File::create(filepath)?;
+
+        file.write_all(buf.as_slice());
 
         Ok(())
     }
 
-    fn load_state(&self, filepath: &str) -> Result<(), Box<dyn Error>>
-    {
+    fn load_state(&self, filepath: &str) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
 }

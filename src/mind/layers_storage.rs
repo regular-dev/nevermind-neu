@@ -55,8 +55,12 @@ impl LayersStorage {
         self.layers.len()
     }
 
-    pub fn at(&mut self, id: usize) -> &mut Box<dyn AbstractLayer> {
+    pub fn at_mut(&mut self, id: usize) -> &mut Box<dyn AbstractLayer> {
         &mut self.layers[id]
+    }
+
+    pub fn at(&self, id: usize) -> &Box<dyn AbstractLayer> {
+        &self.layers[id]
     }
 }
 

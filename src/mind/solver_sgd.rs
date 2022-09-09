@@ -26,7 +26,6 @@ pub struct SolverSGD {
     ws_delta: HashMap<Uuid, WsBlob>,
     ws_batch: HashMap<Uuid, WsBlob>,
     batch_cnt: BatchCounter,
-
 }
 
 impl SolverSGD {

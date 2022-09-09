@@ -26,7 +26,7 @@ impl AbstractLayer for DummyLayer {
         Ok( vec![self.fake_lr.clone()] )
     }
 
-    fn learn_params(&mut self) -> Option<LearnParams> {
+    fn learn_params(&self) -> Option<LearnParams> {
         Some(self.fake_lr.clone())
     }
 

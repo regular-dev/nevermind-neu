@@ -8,8 +8,12 @@ message PbBatchCounter {
   int32 max = 2;
 }
 
-message PbWsBlob {
+message PbFloatVec {
   repeated float vals = 1;
+}
+
+message PbWsBlob {
+  repeated PbFloatVec ws = 1;
 }
 
 message PbSolverRMS {
@@ -18,8 +22,8 @@ message PbSolverRMS {
   float alpha = 3;
   float theta = 4;
   PbBatchCounter batch_cnt = 5;
-  map< string, WsBlob > rms = 6; // uuid - blob
-  map< string, WsBlob > ws_batch = 7;
+  map< string, PbWsBlob > rms = 6; // uuid - blob
+  map< string, PbWsBlob > ws_batch = 7;
 
   repeated PbWsBlob layers = 8;  
 }
@@ -28,8 +32,8 @@ message PbSolverSGD {
   float learn_rate = 1;
   float alpha = 2;
   PbBatchCounter batch_cnt = 3;
-  map< string, WsBlob > ws_delta = 4; // uuid - blob
-  map< string, WsBlob > ws_batch = 5;
+  map< string, PbWsBlob > ws_delta = 4; // uuid - blob
+  map< string, PbWsBlob > ws_batch = 5;
 
   repeated PbWsBlob layers = 6;
 }

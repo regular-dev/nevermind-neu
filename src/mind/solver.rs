@@ -1,7 +1,10 @@
 use std::error::Error;
 
+use prost::Message;
+
 use super::dataset::DataBatch;
 use super::layers_storage::LayersStorage;
+
 
 pub trait Solver {
     fn setup_network(&mut self, layers: LayersStorage);
@@ -27,6 +30,10 @@ impl BatchCounter {
         }
     }
 
+    pub fn batch_id(&self) -> usize {
+        self.batch_id
+    }
+
     pub fn reset(&mut self) {
         self.batch_id = 0;
     }
@@ -45,7 +52,5 @@ impl BatchCounter {
 }
 
 pub mod pb {
-
-include!(concat!(env!("OUT_DIR"), "/mind.solvers.rs"));
-
+    include!(concat!(env!("OUT_DIR"), "/mind.serial_pb.rs"));
 }
