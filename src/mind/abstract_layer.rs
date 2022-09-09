@@ -50,11 +50,11 @@ pub trait AbstractLayer {
 
     fn learn_params(&self) -> Option<LearnParams>;
 
-    fn layer_cfg(&self) -> HashMap<&str, Variant> {
-        let mut cfg: HashMap<&str, Variant> = HashMap::new();
+    fn layer_cfg(&self) -> HashMap<String, Variant> {
+        let mut cfg: HashMap<String, Variant> = HashMap::new();
 
         cfg.insert(
-            "layer_type",
+            "layer_type".to_owned(),
             Variant::String(String::from(self.layer_type())),
         );
 

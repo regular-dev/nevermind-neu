@@ -1,8 +1,9 @@
-use serde::{Serialize};
+use serde::{Serialize, Deserialize};
 use serde::ser::{Serializer};
 
 use ndarray::{Array1, Array2};
 
+#[derive(Serialize, Deserialize)]
 pub enum Variant {
     Int(i32),
     Float(f32),
@@ -15,21 +16,21 @@ pub type WsMat = Array2< Num >;
 pub type WsBlob = Vec< WsMat >;  
 pub type Blob<'a> = Vec< &'a DataVec >;
 
-impl Serialize for Variant {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match &self {
-            Variant::Int(val) => {
-                serializer.serialize_i32(*val)
-            },
-            Variant::Float(val) => {
-                serializer.serialize_f32(*val)
-            },
-            Variant::String(val) => {
-                serializer.serialize_str(val.as_str())
-            }
-        }
-    }
-}
+// impl Serialize for Variant {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: Serializer,
+//     {
+//         match &self {
+//             Variant::Int(val) => {
+//                 serializer.serialize_i32(*val)
+//             },
+//             Variant::Float(val) => {
+//                 serializer.serialize_f32(*val)
+//             },
+//             Variant::String(val) => {
+//                 serializer.serialize_str(val.as_str())
+//             }
+//         }
+//     }
+// }

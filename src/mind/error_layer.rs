@@ -82,14 +82,10 @@ impl AbstractLayer for ErrorLayer {
         Some(self.lr_params.clone())
     }
 
-    fn layer_cfg(&self) -> HashMap<&str, Variant> {
-        let mut cfg: HashMap<&str, Variant> = HashMap::new();
+    fn layer_cfg(&self) -> HashMap<String, Variant> {
+        let mut cfg: HashMap<String, Variant> = HashMap::new();
 
-        cfg.insert(
-            "layer_type",
-            Variant::String(String::from(self.layer_type())),
-        );
-        cfg.insert("size", Variant::Int(self.size as i32));
+        cfg.insert("size".to_owned(), Variant::Int(self.size as i32));
 
         cfg
     }

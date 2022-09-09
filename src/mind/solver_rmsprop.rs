@@ -8,6 +8,7 @@ use log::{debug, error};
 
 use serde::ser::SerializeStruct;
 use serde::ser::{Serialize, Serializer};
+use serde::{Deserialize, Deserializer};
 
 use prost::Message;
 
@@ -220,3 +221,13 @@ impl Serialize for SolverRMS {
         solver_cfg.end()
     }
 }
+
+impl<'de> Deserialize<'de> for SolverRMS {
+    fn deserialize<D>(deserializer: D) -> Result<SolverRMS, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+     //   deserialize(deserializer: D)
+    }
+}
+
