@@ -8,6 +8,7 @@ use super::util::{Blob, DataVec, Variant, WsBlob, WsMat};
 use crate::mind::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
 
 // not used
+#[derive(Default)]
 pub struct DummyLayer {
     output: DataVec,
     fake_lr: LearnParams,

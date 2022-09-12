@@ -52,22 +52,8 @@ pub trait AbstractLayer {
 
     fn layer_cfg(&self) -> HashMap<String, Variant> {
         let mut cfg: HashMap<String, Variant> = HashMap::new();
-
-        cfg.insert(
-            "layer_type".to_owned(),
-            Variant::String(String::from(self.layer_type())),
-        );
-
         cfg
     }
 
-    fn optimize(
-        &mut self,
-        f: &mut dyn FnMut(&mut LearnParams, Vec<&LearnParams>),
-        prev_lr: Vec<&LearnParams>,
-    ) {
-        // f(self.learn_params().unwrap(), prev_lr);
-    }
-
-    fn set_layers_cfg(&self, _cfg: HashMap<String, Variant>) {}
+    fn set_layer_cfg(&mut self, _cfg: &HashMap<String, Variant>) {}
 }

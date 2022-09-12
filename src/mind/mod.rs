@@ -8,6 +8,7 @@ pub mod dataset;
 pub mod activation;
 pub mod learn_params;
 pub mod layers_storage;
+pub mod layer_fabric;
 pub mod solver;
 pub mod solver_helper;
 pub mod solver_sgd;

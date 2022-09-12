@@ -7,13 +7,12 @@ use std::ops::Deref;
 use log::{debug, error};
 
 use serde::ser::SerializeStruct;
-use serde::ser::{Serialize, Serializer};
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use prost::Message;
 
 use super::dataset::DataBatch;
-use super::layers_storage::LayersStorage;
+use super::layers_storage::{LayersStorage, SerdeLayersStorage};
 use super::learn_params::LearnParams;
 use super::solver::{
     pb::{PbBatchCounter, PbFloatVec, PbSolverRms, PbWsBlob},
@@ -209,14 +208,34 @@ impl Solver for SolverRMS {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+struct SerdeSolverRMS {
+    pub learn_rate: f32,
+    pub momentum: f32,
+    pub alpha: f32,
+    pub theta: f32,
+    pub layers_cfg: LayersStorage,
+}
+
 impl Serialize for SolverRMS {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
+        // let s_solver = SerdeSolverRMS { learning_rate: self.learn_rate,
+        //     alpha: self.alpha,
+        //     momentum: self.momentum,
+        //     theta: self.theta,
+        //     layers: self.layers,
+        // };
+
+        // s_solver.serialize(serializer)
+
         let mut solver_cfg = serializer.serialize_struct("SolverRMS Configuration", 3)?;
-        solver_cfg.serialize_field("learning_rate", &self.learn_rate)?;
-        solver_cfg.serialize_field("alpha", &self.momentum)?;
+        solver_cfg.serialize_field("learn_rate", &self.learn_rate)?;
+        solver_cfg.serialize_field("momentum", &self.momentum)?;
+        solver_cfg.serialize_field("alpha", &self.alpha)?;
+        solver_cfg.serialize_field("theta", &self.theta)?;
         solver_cfg.serialize_field("layers_cfg", &self.layers)?;
         solver_cfg.end()
     }
@@ -227,7 +246,17 @@ impl<'de> Deserialize<'de> for SolverRMS {
     where
         D: Deserializer<'de>,
     {
-     //   deserialize(deserializer: D)
+        let mut s_solver = SerdeSolverRMS::deserialize(deserializer)?;
+
+        let layer_storage = std::mem::replace(&mut s_solver.layers_cfg, LayersStorage::new());
+
+        let mut rms_solver = SolverRMS::new();
+        rms_solver.learn_rate = s_solver.learn_rate;
+        rms_solver.momentum = s_solver.momentum;
+        rms_solver.alpha = s_solver.alpha;
+        rms_solver.theta = s_solver.theta;
+        rms_solver.layers = layer_storage;
+
+        Ok(rms_solver)
     }
 }
-

@@ -15,6 +15,7 @@ use super::util::{Blob, DataVec, Num, Variant, WsBlob, WsMat};
 
 use rand::Rng;
 
+#[derive(Default)]
 pub struct ErrorLayer {
     pub error: f32,
     pub size: usize,
@@ -86,8 +87,27 @@ impl AbstractLayer for ErrorLayer {
         let mut cfg: HashMap<String, Variant> = HashMap::new();
 
         cfg.insert("size".to_owned(), Variant::Int(self.size as i32));
+        cfg.insert("prev_size".to_owned(), Variant::Int(self.prev_size as i32));
 
         cfg
+    }
+
+    fn set_layer_cfg(&mut self, cfg: &HashMap<String, Variant>) {
+        let (mut size, mut prev_size) : (usize, usize) = (0, 0);
+
+        if let Variant::Int(var_size) = cfg.get("size").unwrap() {
+            size = *var_size as usize;
+        }
+
+        if let Variant::Int(var_prev_size) = cfg.get("prev_size").unwrap() {
+            prev_size = *var_prev_size as usize;
+        }
+
+        if size > 0 && prev_size > 0 {
+            self.size = size;
+            self.prev_size = prev_size;
+            self.lr_params = LearnParams::new(self.size, self.prev_size);
+        }
     }
 
     fn size(&self) -> usize {

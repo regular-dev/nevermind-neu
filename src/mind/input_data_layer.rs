@@ -10,6 +10,7 @@ use super::activation::sigmoid_on_vec;
 use super::learn_params::{LearnParams, ParamsBlob};
 use super::util::{Blob, DataVec, Variant, WsBlob, WsMat};
 
+#[derive(Default)]
 pub struct InputDataLayer {
     pub input_size: usize,
     pub lr_params: LearnParams,
@@ -42,6 +43,18 @@ impl AbstractLayer for InputDataLayer {
         cfg.insert("size".to_owned(), Variant::Int(self.input_size as i32));
 
         cfg
+    }
+
+    fn set_layer_cfg(&mut self, cfg: &HashMap<String, Variant>) {
+        let mut size : usize = 0;
+
+        if let Variant::Int(var_size) = cfg.get("size").unwrap() {
+            size = *var_size as usize;
+        }
+
+        if size > 0 {
+            self.input_size = size;
+        }
     }
 
     fn size(&self) -> usize {

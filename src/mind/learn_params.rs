@@ -8,7 +8,7 @@ use ndarray_rand::RandomExt;
 
 use super::util::{Blob, DataVec, WsBlob, WsMat};
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct LearnParams {
     pub ws: Rc<RefCell<WsBlob>>,
     pub ws_grad: Rc<RefCell<WsBlob>>,

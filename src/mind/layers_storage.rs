@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 
 use serde::ser::SerializeSeq;
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::abstract_layer::AbstractLayer;
-use super::input_data_layer::InputDataLayer;
 use super::error_layer::ErrorLayer;
 use super::hidden_layer::HiddenLayer;
+use super::input_data_layer::InputDataLayer;
+use super::layer_fabric::*;
 use super::util::Variant;
 
 pub struct LayersStorage {
@@ -69,15 +70,15 @@ impl LayersStorage {
 
 /// Helper class to easy ser/deserialize
 #[derive(Serialize, Deserialize)]
-struct SerdeLayerParam {
+pub struct SerdeLayerParam {
     name: String,
-    params: HashMap<String, Variant>
+    params: HashMap<String, Variant>,
 }
 
 /// Helper class to easy ser/deserialize
 #[derive(Serialize, Deserialize, Default)]
-struct SerdeLayersStorage {
-    layers_cfg: Vec< SerdeLayerParam >,
+pub struct SerdeLayersStorage {
+    layers_cfg: Vec<SerdeLayerParam>,
 }
 
 impl Serialize for LayersStorage {
@@ -106,10 +107,19 @@ impl<'de> Deserialize<'de> for LayersStorage {
     {
         let s_layers_storage = SerdeLayersStorage::deserialize(deserializer)?;
 
-        // TODO : impl with layer fabric
-        let todo_ls = LayersStorage { layers: Vec::new() };
+        let mut ls = LayersStorage { layers: Vec::new() };
 
-        Ok(todo_ls)
+        for i in &s_layers_storage.layers_cfg {
+            let l_opt = create_layer(i.name.as_str(), Some(&i.params));
+
+            if let Some(l) = l_opt {
+                ls.layers.push(l);
+            } else {
+                // TODO : impl return D::Error
+                panic!("Bad deserialization");
+            }
+        }
+
+        Ok(ls)
     }
 }
-
