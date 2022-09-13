@@ -10,6 +10,8 @@ message PbBatchCounter {
 
 message PbFloatVec {
   repeated float vals = 1;
+  int32 shape_size = 2;
+  int32 shape_prev_size = 3;
 }
 
 message PbWsBlob {
@@ -23,7 +25,7 @@ message PbSolverRMS {
   float theta = 4;
   PbBatchCounter batch_cnt = 5;
   map< string, PbWsBlob > rms = 6; // uuid - blob
-  map< string, PbWsBlob > ws_batch = 7;
+  //map< string, PbWsBlob > ws_batch = 7;
 
   repeated PbWsBlob layers = 8;  
 }

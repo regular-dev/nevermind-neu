@@ -117,7 +117,7 @@ impl AbstractLayer for HiddenLayer {
         if size > 0 && prev_size > 0 {
             self.size = size;
             self.prev_size = prev_size;
-            self.lr_params = LearnParams::new(self.size, self.prev_size);
+            self.lr_params = LearnParams::new_with_const_bias(self.size, self.prev_size);
             self.bias = ConstBias::new(self.size, 1.0);
         }
     }

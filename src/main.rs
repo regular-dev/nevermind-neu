@@ -1,5 +1,7 @@
 mod mind;
 
+use std::fs::File;
+
 use log::{LevelFilter, SetLoggerError, info};
 use log4rs::append::console::ConsoleAppender;
 use log4rs::append::file::FileAppender;
@@ -14,6 +16,7 @@ use crate::mind::dataset::SimpleDataLoader;
 use crate::mind::network::Network;
 use crate::mind::solver_sgd::SolverSGD;
 use crate::mind::solver_rmsprop::SolverRMS;
+use crate::mind::solver::Solver;
 
 
 #[cfg(feature = "log_log4rs")]
@@ -62,7 +65,7 @@ fn init_logger() {
     env_logger::Builder::from_env(Env::default().default_filter_or("warn")).init();
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error> >{
     init_logger();
     log::info!("Regular-mind 0.1 test app starting...");
 
@@ -75,15 +78,20 @@ fn main() {
 
     let dataloader = Box::new(SimpleDataLoader::new(dataset_train));
 
+    //let mut solver_rms = SolverRMS::from_file("network.cfg")?;
+   // solver_rms.load_state("solver_state.proto")?;
+
     // create a network
-    let mut net = Network::new(dataloader, SolverRMS::new().batch(4));
+    let mut net = Network::new(dataloader, SolverRMS::new());
     let net_cfg = vec![2, 15, 1];
     net.setup_simple_network(&net_cfg);
 
-    net.save_network_cfg("network.cfg");
-    net.train_for_n_times(120_000);
+    net.save_network_cfg("network.cfg")?;
 
-    net.save_solver_state("solver_state.proto");
+
+    net.train_for_n_times(150_000);
+
+    net.save_solver_state("solver_state.proto")?;
 
     // test dataset
     let mut dataset_test: Vec<DataBatch> = Vec::new();
@@ -98,4 +106,6 @@ fn main() {
     net.feedforward(&dataset_test[1], true);
     net.feedforward(&dataset_test[2], true);
     net.feedforward(&dataset_test[3], true);
+
+    Ok(())
 }

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::error::Error;
+use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
 use std::ops::Deref;
@@ -23,10 +24,10 @@ use super::util::{DataVec, Num, WsBlob, WsMat};
 use uuid::Uuid;
 
 pub struct SolverRMS {
-    learn_rate: f32,
-    momentum: f32,
-    alpha: f32,
-    theta: f32,
+    pub learn_rate: f32,
+    pub momentum: f32,
+    pub alpha: f32,
+    pub theta: f32,
     layers: LayersStorage,
     batch_cnt: BatchCounter,
     rms: HashMap<Uuid, WsBlob>,
@@ -118,6 +119,12 @@ impl SolverRMS {
             }
         }
     }
+
+    pub fn from_file(filepath: &str) -> Result<Self, Box<dyn Error>> {
+        let net_cfg_file = File::open(filepath)?;
+        let solver_rms: SolverRMS = serde_yaml::from_reader(net_cfg_file)?;
+        Ok(solver_rms)
+    }
 }
 
 impl Solver for SolverRMS {
@@ -142,11 +149,8 @@ impl Solver for SolverRMS {
     fn optimize_network(&mut self) {
         let is_upd = self.batch_cnt.is_update();
 
-        let mut prev_lr = None;
-
         for (idx, l) in self.layers.iter_mut().enumerate() {
             if idx == 0 {
-                prev_lr = l.learn_params();
                 continue;
             }
 
@@ -163,16 +167,12 @@ impl Solver for SolverRMS {
                 &self.theta,
                 is_upd,
             );
-
-            prev_lr = l.learn_params();
         }
 
         self.batch_cnt.increment();
     }
 
     fn save_state(&self, filepath: &str) -> Result<(), Box<dyn Error>> {
-        let f = File::create(filepath)?;
-
         // create vector of layers learn_params
         let mut vec_lr = Vec::new();
         for l in 0..self.layers.len() {
@@ -191,7 +191,6 @@ impl Solver for SolverRMS {
                 max: self.batch_cnt.batch_size as i32,
             }),
             rms: solver_helper::convert_hash_ws_blob_to_pb(&self.rms),
-            ws_batch: solver_helper::convert_hash_ws_blob_to_pb(&self.ws_batch),
             layers: vec_lr,
         };
 
@@ -203,7 +202,24 @@ impl Solver for SolverRMS {
         Ok(())
     }
 
-    fn load_state(&self, filepath: &str) -> Result<(), Box<dyn Error>> {
+    fn load_state(&mut self, filepath: &str) -> Result<(), Box<dyn Error>> {
+        let buf = fs::read(filepath)?;
+
+        let mut solver_rms = PbSolverRms::decode(buf.as_slice())?;
+
+        self.learn_rate = solver_rms.learn_rate;
+        self.momentum = solver_rms.momentum;
+        self.alpha = solver_rms.alpha;
+        self.theta = solver_rms.theta;
+        self.batch_cnt.batch_size = solver_rms.batch_cnt.unwrap().max as usize;
+        self.rms = solver_helper::convert_pb_to_hash_ws_blob(&mut solver_rms.rms);
+
+        for (self_l, l) in self.layers.iter_mut().zip(&mut solver_rms.layers) {
+            let layer_param = self_l.learn_params().unwrap();
+            let mut l_ws = layer_param.ws.borrow_mut();
+            *l_ws = solver_helper::convert_pb_to_ws_blob(l);
+        }
+
         Ok(())
     }
 }
@@ -214,6 +230,7 @@ struct SerdeSolverRMS {
     pub momentum: f32,
     pub alpha: f32,
     pub theta: f32,
+    pub batch_size: usize,
     pub layers_cfg: LayersStorage,
 }
 
@@ -222,20 +239,12 @@ impl Serialize for SolverRMS {
     where
         S: Serializer,
     {
-        // let s_solver = SerdeSolverRMS { learning_rate: self.learn_rate,
-        //     alpha: self.alpha,
-        //     momentum: self.momentum,
-        //     theta: self.theta,
-        //     layers: self.layers,
-        // };
-
-        // s_solver.serialize(serializer)
-
         let mut solver_cfg = serializer.serialize_struct("SolverRMS Configuration", 3)?;
         solver_cfg.serialize_field("learn_rate", &self.learn_rate)?;
         solver_cfg.serialize_field("momentum", &self.momentum)?;
         solver_cfg.serialize_field("alpha", &self.alpha)?;
         solver_cfg.serialize_field("theta", &self.theta)?;
+        solver_cfg.serialize_field("batch_size", &self.batch_cnt.batch_size)?;
         solver_cfg.serialize_field("layers_cfg", &self.layers)?;
         solver_cfg.end()
     }
@@ -256,6 +265,7 @@ impl<'de> Deserialize<'de> for SolverRMS {
         rms_solver.alpha = s_solver.alpha;
         rms_solver.theta = s_solver.theta;
         rms_solver.layers = layer_storage;
+        rms_solver.batch_cnt.batch_size = s_solver.batch_size;
 
         Ok(rms_solver)
     }

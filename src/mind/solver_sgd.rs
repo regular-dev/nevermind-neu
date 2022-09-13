@@ -168,7 +168,7 @@ impl Solver for SolverSGD {
         Ok(())
     }
 
-    fn load_state(&self, filepath: &str) -> Result<(), Box<dyn Error>>
+    fn load_state(&mut self, filepath: &str) -> Result<(), Box<dyn Error>>
     {
         Ok(())
     }

@@ -54,6 +54,7 @@ impl AbstractLayer for InputDataLayer {
 
         if size > 0 {
             self.input_size = size;
+            self.lr_params = LearnParams::new_only_output(size);
         }
     }
 

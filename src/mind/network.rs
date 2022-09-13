@@ -14,6 +14,7 @@ use std::error::*;
 
 use super::dataset::DataLoader;
 use super::layers_storage::LayersStorage;
+use super::solver_rmsprop::SolverRMS;
 
 use super::{
     dataset::{DataBatch, SimpleDataLoader},
@@ -52,11 +53,6 @@ where
         let ls = LayersStorage::new_simple_network(layers);
         self.solver.setup_network(ls);
     }
-
-    // pub fn load_network_cfg(&mut self, path: &str) -> Result<()> {
-
-    //     Ok(())
-    // }
 
     pub fn save_network_cfg(&mut self, path: &str) -> std::io::Result<()> {
         let json_str_result = serde_yaml::to_string(&self.solver);

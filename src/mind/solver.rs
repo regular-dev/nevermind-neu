@@ -1,7 +1,5 @@
 use std::error::Error;
 
-use prost::Message;
-
 use super::dataset::DataBatch;
 use super::layers_storage::LayersStorage;
 
@@ -14,7 +12,7 @@ pub trait Solver {
     fn optimize_network(&mut self);
 
     fn save_state(&self, filepath: &str) -> Result<(), Box<dyn Error>>;
-    fn load_state(&self, filepath: &str) -> Result<(), Box<dyn Error>>;
+    fn load_state(&mut self, filepath: &str) -> Result<(), Box<dyn Error>>;
 }
 
 pub struct BatchCounter {
@@ -45,6 +43,7 @@ impl BatchCounter {
     pub fn increment(&mut self) {
         if self.batch_id == (self.batch_size - 1) {
             self.batch_id = 0;
+            return;
         }
 
         self.batch_id += 1;
