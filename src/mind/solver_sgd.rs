@@ -4,7 +4,7 @@ use std::error::Error;
 use std::ops::{Deref, DerefMut};
 
 use serde::ser::SerializeStruct;
-use serde::{Serialize, Serializer};
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
 
 use log::debug;
 use uuid::Uuid;
@@ -21,7 +21,7 @@ use super::util::{DataVec, Num, WsBlob, WsMat};
 // Train/Test Impl
 pub struct SolverSGD {
     learn_rate: f32,
-    alpha: f32,
+    momentum: f32,
     layers: LayersStorage,
     ws_delta: HashMap<Uuid, WsBlob>,
     ws_batch: HashMap<Uuid, WsBlob>,
@@ -33,7 +33,7 @@ impl SolverSGD {
         SolverSGD {
             layers: LayersStorage::new(),
             learn_rate: 0.2,
-            alpha: 0.2,
+            momentum: 0.2,
             ws_delta: HashMap::new(),
             ws_batch: HashMap::new(),
             batch_cnt: BatchCounter::new(1)
@@ -149,7 +149,7 @@ impl Solver for SolverSGD {
                 &mut self.ws_delta,
                 &mut self.ws_batch,
                 &self.learn_rate,
-                &self.alpha,
+                &self.momentum,
                 is_upd
             );
 
@@ -174,6 +174,14 @@ impl Solver for SolverSGD {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+struct SerdeSolverRMS {
+    pub learn_rate: f32,
+    pub momentum: f32,
+    pub batch_size: usize,
+    pub layers_cfg: LayersStorage,
+}
+
 impl Serialize for SolverSGD {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -181,8 +189,28 @@ impl Serialize for SolverSGD {
     {
         let mut solver_cfg = serializer.serialize_struct("SolverSGD Configuration", 3)?;
         solver_cfg.serialize_field("learning_rate", &self.learn_rate)?;
-        solver_cfg.serialize_field("alpha", &self.alpha)?;
+        solver_cfg.serialize_field("momentum", &self.momentum)?;
         solver_cfg.serialize_field("layers_cfg", &self.layers)?;
         solver_cfg.end()
     }
 }
+
+impl<'de> Deserialize<'de> for SolverSGD {
+    fn deserialize<D>(deserializer: D) -> Result<SolverSGD, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let mut s_solver = SerdeSolverRMS::deserialize(deserializer)?;
+
+        let layer_storage = std::mem::replace(&mut s_solver.layers_cfg, LayersStorage::new());
+
+        let mut rms_solver = SolverSGD::new();
+        rms_solver.learn_rate = s_solver.learn_rate;
+        rms_solver.momentum = s_solver.momentum;
+        rms_solver.layers = layer_storage;
+        rms_solver.batch_cnt.batch_size = s_solver.batch_size;
+
+        Ok(rms_solver)
+    }
+}
+
