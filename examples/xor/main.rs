@@ -1,5 +1,3 @@
-mod mind;
-
 use std::fs::File;
 
 use log::{LevelFilter, SetLoggerError, info};
@@ -11,12 +9,14 @@ use log4rs::config::{Appender, Config, Root};
 
 use env_logger::Env;
 
-use crate::mind::dataset::DataBatch;
-use crate::mind::dataset::SimpleDataLoader;
-use crate::mind::network::Network;
-use crate::mind::solver_sgd::SolverSGD;
-use crate::mind::solver_rmsprop::SolverRMS;
-use crate::mind::solver::Solver;
+use regular_mind;
+
+use regular_mind::mind::dataset;
+use regular_mind::mind::dataset::SimpleDataLoader;
+use regular_mind::mind::network::Network;
+use regular_mind::mind::solver_sgd::SolverSGD;
+use regular_mind::mind::solver_rmsprop::SolverRMS;
+use regular_mind::mind::solver::Solver;
 
 
 #[cfg(feature = "log_log4rs")]
