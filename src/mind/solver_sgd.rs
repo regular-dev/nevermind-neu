@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 use std::fs::File;
+use std::fs;
+use std::io::prelude::*;
 use std::error::Error;
 use std::ops::{Deref, DerefMut};
 
@@ -11,10 +13,12 @@ use uuid::Uuid;
 
 use ndarray::{Array, Array2}; // test purpose @xion
 
+use prost::Message;
+
 use super::dataset::DataBatch;
 use super::layers_storage::LayersStorage;
 use super::learn_params::LearnParams;
-use super::solver::{Solver, BatchCounter};
+use super::solver::{Solver, BatchCounter, pb::{PbBatchCounter, PbSolverSgd}};
 use super::solver_helper;
 use super::util::{DataVec, Num, WsBlob, WsMat};
 
@@ -161,15 +165,50 @@ impl Solver for SolverSGD {
 
     fn save_state(&self, filepath: &str) -> Result<(), Box<dyn Error>>
     {
-        let f = File::create(filepath)?;
+        // create vector of layers learn_params
+        let mut vec_lr = Vec::new();
+        for l in 0..self.layers.len() {
+            let lr_params = self.layers.at(l).learn_params().unwrap();
+            let ws = lr_params.ws.borrow();
+            vec_lr.push(solver_helper::convert_ws_blob_to_pb(ws.deref()));
+        }
 
-        
+        let pb_solver = PbSolverSgd {
+            learn_rate: self.learn_rate,
+            momentum: self.momentum,
+            batch_cnt: Some(PbBatchCounter {
+                id: self.batch_cnt.batch_id() as i32,
+                max: self.batch_cnt.batch_size as i32,
+            }),
+            ws_delta: solver_helper::convert_hash_ws_blob_to_pb(&self.ws_delta),
+            layers: vec_lr,
+        };
+
+        // encode
+        let mut file = File::create(filepath)?;
+
+        file.write_all(pb_solver.encode_to_vec().as_slice())?;
 
         Ok(())
     }
 
     fn load_state(&mut self, filepath: &str) -> Result<(), Box<dyn Error>>
     {
+        let buf = fs::read(filepath)?;
+
+        let mut solver_rms = PbSolverSgd::decode(buf.as_slice())?;
+
+        self.learn_rate = solver_rms.learn_rate;
+        self.momentum = solver_rms.momentum;
+        self.batch_cnt.batch_size = solver_rms.batch_cnt.unwrap().max as usize;
+        self.ws_delta = solver_helper::convert_pb_to_hash_ws_blob(&mut solver_rms.ws_delta);
+
+        for (self_l, l) in self.layers.iter_mut().zip(&mut solver_rms.layers) {
+            let layer_param = self_l.learn_params().unwrap();
+            let mut l_ws = layer_param.ws.borrow_mut();
+            *l_ws = solver_helper::convert_pb_to_ws_blob(l);
+        }
+
         Ok(())
     }
 }

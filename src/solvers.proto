@@ -32,10 +32,9 @@ message PbSolverRMS {
 
 message PbSolverSGD {
   float learn_rate = 1;
-  float alpha = 2;
+  float momentum = 2;
   PbBatchCounter batch_cnt = 3;
   map< string, PbWsBlob > ws_delta = 4; // uuid - blob
-  map< string, PbWsBlob > ws_batch = 5;
 
   repeated PbWsBlob layers = 6;
 }
