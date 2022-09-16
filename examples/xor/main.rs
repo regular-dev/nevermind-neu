@@ -79,14 +79,14 @@ fn main() -> Result<(), Box<dyn std::error::Error> >{
 
     // create a network
     let mut net = Network::new(dataloader, SolverRMS::new());
-    let net_cfg = vec![2, 50000, 1];
+    let net_cfg = vec![2, 10, 1];
     net.setup_simple_network(&net_cfg);
 
   //  net.save_network_cfg("network.cfg")?;
 
     let now_time = Instant::now();
 
-    net.train_for_n_times(10000);
+    net.train_for_n_times(150_000);
 
     let elapsed_bench = now_time.elapsed();
 
