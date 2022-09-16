@@ -5,6 +5,8 @@ use log4rs::append::console::ConsoleAppender;
 use log4rs::append::file::FileAppender;
 use log4rs::encode::pattern::PatternEncoder;
 
+use std::time::Instant;
+
 use log4rs::config::{Appender, Config, Root};
 
 use env_logger::Env;
@@ -77,15 +79,20 @@ fn main() -> Result<(), Box<dyn std::error::Error> >{
 
     // create a network
     let mut net = Network::new(dataloader, SolverRMS::new());
-    let net_cfg = vec![2, 15, 1];
+    let net_cfg = vec![2, 50000, 1];
     net.setup_simple_network(&net_cfg);
 
-    net.save_network_cfg("network.cfg")?;
+  //  net.save_network_cfg("network.cfg")?;
 
+    let now_time = Instant::now();
 
-    net.train_for_n_times(150_000);
+    net.train_for_n_times(10000);
 
-    net.save_solver_state("solver_state.proto")?;
+    let elapsed_bench = now_time.elapsed();
+
+    println!("Elapsed for training : {}", elapsed_bench.as_millis());
+
+   //net.save_solver_state("solver_state.proto")?;
 
     // test dataset
     let mut dataset_test: Vec<DataBatch> = Vec::new();

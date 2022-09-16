@@ -8,6 +8,8 @@ use ndarray_rand::RandomExt;
 
 use log::debug;
 
+use ndarray::parallel::prelude::*;
+
 use crate::learn_params::{LearnParams, ParamsBlob};
 use crate::util::Num;
 
@@ -36,6 +38,13 @@ impl AbstractLayer for HiddenLayer {
 
         let bias_out = self.bias.forward(&ws[1]);
 
+        Zip::from(out_m.deref_mut())
+            .and(mul_res.rows())
+            .and(bias_out)
+            .par_for_each(|out_el, in_row, bias_el| {
+                *out_el = sigmoid(in_row.sum() + bias_el);
+            });
+
         for (idx, el) in out_m.indexed_iter_mut() {
             *el = sigmoid(mul_res.row(idx).sum() + bias_out[idx]);
         }
@@ -56,7 +65,7 @@ impl AbstractLayer for HiddenLayer {
         Zip::from(self_err_vals.deref_mut())
             .and(self_output.deref())
             .and(err_mul.columns())
-            .for_each(|err_val, output, col| {
+            .par_for_each(|err_val, output, col| {
                 *err_val = sigmoid_deriv(*output) * col.sum();
             });
 
@@ -104,7 +113,7 @@ impl AbstractLayer for HiddenLayer {
     }
 
     fn set_layer_cfg(&mut self, cfg: &HashMap<String, Variant>) {
-        let (mut size, mut prev_size) : (usize, usize) = (0, 0);
+        let (mut size, mut prev_size): (usize, usize) = (0, 0);
 
         if let Variant::Int(var_size) = cfg.get("size").unwrap() {
             size = *var_size as usize;

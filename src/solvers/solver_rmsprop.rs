@@ -21,6 +21,7 @@ use super::solver::{
 };
 use super::solver_helper;
 use crate::util::{DataVec, Num, WsBlob, WsMat};
+
 use uuid::Uuid;
 
 pub struct SolverRMS {
