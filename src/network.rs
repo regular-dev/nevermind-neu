@@ -14,15 +14,14 @@ use std::error::*;
 
 use super::dataset::DataLoader;
 use super::layers_storage::LayersStorage;
-use super::solver_rmsprop::SolverRMS;
+use super::solvers::SolverRMS;
 
 use super::{
     dataset::{DataBatch, SimpleDataLoader},
-    input_data_layer,
+    layers::InputDataLayer,
 };
 
-use super::solver::Solver;
-//use super::solver_sgd::SolverSGD;
+use super::solvers::Solver;
 
 
 /// Neural-Network

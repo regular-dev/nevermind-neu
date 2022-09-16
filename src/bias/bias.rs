@@ -1,6 +1,6 @@
 use log::debug;
 
-use super::util::{DataVec, Num, WsMat};
+use crate::util::{DataVec, Num, WsMat};
 
 pub trait Bias {
     fn forward(&mut self, ws: &WsMat) -> &DataVec;

@@ -6,9 +6,9 @@ use serde::{Serialize, Serializer};
 
 use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerError, LayerForwardResult};
 
-use super::activation::sigmoid_on_vec;
-use super::learn_params::{LearnParams, ParamsBlob};
-use super::util::{Blob, DataVec, Variant, WsBlob, WsMat};
+use crate::activation::sigmoid_on_vec;
+use crate::learn_params::{LearnParams, ParamsBlob};
+use crate::util::{Blob, DataVec, Variant, WsBlob, WsMat};
 
 #[derive(Default)]
 pub struct InputDataLayer {

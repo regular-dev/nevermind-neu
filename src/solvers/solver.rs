@@ -1,7 +1,7 @@
 use std::error::Error;
 
-use super::dataset::DataBatch;
-use super::layers_storage::LayersStorage;
+use crate::dataset::DataBatch;
+use crate::layers_storage::LayersStorage;
 
 
 pub trait Solver {

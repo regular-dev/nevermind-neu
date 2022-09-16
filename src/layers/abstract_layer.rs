@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize, Serializer};
 
 use std::cell::RefCell;
 
-use super::learn_params::{LearnParams, LearnParamsPtr, ParamsBlob};
-use super::util::{Blob, DataVec, Num, Variant, WsBlob};
+use crate::learn_params::{LearnParams, LearnParamsPtr, ParamsBlob};
+use crate::util::{Blob, DataVec, Num, Variant, WsBlob};
 
 #[derive(Debug)]
 pub enum LayerError {

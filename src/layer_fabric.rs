@@ -2,11 +2,8 @@ use std::collections::HashMap;
 
 use log::warn;
 
+use super::layers::{AbstractLayer, DummyLayer, ErrorLayer, HiddenLayer, InputDataLayer};
 use super::util::Variant;
-use super::{
-    abstract_layer::AbstractLayer, dummy_layer::DummyLayer, error_layer::ErrorLayer,
-    hidden_layer::HiddenLayer, input_data_layer::InputDataLayer,
-};
 
 /// Fabric used to create neural network layers, when deserialing and other cases
 /// TODO : create a macros for below implementation
@@ -21,7 +18,7 @@ pub fn create_layer(
                 l.set_layer_cfg(cfg.unwrap());
             }
             return Some(l);
-        },
+        }
         "HiddenLayer" => {
             let mut l = Box::new(HiddenLayer::default());
             if cfg.is_some() {
@@ -35,7 +32,7 @@ pub fn create_layer(
                 l.set_layer_cfg(cfg.unwrap());
             }
             return Some(l);
-        },
+        }
         "DummyLayer" => {
             let l = Box::new(DummyLayer::default());
             return Some(l);

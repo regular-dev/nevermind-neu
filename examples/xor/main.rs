@@ -9,15 +9,9 @@ use log4rs::config::{Appender, Config, Root};
 
 use env_logger::Env;
 
-use regular_mind;
-
-use regular_mind::mind::dataset;
-use regular_mind::mind::dataset::SimpleDataLoader;
-use regular_mind::mind::network::Network;
-use regular_mind::mind::solver_sgd::SolverSGD;
-use regular_mind::mind::solver_rmsprop::SolverRMS;
-use regular_mind::mind::solver::Solver;
-
+use regular_mind::dataset::*;
+use regular_mind::network::*;
+use regular_mind::solvers::*;
 
 #[cfg(feature = "log_log4rs")]
 fn init_logger() {

@@ -3,10 +3,10 @@ use std::collections::HashMap;
 use serde::ser::SerializeSeq;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use super::abstract_layer::AbstractLayer;
-use super::error_layer::ErrorLayer;
-use super::hidden_layer::HiddenLayer;
-use super::input_data_layer::InputDataLayer;
+use super::layers::AbstractLayer;
+use super::layers::ErrorLayer;
+use super::layers::HiddenLayer;
+use super::layers::InputDataLayer;
 use super::layer_fabric::*;
 use super::util::Variant;
 

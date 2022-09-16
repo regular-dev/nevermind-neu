@@ -3,9 +3,9 @@ use std::option::Option;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use super::learn_params::{LearnParams, LearnParamsPtr, ParamsBlob};
-use super::util::{Blob, DataVec, Variant, WsBlob, WsMat};
-use crate::mind::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
+use crate::learn_params::{LearnParams, LearnParamsPtr, ParamsBlob};
+use crate::util::{Blob, DataVec, Variant, WsBlob, WsMat};
+use crate::layers::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
 
 // not used
 #[derive(Default)]

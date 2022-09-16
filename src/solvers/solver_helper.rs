@@ -5,10 +5,10 @@ use uuid::Uuid;
 use ndarray::Array2;
 use std::str::FromStr;
 
-use super::dataset::DataBatch;
-use super::layers_storage::LayersStorage;
-use super::solver::pb::{PbFloatVec, PbWsBlob};
-use super::util::WsBlob;
+use crate::dataset::DataBatch;
+use crate::layers_storage::LayersStorage;
+use crate::solvers::pb::{PbFloatVec, PbWsBlob};
+use crate::util::WsBlob;
 
 pub fn feedforward(layers: &mut LayersStorage, train_data: &DataBatch, print_out: bool) {
     let input_data = &train_data.input;

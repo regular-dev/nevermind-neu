@@ -12,15 +12,15 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use prost::Message;
 
-use super::dataset::DataBatch;
-use super::layers_storage::{LayersStorage, SerdeLayersStorage};
-use super::learn_params::LearnParams;
+use crate::dataset::DataBatch;
+use crate::layers_storage::{LayersStorage, SerdeLayersStorage};
+use crate::learn_params::LearnParams;
 use super::solver::{
     pb::{PbBatchCounter, PbFloatVec, PbSolverRms, PbWsBlob},
     BatchCounter, Solver,
 };
 use super::solver_helper;
-use super::util::{DataVec, Num, WsBlob, WsMat};
+use crate::util::{DataVec, Num, WsBlob, WsMat};
 use uuid::Uuid;
 
 pub struct SolverRMS {

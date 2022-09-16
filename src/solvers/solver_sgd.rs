@@ -15,12 +15,12 @@ use ndarray::{Array, Array2}; // test purpose @xion
 
 use prost::Message;
 
-use super::dataset::DataBatch;
-use super::layers_storage::LayersStorage;
-use super::learn_params::LearnParams;
+use crate::dataset::DataBatch;
+use crate::layers_storage::LayersStorage;
+use crate::learn_params::LearnParams;
 use super::solver::{Solver, BatchCounter, pb::{PbBatchCounter, PbSolverSgd}};
 use super::solver_helper;
-use super::util::{DataVec, Num, WsBlob, WsMat};
+use crate::util::{DataVec, Num, WsBlob, WsMat};
 
 // Train/Test Impl
 pub struct SolverSGD {
