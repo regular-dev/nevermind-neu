@@ -12,14 +12,14 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use prost::Message;
 
-use crate::dataset::DataBatch;
-use crate::layers_storage::{LayersStorage, SerdeLayersStorage};
-use crate::learn_params::LearnParams;
 use super::solver::{
     pb::{PbBatchCounter, PbFloatVec, PbSolverRms, PbWsBlob},
     BatchCounter, Solver,
 };
 use super::solver_helper;
+use crate::dataset::DataBatch;
+use crate::layers_storage::{LayersStorage, SerdeLayersStorage};
+use crate::learn_params::LearnParams;
 use crate::util::{DataVec, Num, WsBlob, WsMat};
 
 use uuid::Uuid;
@@ -29,6 +29,8 @@ pub struct SolverRMS {
     pub momentum: f32,
     pub alpha: f32,
     pub theta: f32,
+    err: f32,
+    cur_err: f32,
     layers: LayersStorage,
     batch_cnt: BatchCounter,
     rms: HashMap<Uuid, WsBlob>,
@@ -41,6 +43,8 @@ impl SolverRMS {
             learn_rate: 0.02,
             momentum: 0.2,
             alpha: 0.9,
+            err: 999999.0,
+            cur_err: 0.0,
             batch_cnt: BatchCounter::new(1),
             theta: 0.00000001,
             layers: LayersStorage::new(),
@@ -170,7 +174,26 @@ impl Solver for SolverRMS {
             );
         }
 
+        // TODO : maybe impl as macro ? : count_error!(self.layers)
+        if is_upd {
+            self.err = self.cur_err / self.batch_cnt.batch_size as f32;
+            self.cur_err = 0.0;
+        } else {
+            let last_l = self.layers.at(self.layers.len() - 1);
+            let lr_params = last_l.learn_params().unwrap();
+            let mut err = 0.0;
+            let err_vals = lr_params.err_vals.borrow();
+            for i in err_vals.deref() {
+                err += i.powf(2.0);
+            }
+            self.cur_err += (err / err_vals.shape()[0] as f32).sqrt();
+        }
+
         self.batch_cnt.increment();
+    }
+
+    fn error(&self) -> f32 {
+        self.err
     }
 
     fn save_state(&self, filepath: &str) -> Result<(), Box<dyn Error>> {

@@ -1,12 +1,12 @@
 use std::collections::HashMap;
-use std::fs::File;
-use std::fs;
-use std::io::prelude::*;
 use std::error::Error;
+use std::fs;
+use std::fs::File;
+use std::io::prelude::*;
 use std::ops::{Deref, DerefMut};
 
 use serde::ser::SerializeStruct;
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use log::debug;
 use uuid::Uuid;
@@ -15,17 +15,22 @@ use ndarray::{Array, Array2}; // test purpose @xion
 
 use prost::Message;
 
+use super::solver::{
+    pb::{PbBatchCounter, PbSolverSgd},
+    BatchCounter, Solver,
+};
+use super::solver_helper;
 use crate::dataset::DataBatch;
 use crate::layers_storage::LayersStorage;
 use crate::learn_params::LearnParams;
-use super::solver::{Solver, BatchCounter, pb::{PbBatchCounter, PbSolverSgd}};
-use super::solver_helper;
 use crate::util::{DataVec, Num, WsBlob, WsMat};
 
 // Train/Test Impl
 pub struct SolverSGD {
     learn_rate: f32,
     momentum: f32,
+    err: f32,
+    cur_err: f32,
     layers: LayersStorage,
     ws_delta: HashMap<Uuid, WsBlob>,
     ws_batch: HashMap<Uuid, WsBlob>,
@@ -38,9 +43,11 @@ impl SolverSGD {
             layers: LayersStorage::new(),
             learn_rate: 0.2,
             momentum: 0.2,
+            err: 999999.0,
+            cur_err: 0.0,
             ws_delta: HashMap::new(),
             ws_batch: HashMap::new(),
-            batch_cnt: BatchCounter::new(1)
+            batch_cnt: BatchCounter::new(1),
         }
     }
 
@@ -136,11 +143,8 @@ impl Solver for SolverSGD {
     fn optimize_network(&mut self) {
         let is_upd = self.batch_cnt.is_update();
 
-        let mut prev_lr = None;
-
         for (idx, l) in self.layers.iter_mut().enumerate() {
             if idx == 0 {
-                prev_lr = l.learn_params();
                 continue;
             }
 
@@ -154,17 +158,33 @@ impl Solver for SolverSGD {
                 &mut self.ws_batch,
                 &self.learn_rate,
                 &self.momentum,
-                is_upd
+                is_upd,
             );
+        }
 
-            prev_lr = l.learn_params();
+        // TODO : maybe impl as macro ? : count_error!(self.layers)
+        if is_upd {
+            self.err = self.cur_err / self.batch_cnt.batch_size as f32;
+            self.cur_err = 0.0;
+        } else {
+            let last_l = self.layers.at(self.layers.len() - 1);
+            let lr_params = last_l.learn_params().unwrap();
+            let mut err = 0.0;
+            let err_vals = lr_params.err_vals.borrow();
+            for i in err_vals.deref() {
+                err += i.powf(2.0);
+            }
+            self.cur_err += (err / err_vals.shape()[0] as f32).sqrt();
         }
 
         self.batch_cnt.increment();
     }
 
-    fn save_state(&self, filepath: &str) -> Result<(), Box<dyn Error>>
-    {
+    fn error(&self) -> f32 {
+        self.err
+    }
+
+    fn save_state(&self, filepath: &str) -> Result<(), Box<dyn Error>> {
         // create vector of layers learn_params
         let mut vec_lr = Vec::new();
         for l in 0..self.layers.len() {
@@ -192,8 +212,7 @@ impl Solver for SolverSGD {
         Ok(())
     }
 
-    fn load_state(&mut self, filepath: &str) -> Result<(), Box<dyn Error>>
-    {
+    fn load_state(&mut self, filepath: &str) -> Result<(), Box<dyn Error>> {
         let buf = fs::read(filepath)?;
 
         let mut solver_rms = PbSolverSgd::decode(buf.as_slice())?;
@@ -252,4 +271,3 @@ impl<'de> Deserialize<'de> for SolverSGD {
         Ok(rms_solver)
     }
 }
-

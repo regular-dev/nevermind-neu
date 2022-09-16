@@ -90,4 +90,18 @@ where
             self.perform_step();
         }
     }
+
+    pub fn train_for_error(&mut self, err: f32) {
+        let mut iter_num = 0;
+
+        while self.solver.error() > err {
+            self.perform_step();
+
+            debug!("Squared error : {}", self.solver.error());
+            iter_num += 1;
+        }
+
+        info!("Trained for error : {}", self.solver.error());
+        info!("Iterations : {}", iter_num);
+    }
 }

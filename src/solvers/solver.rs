@@ -11,6 +11,8 @@ pub trait Solver {
     fn backpropagate(&mut self, train_data: &DataBatch);
     fn optimize_network(&mut self);
 
+    fn error(&self) -> f32;
+
     fn save_state(&self, filepath: &str) -> Result<(), Box<dyn Error>>;
     fn load_state(&mut self, filepath: &str) -> Result<(), Box<dyn Error>>;
 }

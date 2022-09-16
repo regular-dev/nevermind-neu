@@ -58,7 +58,7 @@ fn init_logger() {
 
 #[cfg(feature = "log_env_logger")]
 fn init_logger() {
-    env_logger::Builder::from_env(Env::default().default_filter_or("warn")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error> >{
@@ -78,7 +78,7 @@ fn main() -> Result<(), Box<dyn std::error::Error> >{
    // solver_rms.load_state("solver_state.proto")?;
 
     // create a network
-    let mut net = Network::new(dataloader, SolverRMS::new());
+    let mut net = Network::new(dataloader, SolverRMS::new().batch(4));
     let net_cfg = vec![2, 10, 1];
     net.setup_simple_network(&net_cfg);
 
@@ -86,7 +86,7 @@ fn main() -> Result<(), Box<dyn std::error::Error> >{
 
     let now_time = Instant::now();
 
-    net.train_for_n_times(150_000);
+    net.train_for_error(0.001);
 
     let elapsed_bench = now_time.elapsed();
 
