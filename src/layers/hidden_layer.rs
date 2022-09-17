@@ -14,21 +14,26 @@ use crate::learn_params::{LearnParams, ParamsBlob};
 use crate::util::Num;
 
 use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
-use crate::activation::{sigmoid, sigmoid_deriv};
+use crate::activation::{
+    sigmoid, sigmoid_deriv, Activation,
+};
 use crate::bias::{Bias, ConstBias};
 use crate::util::{Blob, DataVec, Variant, WsBlob, WsMat};
 
 use rand::Rng;
 
-#[derive(Default)]
-pub struct HiddenLayer {
+pub struct HiddenLayer<T: Fn(f32) -> f32>
+{
     pub lr_params: LearnParams,
     pub size: usize,
     pub prev_size: usize,
     pub bias: ConstBias,
+    pub activation: Activation<T>,
 }
 
-impl AbstractLayer for HiddenLayer {
+impl<T> AbstractLayer for HiddenLayer<T>
+where T: Fn(f32) -> f32
+{
     fn forward(&mut self, input: ParamsBlob) -> LayerForwardResult {
         let inp_m = input[0].output.borrow();
         let mut out_m = self.lr_params.output.borrow_mut();
@@ -38,16 +43,16 @@ impl AbstractLayer for HiddenLayer {
 
         let bias_out = self.bias.forward(&ws[1]);
 
+        let sigma_func = |val: f32| -> f32 {
+            sigmoid(val)
+        };
+
         Zip::from(out_m.deref_mut())
             .and(mul_res.rows())
             .and(bias_out)
             .par_for_each(|out_el, in_row, bias_el| {
-                *out_el = sigmoid(in_row.sum() + bias_el);
+                *out_el = sigma_func(in_row.sum() + bias_el);
             });
-
-        for (idx, el) in out_m.indexed_iter_mut() {
-            *el = sigmoid(mul_res.row(idx).sum() + bias_out[idx]);
-        }
 
         debug!("[ok] HiddenLayer forward()");
 
@@ -136,13 +141,17 @@ impl AbstractLayer for HiddenLayer {
     }
 }
 
-impl HiddenLayer {
-    pub fn new(size: usize, prev_size: usize) -> Self {
+impl<T> HiddenLayer<T>
+where T: Fn(f32) -> f32
+{
+    /// Default activation function is sigmoid
+    pub fn new(size: usize, prev_size: usize, activation: Activation<T>) -> Self {
         Self {
             size,
             prev_size,
             lr_params: LearnParams::new_with_const_bias(size, prev_size),
             bias: ConstBias::new(size, 1.0),
+            activation: activation,
         }
     }
 }

@@ -1,5 +1,4 @@
-use super::util::{DataVec};
-
+use super::util::DataVec;
 
 pub fn sigmoid(val: f32) -> f32 {
     return 1.0 / (1.0 + (-val).exp());
@@ -26,3 +25,70 @@ pub fn sigmoid_on_vec(input: &DataVec, output: &mut DataVec) {
         output[idx] = sigmoid(*val);
     }
 }
+
+pub struct Activation<T: Fn(f32)->f32> {
+    func: T,
+    name: String, // &str ???
+}
+
+impl<T> Activation<T>
+where T: Fn(f32) -> f32
+{
+    pub fn new(name: &str, func: T) -> Self {
+        Self {
+            func,
+            name: name.to_owned(),
+        }
+    }
+}
+
+pub mod macros {
+    macro_rules! sigmoid_activation {
+        (  ) => {
+            {
+                Activation::new("sigmoid", sigmoid)
+            }
+        };
+    }
+
+    macro_rules! tanh_activation {
+        (  ) => {
+            {
+                Activation::new("tanh", sigmoid)
+            }
+        };
+    }
+
+    pub(crate) use sigmoid_activation;
+}
+
+// pub trait ActivationTrait {
+//     fn func(&self) -> Box<dyn Fn(f32) -> f32>;
+//     fn name(&self) -> &str;
+// }
+
+// #[derive(Default)]
+// pub struct SigmoidActivation;
+
+// impl ActivationTrait for SigmoidActivation {
+//     fn func(&self) -> Box<dyn Fn(f32) -> f32> {
+//         Box::new(|val: f32| -> f32 { sigmoid(val) })
+//     }
+
+//     fn name(&self) -> &str {
+//         "sigmoid"
+//     }
+// }
+
+// #[derive(Default)]
+// pub struct TanhActivation;
+
+// impl ActivationTrait for TanhActivation {
+//     fn func(&self) -> Box<dyn Fn(f32) -> f32> {
+//         Box::new(|val: f32| -> f32 { tanh(val) })
+//     }
+
+//     fn name(&self) -> &str {
+//         "tanh"
+//     }
+// }

@@ -3,12 +3,16 @@ use std::collections::HashMap;
 use serde::ser::SerializeSeq;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use super::layer_fabric::*;
 use super::layers::AbstractLayer;
 use super::layers::ErrorLayer;
 use super::layers::HiddenLayer;
 use super::layers::InputDataLayer;
-use super::layer_fabric::*;
 use super::util::Variant;
+
+use crate::*; // TODO : refactor
+use crate::activation::Activation;
+use crate::activation::*;
 
 pub struct LayersStorage {
     layers: Vec<Box<dyn AbstractLayer>>,
@@ -40,7 +44,11 @@ impl LayersStorage {
                 continue;
             }
 
-            let l: Box<dyn AbstractLayer> = Box::new(HiddenLayer::new(*val, layers[idx - 1]));
+            let l: Box<dyn AbstractLayer> = Box::new(HiddenLayer::new(
+                *val,
+                layers[idx - 1],
+                activation::macros::sigmoid_activation!(),
+            ));
             ls.add_layer(l);
         }
 
@@ -113,8 +121,6 @@ impl<'de> Deserialize<'de> for LayersStorage {
             let l_opt = create_layer(i.name.as_str(), Some(&i.params));
 
             if let Some(l) = l_opt {
-                
-
                 ls.layers.push(l);
             } else {
                 // TODO : impl return D::Error
