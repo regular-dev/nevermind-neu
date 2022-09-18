@@ -4,7 +4,6 @@ use log::warn;
 
 use super::layers::{AbstractLayer, DummyLayer, ErrorLayer, HiddenLayer, InputDataLayer};
 use super::util::Variant;
-use crate::*; // TODO : refactor
 use crate::activation::Activation;
 use crate::activation::*;
 
@@ -24,7 +23,7 @@ pub fn create_layer(
             return Some(l);
         }
         "HiddenLayer" => {
-            let mut l = Box::new(macros::sigmoid_hidden_layer!());
+            let mut l = Box::new(layers_macros::sigmoid_hidden_layer!());
             if cfg.is_some() {
                 l.set_layer_cfg(cfg.unwrap());
             }
@@ -48,11 +47,11 @@ pub fn create_layer(
     }
 }
 
-pub mod macros {
+pub mod layers_macros {
     macro_rules! sigmoid_hidden_layer {
         (  ) => {
             {
-                HiddenLayer::new(0, 0, activation::macros::sigmoid_activation!())                
+                HiddenLayer::new(0, 0, activation_macros::sigmoid_activation!())                
             }
         };
     }
@@ -60,7 +59,7 @@ pub mod macros {
     macro_rules! tanh_hidden_layer {
         (  ) => {
             {
-                HiddenLayer::new(0, 0, activation::macros::tanh_activation!())                
+                HiddenLayer::new(0, 0, activation_macros::tanh_activation!())                
             }
         };
     }

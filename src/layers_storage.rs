@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use serde::ser::SerializeSeq;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::layer_fabric::*;
@@ -10,7 +9,6 @@ use super::layers::HiddenLayer;
 use super::layers::InputDataLayer;
 use super::util::Variant;
 
-use crate::*; // TODO : refactor
 use crate::activation::Activation;
 use crate::activation::*;
 
@@ -47,7 +45,7 @@ impl LayersStorage {
             let l: Box<dyn AbstractLayer> = Box::new(HiddenLayer::new(
                 *val,
                 layers[idx - 1],
-                activation::macros::sigmoid_activation!(),
+                activation_macros::sigmoid_activation!(),
             ));
             ls.add_layer(l);
         }

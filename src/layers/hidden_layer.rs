@@ -14,25 +14,24 @@ use crate::learn_params::{LearnParams, ParamsBlob};
 use crate::util::Num;
 
 use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
-use crate::activation::{
-    sigmoid, sigmoid_deriv, Activation,
-};
+use crate::activation::{sigmoid, sigmoid_deriv, Activation};
 use crate::bias::{Bias, ConstBias};
 use crate::util::{Blob, DataVec, Variant, WsBlob, WsMat};
 
 use rand::Rng;
 
-pub struct HiddenLayer<T: Fn(f32) -> f32>
-{
+pub struct HiddenLayer<T: Fn(f32) -> f32, TD: Fn(f32) -> f32> {
     pub lr_params: LearnParams,
     pub size: usize,
     pub prev_size: usize,
     pub bias: ConstBias,
-    pub activation: Activation<T>,
+    pub activation: Activation<T, TD>,
 }
 
-impl<T> AbstractLayer for HiddenLayer<T>
-where T: Fn(f32) -> f32
+impl<T, TD> AbstractLayer for HiddenLayer<T, TD>
+where
+    T: Fn(f32) -> f32 + Sync,
+    TD: Fn(f32) -> f32 + Sync,
 {
     fn forward(&mut self, input: ParamsBlob) -> LayerForwardResult {
         let inp_m = input[0].output.borrow();
@@ -43,15 +42,11 @@ where T: Fn(f32) -> f32
 
         let bias_out = self.bias.forward(&ws[1]);
 
-        let sigma_func = |val: f32| -> f32 {
-            sigmoid(val)
-        };
-
         Zip::from(out_m.deref_mut())
             .and(mul_res.rows())
             .and(bias_out)
             .par_for_each(|out_el, in_row, bias_el| {
-                *out_el = sigma_func(in_row.sum() + bias_el);
+                *out_el = (self.activation.func)(in_row.sum() + bias_el);
             });
 
         debug!("[ok] HiddenLayer forward()");
@@ -141,11 +136,13 @@ where T: Fn(f32) -> f32
     }
 }
 
-impl<T> HiddenLayer<T>
-where T: Fn(f32) -> f32
+impl<T, TD> HiddenLayer<T, TD>
+where
+    T: Fn(f32) -> f32,
+    TD: Fn(f32) -> f32,
 {
     /// Default activation function is sigmoid
-    pub fn new(size: usize, prev_size: usize, activation: Activation<T>) -> Self {
+    pub fn new(size: usize, prev_size: usize, activation: Activation<T, TD>) -> Self {
         Self {
             size,
             prev_size,
