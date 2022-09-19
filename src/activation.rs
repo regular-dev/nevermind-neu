@@ -60,6 +60,7 @@ pub mod activation_macros {
     }
 
     pub(crate) use sigmoid_activation;
+    pub(crate) use tanh_activation;
 }
 
 // pub trait ActivationTrait {

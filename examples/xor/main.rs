@@ -79,7 +79,7 @@ fn main() -> Result<(), Box<dyn std::error::Error> >{
 
     // create a network
     let mut net = Network::new(dataloader, SolverRMS::new().batch(4));
-    let net_cfg = vec![2, 10, 1];
+    let net_cfg = vec![2, 20, 1];
     net.setup_simple_network(&net_cfg);
 
   //  net.save_network_cfg("network.cfg")?;

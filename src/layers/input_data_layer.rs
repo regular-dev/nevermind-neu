@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::vec::Vec;
+use std::ops::DerefMut;
 
 use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
@@ -25,7 +26,8 @@ impl AbstractLayer for InputDataLayer {
             return Err(LayerError::InvalidSize);
         }
 
-        sigmoid_on_vec(input, out_vec);
+        *out_vec.deref_mut() = input.clone();
+
         Ok(vec![self.lr_params.clone()])
     }
 

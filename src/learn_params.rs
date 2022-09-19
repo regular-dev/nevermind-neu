@@ -2,9 +2,13 @@ use uuid::Uuid;
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::ops::DerefMut;
 
-use ndarray_rand::rand_distr::Uniform;
+use ndarray_rand::rand_distr::{Uniform, Distribution};
+use ndarray_rand::rand::{Rng, SeedableRng};
+use ndarray_rand::rand::rngs::SmallRng;
 use ndarray_rand::RandomExt;
+use ndarray::ArrayView;
 
 use super::util::{Blob, DataVec, WsBlob, WsMat};
 
@@ -57,6 +61,22 @@ impl LearnParams {
             err_vals: Rc::new(RefCell::new(DataVec::zeros(0))),
             output: Rc::new(RefCell::new(DataVec::zeros(size))),
             uuid: Uuid::new_v4(),
+        }
+    }
+
+    pub fn drop_ws(&mut self, dropout: f32) {
+        let mut ws = self.ws.borrow_mut();
+        let between = Uniform::from((0.0)..(1.0));
+        let mut rng = SmallRng::from_entropy();
+
+        for i in ws.deref_mut() {
+            for it_ws in i.iter_mut() {
+                let n = between.sample(&mut rng);
+
+                if n > dropout {
+                    *it_ws = 0.0;
+                }
+            }
         }
     }
 }
