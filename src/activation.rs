@@ -55,7 +55,7 @@ pub mod activation_macros {
 
     macro_rules! tanh_activation {
         (  ) => {{
-            Activation::new("tanh", sigmoid)
+            Activation::new("tanh", tanh, tanh_deriv)
         }};
     }
 
