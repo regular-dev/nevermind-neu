@@ -5,7 +5,7 @@ use uuid::Uuid;
 use ndarray::Array2;
 use std::str::FromStr;
 
-use crate::dataset::DataBatch;
+use crate::dataloader::DataBatch;
 use crate::layers_storage::LayersStorage;
 use crate::solvers::pb::{PbFloatVec, PbWsBlob};
 use crate::util::WsBlob;

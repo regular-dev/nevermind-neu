@@ -11,7 +11,7 @@ use log4rs::config::{Appender, Config, Root};
 
 use env_logger::Env;
 
-use regular_mind::dataset::*;
+use regular_mind::dataloader::*;
 use regular_mind::network::*;
 use regular_mind::solvers::*;
 
@@ -79,7 +79,7 @@ fn main() -> Result<(), Box<dyn std::error::Error> >{
 
     // create a network
     let mut net = Network::new(dataloader, SolverRMS::new().batch(4));
-    let net_cfg = vec![2, 20, 1];
+    let net_cfg = vec![2, 10, 1];
     net.setup_simple_network(&net_cfg);
 
   //  net.save_network_cfg("network.cfg")?;
@@ -90,7 +90,7 @@ fn main() -> Result<(), Box<dyn std::error::Error> >{
 
     let elapsed_bench = now_time.elapsed();
 
-    println!("Elapsed for training : {}", elapsed_bench.as_millis());
+    info!("Elapsed for training : {} ms", elapsed_bench.as_millis());
 
    //net.save_solver_state("solver_state.proto")?;
 

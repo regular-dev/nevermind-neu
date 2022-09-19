@@ -3,6 +3,7 @@ pub mod bias;
 pub mod layers;
 pub mod solvers;
 pub mod util;
+pub mod dataloader;
 
 /// Files
 pub mod activation;

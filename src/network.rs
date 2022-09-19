@@ -12,12 +12,12 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Error, ErrorKind, Write};
 use std::error::*;
 
-use super::dataset::DataLoader;
+use super::dataloader::DataLoader;
 use super::layers_storage::LayersStorage;
 use super::solvers::SolverRMS;
 
 use super::{
-    dataset::{DataBatch, SimpleDataLoader},
+    dataloader::{DataBatch, SimpleDataLoader},
     layers::InputDataLayer,
 };
 

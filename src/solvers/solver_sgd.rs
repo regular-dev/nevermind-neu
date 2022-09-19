@@ -20,7 +20,7 @@ use super::solver::{
     BatchCounter, Solver,
 };
 use super::solver_helper;
-use crate::dataset::DataBatch;
+use crate::dataloader::DataBatch;
 use crate::layers_storage::LayersStorage;
 use crate::learn_params::LearnParams;
 use crate::util::{DataVec, Num, WsBlob, WsMat};

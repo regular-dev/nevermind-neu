@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use crate::dataset::DataBatch;
+use crate::dataloader::DataBatch;
 use crate::layers_storage::LayersStorage;
 
 
