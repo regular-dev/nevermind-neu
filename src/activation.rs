@@ -62,34 +62,3 @@ pub mod activation_macros {
     pub(crate) use sigmoid_activation;
     pub(crate) use tanh_activation;
 }
-
-// pub trait ActivationTrait {
-//     fn func(&self) -> Box<dyn Fn(f32) -> f32>;
-//     fn name(&self) -> &str;
-// }
-
-// #[derive(Default)]
-// pub struct SigmoidActivation;
-
-// impl ActivationTrait for SigmoidActivation {
-//     fn func(&self) -> Box<dyn Fn(f32) -> f32> {
-//         Box::new(|val: f32| -> f32 { sigmoid(val) })
-//     }
-
-//     fn name(&self) -> &str {
-//         "sigmoid"
-//     }
-// }
-
-// #[derive(Default)]
-// pub struct TanhActivation;
-
-// impl ActivationTrait for TanhActivation {
-//     fn func(&self) -> Box<dyn Fn(f32) -> f32> {
-//         Box::new(|val: f32| -> f32 { tanh(val) })
-//     }
-
-//     fn name(&self) -> &str {
-//         "tanh"
-//     }
-// }
