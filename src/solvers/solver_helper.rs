@@ -11,14 +11,12 @@ use crate::solvers::pb::{PbFloatVec, PbWsBlob};
 use crate::util::WsBlob;
 
 pub fn feedforward(layers: &mut LayersStorage, train_data: &DataBatch, print_out: bool) {
-    let input_data = &train_data.input;
-
     let mut out = None;
 
     for (idx, l) in layers.iter_mut().enumerate() {
         // handle input layer
         if idx == 0 {
-            let result_out = l.forward_input(&input_data);
+            let result_out = l.forward_input(train_data.input.clone());
 
             match result_out {
                 Err(_reason) => {

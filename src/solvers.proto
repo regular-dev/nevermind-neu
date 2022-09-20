@@ -38,3 +38,12 @@ message PbSolverSGD {
 
   repeated PbWsBlob layers = 6;
 }
+
+message PbDataBatch {
+  repeated float input = 1;
+  repeated float expected = 2;
+}
+
+message PbDataStorage {
+  repeated PbDataBatch data = 1;
+}

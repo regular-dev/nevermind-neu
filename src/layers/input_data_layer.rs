@@ -9,7 +9,7 @@ use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerError, Laye
 
 use crate::activation::sigmoid_on_vec;
 use crate::learn_params::{LearnParams, ParamsBlob};
-use crate::util::{Blob, DataVec, Variant, WsBlob, WsMat};
+use crate::util::{Blob, DataVec, Variant, WsBlob, WsMat, DataVecPtr};
 
 #[derive(Default)]
 pub struct InputDataLayer {
@@ -18,15 +18,17 @@ pub struct InputDataLayer {
 }
 
 impl AbstractLayer for InputDataLayer {
-    fn forward_input(&mut self, input: &DataVec) -> LayerForwardResult {
-        let out_vec = &mut self.lr_params.output.borrow_mut();
+    fn forward_input(&mut self, input: DataVecPtr) -> LayerForwardResult {
+        let input_bor = input.borrow();
 
-        if input.len() != self.input_size {
-            eprintln!("Invalid input size for InputDataLayer : {}", input.len());
+        if input_bor.len() != self.input_size {
+            eprintln!("Invalid input size for InputDataLayer : {}", input_bor.len());
             return Err(LayerError::InvalidSize);
         }
 
-        *out_vec.deref_mut() = input.clone();
+        drop(input_bor);
+
+        self.lr_params.output = input;
 
         Ok(vec![self.lr_params.clone()])
     }

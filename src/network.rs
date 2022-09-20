@@ -47,7 +47,7 @@ where
     }
 
     /// Setup the network with [0] - input size, [...] - hidden neurons, [N] - output size
-    /// TODO : make this function static and make static constructor for Network class
+    /// TODO : make this function static and make as static constructor for Network class
     pub fn setup_simple_network(&mut self, layers: &Vec<usize>) {
         let ls = LayersStorage::new_simple_network(layers);
         self.solver.setup_network(ls);

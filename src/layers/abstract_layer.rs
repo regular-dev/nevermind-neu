@@ -7,9 +7,10 @@ use serde::ser::{SerializeSeq, SerializeStruct};
 use serde::{Deserialize, Serialize, Serializer};
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use crate::learn_params::{LearnParams, LearnParamsPtr, ParamsBlob};
-use crate::util::{Blob, DataVec, Num, Variant, WsBlob};
+use crate::util::{Blob, DataVec, Num, Variant, WsBlob, DataVecPtr};
 
 #[derive(Debug)]
 pub enum LayerError {
@@ -23,7 +24,7 @@ pub type LayerBackwardResult = Result<ParamsBlob, LayerError>;
 
 pub trait AbstractLayer {
     // for signature for input layers
-    fn forward_input(&mut self, input_data: &DataVec) -> LayerForwardResult {
+    fn forward_input(&mut self, input_data: DataVecPtr) -> LayerForwardResult {
         Err(LayerError::NotImpl)
     }
 
