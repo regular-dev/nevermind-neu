@@ -12,6 +12,8 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Error, ErrorKind, Write};
 use std::error::*;
 
+use std::fs::OpenOptions;
+
 use super::dataloader::DataLoader;
 use super::layers_storage::LayersStorage;
 use super::solvers::SolverRMS;
@@ -31,6 +33,9 @@ where
 {
     dataloader: Box<dyn DataLoader>,
     solver: T,
+    snap_iter: usize,
+    err_to_file_iter: usize,
+    name: String,
 }
 
 impl<T> Network<T>
@@ -38,11 +43,12 @@ where
     T: Solver + Serialize
 {
     pub fn new(dataloader: Box<dyn DataLoader>, solver: T) -> Self {
-        debug!("Created an neural network!");
-
         Network {
             dataloader,
             solver,
+            snap_iter: 0,
+            err_to_file_iter: 0,
+            name: "network".to_owned(),
         }
     }
 
@@ -91,17 +97,41 @@ where
         }
     }
 
-    pub fn train_for_error(&mut self, err: f32) {
+    fn create_empty_error_file(&self) -> Result<File, Box< Error > >{
+        let file = OpenOptions::new().write(true)
+                             .create_new(true)
+                             .open("err.log")?;
+        Ok(file)
+    }
+
+    fn append_error(&self, f: &mut File) {
+        write!(f, "{}", self.solver.error());
+    }
+
+    pub fn train_for_error(&mut self, err: f32) -> Result<(), Box<dyn std::error::Error>> {
         let mut iter_num = 0;
+
+        let mut err_file = self.create_empty_error_file()?;
 
         while self.solver.error() > err {
             self.perform_step();
 
             debug!("Squared error : {}", self.solver.error());
             iter_num += 1;
+
+            if iter_num % self.snap_iter == 0 {
+                let filename = format!("{}_{}.state", self.name, iter_num);
+                self.save_solver_state(&filename)?;
+            }
+
+            if iter_num % self.err_to_file_iter == 0 {
+                self.append_error(&mut err_file);
+            }
         }
 
         info!("Trained for error : {}", self.solver.error());
         info!("Iterations : {}", iter_num);
+
+        Ok(())
     }
 }

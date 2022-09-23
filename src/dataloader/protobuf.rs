@@ -18,10 +18,18 @@ use crate::util::DataVecPtr;
 #[derive(Default)]
 pub struct ProtobufDataLoader {
     pub data: Vec<DataBatch>,
+    pub id: usize,
 }
 
 impl ProtobufDataLoader {
-    fn from_file(filepath: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn empty() -> Self {
+        Self {
+            data: Vec::new(),
+            id: 0,
+        }
+    }
+
+    pub fn from_file(filepath: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let mut dl = ProtobufDataLoader::default();
 
         let buf = fs::read(filepath)?;
@@ -45,7 +53,7 @@ impl ProtobufDataLoader {
         Ok(dl)
     }
 
-    fn to_file(&self, filepath: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn to_file(&self, filepath: &str) -> Result<(), Box<dyn std::error::Error>> {
         let mut pb_data = PbDataStorage::default();
 
         for i in &self.data {
@@ -66,5 +74,21 @@ impl ProtobufDataLoader {
 
         Ok(())
     }
+}
 
+impl DataLoader for ProtobufDataLoader {
+    fn next(&mut self) -> &DataBatch {
+        if self.id < self.data.len() {
+            let ret = &self.data[ self.id ];
+            self.id += 1;
+            return ret;
+        } else {
+            self.id = 0;
+            return self.next();
+        }
+    }
+
+    fn reset(&mut self) {
+        self.id = 0;
+    }
 }

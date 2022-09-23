@@ -2,27 +2,33 @@ use crate::dataloader::DataBatch;
 use crate::dataloader::DataLoader;
 
 pub struct SimpleDataLoader {
-    pub cur_idx: usize,
+    pub id: usize,
     pub data: Vec<DataBatch>,
 }
 
 impl DataLoader for SimpleDataLoader {
     fn next(&mut self) -> &DataBatch {
-        if self.cur_idx < self.data.len() {
-            let ret = &self.data[ self.cur_idx ];
-            self.cur_idx += 1;
+        assert!(self.data.len() > 0);
+
+        if self.id < self.data.len() {
+            let ret = &self.data[ self.id ];
+            self.id += 1;
             return ret;
         } else {
-            self.cur_idx = 0;
+            self.id = 0;
             return self.next();
         }
+    }
+
+    fn reset(&mut self) {
+        self.id = 0;
     }
 }
 
 impl SimpleDataLoader {
     pub fn new(data: Vec<DataBatch>) -> Self {
         Self {
-            cur_idx: 0,
+            id: 0,
             data,
         }
     }
