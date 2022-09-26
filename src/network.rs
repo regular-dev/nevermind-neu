@@ -91,42 +91,61 @@ where
         self.solver.perform_step(&data);
     }
 
-    pub fn train_for_n_times(&mut self, times: i64) {
-        for _i in 0..times {
+    pub fn train_for_n_times(&mut self, times: i64) -> Result<(), Box< dyn std::error::Error >> {
+        let mut err_file = self.create_empty_error_file()?;
+        debug!("Squared error : {}", self.solver.error());
+
+        for iter_num in 0..times as usize {
             self.perform_step();
+
+            if self.snap_iter != 0 && iter_num % self.snap_iter == 0 && iter_num != 0 {
+                let filename = format!("{}_{}.state", self.name, iter_num);
+                self.save_solver_state(&filename)?;
+            }
+
+            if self.err_to_file_iter != 0 && iter_num % self.err_to_file_iter == 0 && iter_num != 0 {
+                info!("on iter {} , error is : {}", iter_num, self.solver.error());
+                self.append_error(&mut err_file);
+            }
         }
+
+        info!("Trained for error : {}", self.solver.error());
+        info!("Iterations : {}", times);
+
+        Ok(())
     }
 
-    fn create_empty_error_file(&self) -> Result<File, Box< Error > >{
+    fn create_empty_error_file(&self) -> Result<File, Box<dyn std::error::Error > >{
         let file = OpenOptions::new().write(true)
-                             .create_new(true)
+                             .create(true)
                              .open("err.log")?;
         Ok(file)
     }
 
     fn append_error(&self, f: &mut File) {
-        write!(f, "{}", self.solver.error());
+        write!(f, "{:.6}\n", self.solver.error());
     }
 
     pub fn train_for_error(&mut self, err: f32) -> Result<(), Box<dyn std::error::Error>> {
         let mut iter_num = 0;
 
         let mut err_file = self.create_empty_error_file()?;
+        debug!("Squared error : {}", self.solver.error());
 
         while self.solver.error() > err {
             self.perform_step();
 
-            debug!("Squared error : {}", self.solver.error());
-            iter_num += 1;
-
-            if iter_num % self.snap_iter == 0 {
+            if self.snap_iter != 0 && iter_num % self.snap_iter == 0 && iter_num != 0 {
                 let filename = format!("{}_{}.state", self.name, iter_num);
                 self.save_solver_state(&filename)?;
             }
 
-            if iter_num % self.err_to_file_iter == 0 {
+            if self.err_to_file_iter != 0 && iter_num % self.err_to_file_iter == 0 && iter_num != 0 {
+                info!("on iter {} , error is : {}", iter_num, self.solver.error());
                 self.append_error(&mut err_file);
             }
+
+            iter_num += 1;
         }
 
         info!("Trained for error : {}", self.solver.error());
