@@ -77,6 +77,16 @@ where
         Ok(())
     }
 
+    pub fn snap_iter(mut self, snap_each_iter: usize) -> Self {
+        self.snap_iter = snap_each_iter;
+        self
+    }
+
+    pub fn err_to_file_iter(mut self, err_iter: usize) -> Self {
+        self.err_to_file_iter = err_iter;
+        self
+    }
+
     pub fn save_solver_state(&self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
         self.solver.save_state(path)?;
         Ok(())
