@@ -150,7 +150,7 @@ where
             dropout: 1.0,
             lr_params: LearnParams::new_with_const_bias(size, prev_size),
             bias: ConstBias::new(size, 1.0),
-            activation: activation,
+            activation,
         }
     }
 

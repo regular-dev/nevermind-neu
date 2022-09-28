@@ -37,7 +37,11 @@ impl LayersStorage {
                 continue;
             }
             if idx == layers.len() - 1 {
-                let l = Box::new(ErrorLayer::new(*val, layers[idx - 1]));
+                let l = Box::new(ErrorLayer::new(
+                    *val,
+                    layers[idx - 1],
+                    activation_macros::raw_activation!(),
+                ));
                 ls.add_layer(l);
                 continue;
             }

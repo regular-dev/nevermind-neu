@@ -16,7 +16,7 @@ pub fn create_layer(
 ) -> Option<Box<dyn AbstractLayer>> {
     match layer_type {
         "ErrorLayer" => {
-            let mut l = Box::new(ErrorLayer::default());
+            let mut l = Box::new( layers_macros::raw_error_layer!() );
             if cfg.is_some() {
                 l.set_layer_cfg(cfg.unwrap());
             }
@@ -64,6 +64,27 @@ pub mod layers_macros {
         };
     }
 
+    macro_rules! sigmoid_error_layer {
+        () => {
+            ErrorLayer::new(0, 0, activation_macros::sigmoid_activation!())
+        };
+    }
+
+    macro_rules! tanh_error_layer {
+        () => {
+            ErrorLayer::new(0, 0, activation_macros::tanh_activation!())
+        };
+    }
+
+    macro_rules! raw_error_layer {
+        () => {
+            ErrorLayer::new(0, 0, activation_macros::raw_activation!())
+        };
+    }
+
     pub(crate) use sigmoid_hidden_layer; 
     pub(crate) use tanh_hidden_layer;
+    pub(crate) use sigmoid_error_layer;
+    pub(crate) use tanh_error_layer;
+    pub(crate) use raw_error_layer;
 }
