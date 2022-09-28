@@ -16,6 +16,14 @@ pub fn tanh_deriv(val: f32) -> f32 {
     return 1.0 - tanh(val) * tanh(val);
 }
 
+pub fn raw(val: f32) -> f32 {
+    val
+}
+
+pub fn raw_deriv(val: f32) -> f32 {
+    1.0
+}
+
 pub fn sigmoid_on_vec(input: &DataVec, output: &mut DataVec) {
     if input.len() != output.len() {
         panic!("ERROR: input length vector != output length vector!!!");
@@ -59,6 +67,13 @@ pub mod activation_macros {
         }};
     }
 
+    macro_rules! raw_activation {
+        () => {
+            Activation::new("raw", raw, raw_deriv);
+        };
+    }
+
     pub(crate) use sigmoid_activation;
     pub(crate) use tanh_activation;
+    pub(crate) use raw_activation;
 }
