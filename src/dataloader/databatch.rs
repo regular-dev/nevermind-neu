@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use crate::util::{Blob, DataVecPtr, DataVec};
 
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct DataBatch {
     pub input: DataVecPtr,
     pub expected: DataVec,
