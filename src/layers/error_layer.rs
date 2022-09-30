@@ -35,9 +35,11 @@ where
 
         let mul_res = inp_m.deref() * ws_mat;
 
-        for (idx, el) in out_m.indexed_iter_mut() {
-            *el = (self.activation.func)(mul_res.row(idx).sum());
-        }
+        Zip::from(out_m.deref_mut()).and(mul_res.rows()).par_for_each(
+            |out_el, in_row| {
+                *out_el = (self.activation.func)(in_row.sum());
+            }
+        );
 
         debug!("[ok] ErrorLayer forward()");
 
@@ -58,7 +60,7 @@ where
         Zip::from(self_err_vals.deref_mut())
             .and(self_output.deref())
             .and(expected_vec)
-            .for_each(|err_val, output, expected| {
+            .par_for_each(|err_val, output, expected| {
                 *err_val = (expected - output) * (self.activation.func_deriv)(*output);
             });
 
