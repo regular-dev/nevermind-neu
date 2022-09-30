@@ -55,25 +55,28 @@ where
 }
 
 pub mod activation_macros {
+    #[macro_export]
     macro_rules! sigmoid_activation {
         (  ) => {{
             Activation::new("sigmoid", sigmoid, sigmoid_deriv)
         }};
     }
 
+    #[macro_export]
     macro_rules! tanh_activation {
         (  ) => {{
             Activation::new("tanh", tanh, tanh_deriv)
         }};
     }
 
+    #[macro_export]
     macro_rules! raw_activation {
         () => {
-            Activation::new("raw", raw, raw_deriv);
+            Activation::new("raw", raw, raw_deriv)
         };
     }
 
-    pub(crate) use sigmoid_activation;
-    pub(crate) use tanh_activation;
-    pub(crate) use raw_activation;
+    pub use sigmoid_activation; // pub(crate) use sigmoid_activation
+    pub use tanh_activation;
+    pub use raw_activation;
 }
