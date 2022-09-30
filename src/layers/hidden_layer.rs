@@ -68,7 +68,7 @@ where
             .and(self_output.deref())
             .and(err_mul.columns())
             .par_for_each(|err_val, output, col| {
-                *err_val = sigmoid_deriv(*output) * col.sum();
+                *err_val = (self.activation.func_deriv)(*output) * col.sum();
             });
 
         // calc per-weight gradient, TODO : refactor code below
