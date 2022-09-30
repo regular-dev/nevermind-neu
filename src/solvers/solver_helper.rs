@@ -84,7 +84,7 @@ pub fn backpropagate(layers: &mut LayersStorage, train_data: &DataBatch) {
         let next_out = layers.at_mut(layers.len() - idx).learn_params();
 
         let result_out = layers
-            .at_mut(idx)
+            .at_mut(layers.len() - 1 - idx)
             .backward(vec![prev_out.unwrap()], vec![next_out.unwrap()]);
 
         match result_out {
