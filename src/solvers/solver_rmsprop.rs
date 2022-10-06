@@ -175,18 +175,18 @@ impl Solver for SolverRMS {
         }
 
         // TODO : maybe impl as macro ? : count_error!(self.layers)
+        let last_l = self.layers.at(self.layers.len() - 1);
+        let lr_params = last_l.learn_params().unwrap();
+        let mut err = 0.0;
+        let err_vals = lr_params.err_vals.borrow();
+        for i in err_vals.deref() {
+            err += i.powf(2.0);
+        }
+        self.cur_err += (err / err_vals.shape()[0] as f32).sqrt();
+
         if is_upd {
             self.err = self.cur_err / self.batch_cnt.batch_size as f32;
             self.cur_err = 0.0;
-        } else {
-            let last_l = self.layers.at(self.layers.len() - 1);
-            let lr_params = last_l.learn_params().unwrap();
-            let mut err = 0.0;
-            let err_vals = lr_params.err_vals.borrow();
-            for i in err_vals.deref() {
-                err += i.powf(2.0);
-            }
-            self.cur_err += (err / err_vals.shape()[0] as f32).sqrt();
         }
 
         self.batch_cnt.increment();
