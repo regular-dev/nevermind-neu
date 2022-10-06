@@ -24,6 +24,18 @@ pub fn raw_deriv(val: f32) -> f32 {
     1.0
 }
 
+pub fn relu(val: f32) -> f32 {
+    if val >= 0.0 {
+        val
+    } else {
+        0.0
+    }
+}
+
+pub fn relu_deriv(val: f32) -> f32 {
+    1.0
+}
+
 pub fn sigmoid_on_vec(input: &DataVec, output: &mut DataVec) {
     if input.len() != output.len() {
         panic!("ERROR: input length vector != output length vector!!!");
@@ -76,7 +88,15 @@ pub mod activation_macros {
         };
     }
 
+    #[macro_export]
+    macro_rules! relu_activation {
+        () => {
+            Activation::new("relu", relu, relu_deriv)
+        };
+    }
+
     pub use sigmoid_activation; // pub(crate) use sigmoid_activation
     pub use tanh_activation;
     pub use raw_activation;
+    pub use relu_activation;
 }
