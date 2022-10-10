@@ -6,12 +6,12 @@ use crate::layers_storage::LayersStorage;
 
 pub trait Solver {
     fn setup_network(&mut self, layers: LayersStorage);
-    fn perform_step(&mut self, data: &DataBatch);
     fn feedforward(&mut self, train_data: &DataBatch, print_out: bool);
     fn backpropagate(&mut self, train_data: &DataBatch);
     fn optimize_network(&mut self);
 
-    fn error(&self) -> f32;
+    fn layers(&self) -> &LayersStorage;
+    fn batch_size(&self) -> usize;
 
     fn save_state(&self, filepath: &str) -> Result<(), Box<dyn Error>>;
     fn load_state(&mut self, filepath: &str) -> Result<(), Box<dyn Error>>;

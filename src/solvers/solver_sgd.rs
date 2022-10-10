@@ -126,10 +126,8 @@ impl Solver for SolverSGD {
         self.layers = layers;
     }
 
-    fn perform_step(&mut self, data: &DataBatch) {
-        self.feedforward(&data, false);
-        self.backpropagate(&data);
-        self.optimize_network();
+    fn batch_size(&self) -> usize {
+        self.batch_cnt.batch_size
     }
 
     fn feedforward(&mut self, train_data: &DataBatch, print_out: bool) {
@@ -162,26 +160,11 @@ impl Solver for SolverSGD {
             );
         }
 
-        // TODO : maybe impl as macro ? : count_error!(self.layers)
-        let last_l = self.layers.at(self.layers.len() - 1);
-        let lr_params = last_l.learn_params().unwrap();
-        let mut err = 0.0;
-        let err_vals = lr_params.err_vals.borrow();
-        for i in err_vals.deref() {
-            err += i.powf(2.0);
-        }
-        self.cur_err += (err / err_vals.shape()[0] as f32).sqrt();
-
-        if is_upd {
-            self.err = self.cur_err / self.batch_cnt.batch_size as f32;
-            self.cur_err = 0.0;
-        }
-
         self.batch_cnt.increment();
     }
 
-    fn error(&self) -> f32 {
-        self.err
+    fn layers(&self) -> &LayersStorage {
+        &self.layers
     }
 
     fn save_state(&self, filepath: &str) -> Result<(), Box<dyn Error>> {
