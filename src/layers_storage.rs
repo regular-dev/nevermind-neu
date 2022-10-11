@@ -49,7 +49,7 @@ impl LayersStorage {
             let l: Box<dyn AbstractLayer> = Box::new(HiddenLayer::new(
                 *val,
                 layers[idx - 1],
-                activation_macros::sigmoid_activation!(),
+                activation_macros::tanh_activation!(),
             ));
             ls.add_layer(l);
         }
@@ -75,6 +75,10 @@ impl LayersStorage {
 
     pub fn at(&self, id: usize) -> &Box<dyn AbstractLayer> {
         &self.layers[id]
+    }
+
+    pub fn last(&self) -> Option<&Box<dyn AbstractLayer>> {
+        return self.layers.last();
     }
 }
 
