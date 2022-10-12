@@ -86,7 +86,7 @@ fn main() -> Result<(), Box<dyn std::error::Error> >{
 
     let now_time = Instant::now();
 
-    net.train_for_error(0.001)?;
+    net.train_for_error_or_iter(0.01, 130_000)?;
 
     let elapsed_bench = now_time.elapsed();
 
