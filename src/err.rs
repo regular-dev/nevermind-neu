@@ -1,0 +1,33 @@
+use std::fmt;
+
+#[derive(Debug)]
+pub enum CustomError {
+    WrongArg,
+    Other
+}
+
+impl fmt::Display for CustomError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            WrongArgErr => {
+                write!(f, "{}", "Wrong arguments")
+            },
+            Other => {
+                write!(f, "{}", "Other")
+            }
+        }
+    }
+}
+
+impl std::error::Error for CustomError {
+    fn description(&self) -> &str {
+        match self {
+            WrongArgErr => {
+                "Wrong arguments"
+            },
+            Other => {
+                "Other"
+            }
+        }
+    }
+}
