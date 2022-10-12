@@ -11,6 +11,7 @@ pub mod layer_fabric;
 pub mod layers_storage;
 pub mod learn_params;
 pub mod network;
+pub mod err;
 
 pub mod prelude {
     // pub use crate::network::* and etc...
