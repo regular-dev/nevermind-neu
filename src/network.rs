@@ -38,6 +38,7 @@ where
     test_dl: Option<Box<dyn DataLoader>>,
     test_batch_size: usize,
     test_err: f32,
+    is_write_test_err: bool,
     solver: T,
     snap_iter: usize,
     test_iter: usize,
@@ -55,6 +56,7 @@ where
             test_dl: None,
             test_batch_size: 1,
             test_err: 0.0,
+            is_write_test_err: false,
             solver,
             snap_iter: 0,
             test_iter: 0,
@@ -83,6 +85,11 @@ where
         self.test_dl = Some(test_dl);
         self
     }
+    
+    pub fn write_test_err_to_file(mut self, state: bool) -> Self {
+        self.is_write_test_err = state;
+        self
+    }
 
     pub fn save_network_cfg(&mut self, path: &str) -> std::io::Result<()> {
         let json_str_result = serde_yaml::to_string(&self.solver);
@@ -107,7 +114,7 @@ where
         self
     }
 
-    pub fn err_to_file_iter(mut self, err_iter: usize) -> Self {
+    pub fn test_iter(mut self, err_iter: usize) -> Self {
         self.test_iter = err_iter;
         self
     }
