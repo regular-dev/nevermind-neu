@@ -3,27 +3,23 @@ extern crate regular_mind;
 use std::collections::HashMap;
 
 use clap;
-use clap::{App, Arg, ArgMatches, Command};
+use clap::{App, Arg, ArgMatches, Command, ArgAction};
 
 use env_logger::Env;
 
-use regular_mind::util::*;
-
+pub mod create_net;
 pub mod dataset_info;
 pub mod train;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
 
-    let matches = App::new("Regular_mind tool")
+    let matches = App::new("regular_mind tool")
         .version("0.1.0")
         .author("Regular-dev")
         .about("Run neural network training, inspect datasets and more...")
         .subcommand_required(true)
-        .subcommand(Command::new("train"))
-        .subcommand(Command::new("dataset_info"))
-        .after_help("after help message. TODO : expand with examples")
-        .arg(
+        .subcommand(Command::new("train").about("Start a new training or continue").arg(
             Arg::new("TrainData")
                 .long("train_dataset")
                 .help("Provides a file path to train dataset"),
@@ -66,23 +62,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .arg(Arg::new("WriteErrToFile").long("err_to_file").help(
             "Can be true or false, if true test network error will be recorded to file err.log",
-        ))
+        )))
+        .subcommand(Command::new("dataset_info").about("Inspect dataset"))
+        .subcommand(Command::new("create_net").about("Create a new net configuration").arg
+        (Arg::new("OutFile").long("out").short('o').help("Specifies net configuration output file").required(true).action(ArgAction::Set)))
+        .after_help("after help message. TODO : expand with examples")
         .get_matches();
 
     let cmd = matches.subcommand().unwrap();
-    // let fp = matches.get_one::<String>("Filepath").unwrap();
-    // let ssp = matches.get_one::<String>("SolverStatePath");
 
     if cmd.0 == "dataset_info" {
         dataset_info::dataset_info(&matches)?;
     }
-
     if cmd.0 == "train" {
         train::train_new(&matches)?;
     }
-
-    if cmd.0 == "train_continue" {
-        train::train_continue(&matches)?;
+    if cmd.0 == "create_net" {
+        create_net::create_net()?;
     }
 
     Ok(())

@@ -28,41 +28,25 @@ pub fn train_new(
     }
 
     let solver_cfg = args.get_one::<String>("SolverCfgYaml").unwrap();
-    let solver = SolverRMS::from_file(solver_cfg)?;
+    let solver_type = solver_type_from_file(solver_cfg)?;
 
-    train_net(
-        solver,
-        args
-    )
-}
-
-pub fn train_continue(
-    args: &ArgMatches
-) -> Result<(), Box<dyn std::error::Error>> {
-    if !args.contains_id("SolverCfgYaml") {
-        error!("Solver configuration wasn't provided (--solver_cfg_yaml)");
-        return Err(Box::new(CustomError::WrongArg));
+    match solver_type.as_str() {
+        "rmsprop" => {
+            let solver = SolverRMS::from_file(solver_cfg)?;
+            train_net(solver, args)
+        },
+        "sgd" => {
+            let solver = SolverSGD::from_file(solver_cfg)?;
+            train_net(solver, args)
+        }
+        _ => {
+            Err(Box::new(CustomError::Other))
+        }
     }
-
-    if !args.contains_id("SolverState") {
-        error!("Solver state wasn't provided (--state)");
-        return Err(Box::new(CustomError::WrongArg));
-    }
-
-    let solver_state = args.get_one::<String>("SolverState").unwrap();
-    let solver_cfg = args.get_one::<String>("SolverCfgYaml").unwrap();
-
-    let mut solver = SolverRMS::from_file(solver_cfg)?;
-    solver.load_state(solver_state)?;
-
-    train_net(
-        solver,
-        args
-    )
 }
 
 pub fn train_net(
-    solver: impl Solver + Serialize,
+    mut solver: impl Solver + Serialize,
     args: &ArgMatches
 ) -> Result<(), Box<dyn std::error::Error>> {
     if !args.contains_id("TrainData") {
@@ -72,6 +56,11 @@ pub fn train_net(
 
     let train_ds = args.get_one::<String>("TrainData").unwrap();
     let train_ds = Box::new(ProtobufDataLoader::from_file(train_ds)?);
+
+    if let Some(state_file) = args.get_one::<String>("SolverState") {
+        info!("Loading solver state from file {}", *state_file);
+        solver.load_state(state_file)?;
+    }
 
     let mut net = Network::new(train_ds, solver);
 
@@ -129,12 +118,12 @@ pub fn train_net(
         let err = opt_err.unwrap();
 
         info!("Start train till the err {}", *err);
-        net.train_for_error(*err);
+        net.train_for_error(*err)?;
     } else if opt_max_iter.is_some() {
         let max_iter = opt_max_iter.unwrap();
 
         info!("Start train max iteration {}", *max_iter);
-        net.train_for_n_times(*max_iter);
+        net.train_for_n_times(*max_iter)?;
     } else {
         error!("Error and max iteration for training wasn't set (--max_iter , -err)");
         return Err(Box::new(CustomError::WrongArg));
