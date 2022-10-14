@@ -2,7 +2,7 @@ use ndarray::Array;
 
 use std::cell::RefCell;
 
-use crate::util::{Blob, DataVecPtr, DataVec};
+use crate::util::{DataVecPtr, DataVec};
 
 
 #[derive(Clone, Default)]

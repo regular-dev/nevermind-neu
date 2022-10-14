@@ -5,12 +5,11 @@ use std::rc::Rc;
 use std::ops::DerefMut;
 
 use ndarray_rand::rand_distr::{Uniform, Distribution};
-use ndarray_rand::rand::{Rng, SeedableRng};
+use ndarray_rand::rand::{SeedableRng};
 use ndarray_rand::rand::rngs::SmallRng;
 use ndarray_rand::RandomExt;
-use ndarray::ArrayView;
 
-use super::util::{Blob, DataVec, WsBlob, WsMat};
+use super::util::{DataVec, WsBlob, WsMat};
 
 #[derive(Clone, Default)]
 pub struct LearnParams {

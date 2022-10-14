@@ -2,18 +2,14 @@ use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 
 use ndarray::Zip;
-use ndarray::{array, Array, Array1, Array2};
-use ndarray_rand::rand_distr::Uniform;
-use ndarray_rand::RandomExt;
 
 use log::debug;
 
 use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
-use crate::activation::{sigmoid, sigmoid_deriv, Activation};
+use crate::activation::{Activation};
 use crate::learn_params::{LearnParams, ParamsBlob};
-use crate::util::{Blob, DataVec, Num, Variant, WsBlob, WsMat};
+use crate::util::{DataVec, Variant};
 
-use rand::Rng;
 
 pub struct ErrorLayer<T: Fn(f32) -> f32, TD: Fn(f32) -> f32> {
     pub error: f32,

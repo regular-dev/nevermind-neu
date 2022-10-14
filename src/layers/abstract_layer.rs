@@ -1,16 +1,7 @@
 use std::collections::HashMap;
-use std::vec::Vec;
 
-use ndarray::Array2;
-
-use serde::ser::{SerializeSeq, SerializeStruct};
-use serde::{Deserialize, Serialize, Serializer};
-
-use std::cell::RefCell;
-use std::rc::Rc;
-
-use crate::learn_params::{LearnParams, LearnParamsPtr, ParamsBlob};
-use crate::util::{Blob, DataVec, Num, Variant, WsBlob, DataVecPtr};
+use crate::learn_params::{LearnParams, ParamsBlob};
+use crate::util::{DataVec, Variant, DataVecPtr};
 
 #[derive(Debug)]
 pub enum LayerError {

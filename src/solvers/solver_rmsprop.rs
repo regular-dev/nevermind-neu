@@ -5,7 +5,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::ops::Deref;
 
-use log::{debug, error};
+use log::{debug};
 
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -13,14 +13,14 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use prost::Message;
 
 use super::solver::{
-    pb::{PbBatchCounter, PbFloatVec, PbSolverRms, PbWsBlob},
+    pb::{PbBatchCounter, PbSolverRms},
     BatchCounter, Solver,
 };
 use super::solver_helper;
 use crate::dataloader::DataBatch;
-use crate::layers_storage::{LayersStorage, SerdeLayersStorage};
+use crate::layers_storage::{LayersStorage};
 use crate::learn_params::LearnParams;
-use crate::util::{DataVec, Num, WsBlob, WsMat};
+use crate::util::{WsBlob, WsMat};
 
 use uuid::Uuid;
 

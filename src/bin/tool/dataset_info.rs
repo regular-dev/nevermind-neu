@@ -2,7 +2,7 @@ use regular_mind::dataloader::*;
 use regular_mind::util::*;
 use regular_mind::err::*;
 
-use log::{error, info};
+use log::error;
 
 use clap::ArgMatches;
 

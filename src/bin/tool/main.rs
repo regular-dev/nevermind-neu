@@ -1,9 +1,7 @@
 extern crate regular_mind;
 
-use std::collections::HashMap;
-
 use clap;
-use clap::{App, Arg, ArgMatches, Command, ArgAction};
+use clap::{App, Arg, Command, ArgAction};
 
 use env_logger::Env;
 

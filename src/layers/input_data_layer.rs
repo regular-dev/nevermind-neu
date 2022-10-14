@@ -1,15 +1,9 @@
 use std::collections::HashMap;
-use std::vec::Vec;
-use std::ops::DerefMut;
 
-use serde::ser::SerializeStruct;
-use serde::{Serialize, Serializer};
+use super::abstract_layer::{AbstractLayer, LayerError, LayerForwardResult};
 
-use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerError, LayerForwardResult};
-
-use crate::activation::sigmoid_on_vec;
-use crate::learn_params::{LearnParams, ParamsBlob};
-use crate::util::{Blob, DataVec, Variant, WsBlob, WsMat, DataVecPtr};
+use crate::learn_params::{LearnParams};
+use crate::util::{Blob, Variant, DataVecPtr};
 
 #[derive(Default)]
 pub struct InputDataLayer {
@@ -68,8 +62,6 @@ impl AbstractLayer for InputDataLayer {
 }
 
 impl InputDataLayer {
-    pub fn load_data(&mut self, input: Blob) {}
-
     pub fn new(input_size: usize) -> Self {
         Self {
             input_size,

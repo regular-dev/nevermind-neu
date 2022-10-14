@@ -1,20 +1,15 @@
-use log::{debug, error, info, warn};
+use log::{error, info};
 
 use std::time::Instant;
-use std::collections::HashMap;
 
 use serde::Serialize;
 
 use clap::ArgMatches;
 
 // regular_mind
-use regular_mind::activation::*;
 use regular_mind::dataloader::*;
-use regular_mind::layers::*;
-use regular_mind::layers_storage::*;
 use regular_mind::network::*;
 use regular_mind::solvers::*;
-use regular_mind::util::*;
 use regular_mind::err::*;
 
 /// Starts train a network with required net configuration

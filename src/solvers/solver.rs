@@ -5,8 +5,6 @@ use serde::{Serialize, Deserialize};
 
 use crate::dataloader::DataBatch;
 use crate::layers_storage::LayersStorage;
-use crate::solvers::*;
-use crate::err::*;
 
 
 pub trait Solver {

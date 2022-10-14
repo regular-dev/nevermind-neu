@@ -1,10 +1,7 @@
 use std::option::Option;
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
-use crate::learn_params::{LearnParams, LearnParamsPtr, ParamsBlob};
-use crate::util::{Blob, DataVec, Variant, WsBlob, WsMat};
+use crate::learn_params::{LearnParams, ParamsBlob};
+use crate::util::DataVec;
 use crate::layers::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
 
 // not used

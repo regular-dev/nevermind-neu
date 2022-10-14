@@ -3,15 +3,13 @@ use std::error::Error;
 use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use log::debug;
 use uuid::Uuid;
-
-use ndarray::{Array, Array2}; // test purpose @xion
 
 use prost::Message;
 
@@ -23,7 +21,7 @@ use super::solver_helper;
 use crate::dataloader::DataBatch;
 use crate::layers_storage::LayersStorage;
 use crate::learn_params::LearnParams;
-use crate::util::{DataVec, Num, WsBlob, WsMat};
+use crate::util::{DataVec, WsBlob, WsMat};
 
 // Train/Test Impl
 pub struct SolverSGD {

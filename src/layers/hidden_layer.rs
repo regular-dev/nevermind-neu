@@ -2,24 +2,18 @@ use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 
 use ndarray::Zip;
-use ndarray::{Array, Array1, Array2};
-use ndarray_rand::rand_distr::Uniform;
-use ndarray_rand::RandomExt;
 
 use log::debug;
 
-use ndarray::parallel::prelude::*;
-
 use crate::learn_params::{LearnParams, ParamsBlob};
-use crate::util::Num;
+
 
 use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
-use crate::activation::{sigmoid, sigmoid_deriv, Activation};
-use crate::activation::*;
-use crate::bias::{Bias, ConstBias};
-use crate::util::{Blob, DataVec, Variant, WsBlob, WsMat};
+use crate::activation::Activation;
 
-use rand::Rng;
+use crate::bias::{Bias, ConstBias};
+use crate::util::Variant;
+
 
 pub struct HiddenLayer<T: Fn(f32) -> f32, TD: Fn(f32) -> f32> {
     pub lr_params: LearnParams,
