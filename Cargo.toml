@@ -9,6 +9,9 @@ autoexamples = true
 [[example]]
 name = "xor"
 
+[[example]]
+name = "mnist"
+
 [dependencies]
 rand = "0.5"
 serde = { version = "1.0", features = ["derive"] }
@@ -29,6 +32,8 @@ prost = "0.11" # Protobuf for serializing/deserializing net state
 prost-types = "0.11"
 
 clap = { version = "3.2.22" }
+
+rust-mnist = "0.1" # TODO : must be an optional build feature
 
 [dependencies.uuid]
 version = "1.1.2"

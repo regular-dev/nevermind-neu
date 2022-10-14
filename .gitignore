@@ -16,6 +16,6 @@ Cargo.lock
 .vscode/
 examples/mnist
 network.cfg
-solver_state.proto
+*.proto
 err.log
 *.state

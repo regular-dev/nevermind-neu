@@ -25,14 +25,14 @@ pub trait Solver {
 #[derive(Serialize, Deserialize)]
 pub struct SolverSerializeHelper
 {
-    type_solver: String,
+    solver_type: String,
 }
 
 pub fn solver_type_from_file(file: &str) -> Result<String, Box<dyn Error>> {
     let solver_file = File::open(file)?;
     let solver_helper: SolverSerializeHelper = serde_yaml::from_reader(solver_file)?;
 
-    return Ok(solver_helper.type_solver);
+    return Ok(solver_helper.solver_type);
 }
 
 pub struct BatchCounter {

@@ -140,7 +140,7 @@ where
                 err_arr[i] = test_data.expected[i] - out[i];
             }
 
-            let out_err = err_arr.sum() / err_arr.shape()[0] as f32;
+            let out_err = (err_arr.sum() / err_arr.shape()[0] as f32).abs(); // TODO : root squared error
             err += out_err;
         }
 

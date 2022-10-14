@@ -68,12 +68,17 @@ pub fn train_net(
 
     if let Some(test_iter) = args.get_one::<usize>("TestIter") {
         info!("Test iter : {}", test_iter);
-        net = net.test_iter(*test_iter);
+        net = net.test_iter(*test_iter as usize);
     }
 
     if let Some(snap_iter) = args.get_one::<usize>("SnapIter") {
         info!("Snapshot iter : {}", snap_iter);
         net = net.snap_iter(*snap_iter);
+    }
+
+    if let Some(test_batch) = args.get_one::<usize>("TestBatch") {
+        info!("Test batch size : {}", test_batch);
+        net = net.test_batch_num(*test_batch);
     }
 
     if let Some(write_test_err) = args.get_one::<String>("WriteErrToFile") {
