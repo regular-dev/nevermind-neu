@@ -15,12 +15,12 @@ use crate::util::{Blob, DataVec, Num, Variant, WsBlob, WsMat};
 
 use rand::Rng;
 
-pub struct ErrorLayer<T: Fn(f32) -> f32, TD: Fn(f32) -> f32 > {
+pub struct ErrorLayer<T: Fn(f32) -> f32, TD: Fn(f32) -> f32> {
     pub error: f32,
     pub size: usize,
     pub prev_size: usize,
     pub lr_params: LearnParams,
-    pub activation: Activation<T, TD>
+    pub activation: Activation<T, TD>,
 }
 
 impl<T, TD> AbstractLayer for ErrorLayer<T, TD>
@@ -35,11 +35,11 @@ where
 
         let mul_res = inp_m.deref() * ws_mat;
 
-        Zip::from(out_m.deref_mut()).and(mul_res.rows()).par_for_each(
-            |out_el, in_row| {
+        Zip::from(out_m.deref_mut())
+            .and(mul_res.rows())
+            .par_for_each(|out_el, in_row| {
                 *out_el = (self.activation.func)(in_row.sum());
-            }
-        );
+            });
 
         debug!("[ok] ErrorLayer forward()");
 
@@ -99,7 +99,7 @@ where
     }
 
     fn set_layer_cfg(&mut self, cfg: &HashMap<String, Variant>) {
-        let (mut size, mut prev_size) : (usize, usize) = (0, 0);
+        let (mut size, mut prev_size): (usize, usize) = (0, 0);
 
         if let Variant::Int(var_size) = cfg.get("size").unwrap() {
             size = *var_size as usize;
