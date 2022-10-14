@@ -14,5 +14,6 @@ pub mod network;
 pub mod err;
 
 pub mod prelude {
+    pub use crate::network::save_solver_cfg;
     // pub use crate::network::* and etc...
 }

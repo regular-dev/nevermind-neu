@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use std::fmt;
+
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::layer_fabric::*;
@@ -79,6 +81,19 @@ impl LayersStorage {
 
     pub fn last(&self) -> Option<&Box<dyn AbstractLayer>> {
         return self.layers.last();
+    }
+}
+
+impl fmt::Display for LayersStorage {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut out = String::new();
+
+        for i in &self.layers {
+            out += i.size().to_string().as_str();
+            out += "-";
+        }
+
+        write!(f, "{}", &out.as_str()[0..out.len()-1])
     }
 }
 

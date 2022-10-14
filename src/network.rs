@@ -85,28 +85,14 @@ where
         self.test_dl = Some(test_dl);
         self
     }
-    
     pub fn write_test_err_to_file(mut self, state: bool) -> Self {
         self.is_write_test_err = state;
         self
     }
 
+    /// TODO : rename this method. it make a confusion with save_solver_cfg ?
     pub fn save_network_cfg(&mut self, path: &str) -> std::io::Result<()> {
-        let json_str_result = serde_yaml::to_string(&self.solver);
-
-        let mut output = File::create(path)?;
-
-        match json_str_result {
-            Ok(json_str) => {
-                output.write_all(json_str.as_bytes())?;
-            }
-            Err(x) => {
-                eprintln!("Error (serde-yaml) serializing net layers !!!");
-                return Err(std::io::Error::new(ErrorKind::Other, x));
-            }
-        }
-
-        Ok(())
+        save_solver_cfg(&self.solver, path)
     }
 
     pub fn snap_iter(mut self, snap_each_iter: usize) -> Self {
@@ -284,4 +270,23 @@ where
 
         Ok(())
     }
+}
+
+/// TODO : rename this method. it make a confusion with save_network_cfg ?
+pub fn save_solver_cfg <S: Solver + Serialize>(solver: &S, path: &str) -> std::io::Result<()> {
+    let json_str_result = serde_yaml::to_string(solver);
+
+    let mut output = File::create(path)?;
+
+    match json_str_result {
+        Ok(json_str) => {
+            output.write_all(json_str.as_bytes())?;
+        }
+        Err(x) => {
+            eprintln!("Error (serde-yaml) serializing net layers !!!");
+            return Err(std::io::Error::new(ErrorKind::Other, x));
+        }
+    }
+
+    Ok(())
 }
