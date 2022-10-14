@@ -1,7 +1,12 @@
 use std::error::Error;
+use std::fs::File;
+
+use serde::{Serialize, Deserialize};
 
 use crate::dataloader::DataBatch;
 use crate::layers_storage::LayersStorage;
+use crate::solvers::*;
+use crate::err::*;
 
 
 pub trait Solver {
@@ -13,8 +18,23 @@ pub trait Solver {
     fn layers(&self) -> &LayersStorage;
     fn batch_size(&self) -> usize;
 
+    fn solver_type(&self) -> &str;
+
     fn save_state(&self, filepath: &str) -> Result<(), Box<dyn Error>>;
     fn load_state(&mut self, filepath: &str) -> Result<(), Box<dyn Error>>;
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SolverSerializeHelper
+{
+    type_solver: String,
+}
+
+pub fn solver_type_from_file(file: &str) -> Result<String, Box<dyn Error>> {
+    let solver_file = File::open(file)?;
+    let solver_helper: SolverSerializeHelper = serde_yaml::from_reader(solver_file)?;
+
+    return Ok(solver_helper.type_solver);
 }
 
 pub struct BatchCounter {

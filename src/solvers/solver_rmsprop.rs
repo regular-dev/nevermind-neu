@@ -111,7 +111,6 @@ impl SolverRMS {
         for neu_idx in 0..ws.shape()[0] {
             for prev_idx in 0..ws.shape()[1] {
                 let cur_ws_idx = [neu_idx, prev_idx];
-                // let grad = err_vals[neu_idx] * fn_prev(idx_ws, prev_idx);
                 rms[cur_ws_idx] =
                     alpha * rms[cur_ws_idx] + (1.0 - alpha) * ws_grad[cur_ws_idx].powf(2.0);
                 ws_batch[cur_ws_idx] +=
@@ -173,6 +172,10 @@ impl Solver for SolverRMS {
         }
 
         self.batch_cnt.increment();
+    }
+
+    fn solver_type(&self) -> &str {
+        "rmsprop"
     }
 
     fn layers(&self) -> &LayersStorage {
@@ -253,6 +256,7 @@ impl Serialize for SolverRMS {
         solver_cfg.serialize_field("theta", &self.theta)?;
         solver_cfg.serialize_field("batch_size", &self.batch_cnt.batch_size)?;
         solver_cfg.serialize_field("layers_cfg", &self.layers)?;
+        solver_cfg.serialize_field("solver_type", self.solver_type())?;
         solver_cfg.end()
     }
 }

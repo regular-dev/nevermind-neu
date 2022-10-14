@@ -119,6 +119,12 @@ impl SolverSGD {
         self.batch_cnt.batch_size = batch_size;
         self
     }
+
+    pub fn from_file(filepath: &str) -> Result<Self, Box<dyn Error>> {
+        let net_cfg_file = File::open(filepath)?;
+        let solver_sgd: SolverSGD = serde_yaml::from_reader(net_cfg_file)?;
+        Ok(solver_sgd)
+    }
 }
 
 impl Solver for SolverSGD {
@@ -161,6 +167,10 @@ impl Solver for SolverSGD {
         }
 
         self.batch_cnt.increment();
+    }
+
+    fn solver_type(&self) -> &str {
+        "sgd"
     }
 
     fn layers(&self) -> &LayersStorage {
@@ -232,6 +242,7 @@ impl Serialize for SolverSGD {
         solver_cfg.serialize_field("learning_rate", &self.learn_rate)?;
         solver_cfg.serialize_field("momentum", &self.momentum)?;
         solver_cfg.serialize_field("layers_cfg", &self.layers)?;
+        solver_cfg.serialize_field("solver_type", self.solver_type())?;
         solver_cfg.end()
     }
 }
