@@ -27,8 +27,6 @@ use crate::util::{DataVec, WsBlob, WsMat};
 pub struct SolverSGD {
     pub learn_rate: f32,
     pub momentum: f32,
-    err: f32,
-    cur_err: f32,
     layers: LayersStorage,
     ws_delta: HashMap<Uuid, WsBlob>,
     ws_batch: HashMap<Uuid, WsBlob>,
@@ -41,8 +39,6 @@ impl SolverSGD {
             layers: LayersStorage::new(),
             learn_rate: 0.2,
             momentum: 0.2,
-            err: 999999.0,
-            cur_err: 0.0,
             ws_delta: HashMap::new(),
             ws_batch: HashMap::new(),
             batch_cnt: BatchCounter::new(1),
