@@ -25,8 +25,8 @@ use crate::util::{DataVec, WsBlob, WsMat};
 
 // Train/Test Impl
 pub struct SolverSGD {
-    learn_rate: f32,
-    momentum: f32,
+    pub learn_rate: f32,
+    pub momentum: f32,
     err: f32,
     cur_err: f32,
     layers: LayersStorage,
@@ -58,7 +58,6 @@ impl SolverSGD {
         update_ws: bool,
     ) {
         let mut lr_ws = lr.ws.borrow_mut();
-        let lr_err_vals = lr.err_vals.borrow();
         let lr_grad = lr.ws_grad.borrow();
 
         if !ws_delta.contains_key(&lr.uuid) {
@@ -82,8 +81,6 @@ impl SolverSGD {
                 &mut batch_mat[ws_idx],
                 learn_rate,
                 alpha,
-                lr_err_vals.deref(),
-                ws_idx,
                 update_ws,
             );
         }
@@ -96,19 +93,22 @@ impl SolverSGD {
         ws_batch: &mut WsMat,
         learn_rate: &f32,
         alpha: &f32,
-        err_vals: &DataVec,
-        idx_ws: usize,
         update_ws: bool,
     ) {
         for neu_idx in 0..ws.shape()[0] {
             for prev_idx in 0..ws.shape()[1] {
                 let cur_ws_idx = [neu_idx, prev_idx];
                 // ALPHA
-                ws[cur_ws_idx] += alpha * ws_delta[cur_ws_idx];
+                ws_batch[cur_ws_idx] += alpha * ws_delta[cur_ws_idx];
                 // LEARNING RATE
                 ws_delta[cur_ws_idx] = learn_rate * ws_grad[cur_ws_idx];
 
-                ws[cur_ws_idx] += ws_delta[cur_ws_idx];
+                ws_batch[cur_ws_idx] += ws_delta[cur_ws_idx];
+
+                if update_ws {
+                    ws[cur_ws_idx] += ws_batch[cur_ws_idx];
+                    ws_batch[cur_ws_idx] = 0.0;
+                }
             }
         }
     }

@@ -273,7 +273,7 @@ where
 }
 
 /// TODO : rename this method. it make a confusion with save_network_cfg ?
-pub fn save_solver_cfg <S: Solver + Serialize>(solver: &S, path: &str) -> std::io::Result<()> {
+pub fn save_solver_cfg<S: Solver + Serialize>(solver: &S, path: &str) -> std::io::Result<()> {
     let json_str_result = serde_yaml::to_string(solver);
 
     let mut output = File::create(path)?;
