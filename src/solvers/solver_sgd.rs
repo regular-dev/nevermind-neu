@@ -233,8 +233,9 @@ impl Serialize for SolverSGD {
         S: Serializer,
     {
         let mut solver_cfg = serializer.serialize_struct("SolverSGD Configuration", 3)?;
-        solver_cfg.serialize_field("learning_rate", &self.learn_rate)?;
+        solver_cfg.serialize_field("learn_rate", &self.learn_rate)?;
         solver_cfg.serialize_field("momentum", &self.momentum)?;
+        solver_cfg.serialize_field("batch_size", &self.batch_cnt.batch_size)?;
         solver_cfg.serialize_field("layers_cfg", &self.layers)?;
         solver_cfg.serialize_field("solver_type", self.solver_type())?;
         solver_cfg.end()
