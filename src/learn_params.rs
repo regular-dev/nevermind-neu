@@ -39,7 +39,8 @@ impl LearnParams {
 
     pub fn new_with_const_bias(size: usize, prev_size: usize) -> Self {
         let ws = WsMat::random((size, prev_size), Uniform::new(-0.5, 0.5));
-        let ws_bias = WsMat::random((size, 1), Uniform::new(-0.5, 0.5));
+        // let ws_bias = WsMat::random((size, 1), Uniform::new(-0.5, 0.5));
+        let ws_bias = WsMat::from_elem((size, 1), 0.1);
 
         Self {
             ws: Rc::new(RefCell::new(vec![ws, ws_bias])),
