@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use std::fmt;
 
+use log::debug;
+
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::layer_fabric::*;
@@ -142,6 +144,7 @@ impl<'de> Deserialize<'de> for LayersStorage {
             let l_opt = create_layer(i.name.as_str(), Some(&i.params));
 
             if let Some(l) = l_opt {
+                debug!("Create layer : {}", i.name);
                 ls.layers.push(l);
             } else {
                 // TODO : impl return D::Error
