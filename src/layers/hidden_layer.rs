@@ -7,13 +7,11 @@ use log::debug;
 
 use crate::learn_params::{LearnParams, ParamsBlob};
 
-
 use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
 use crate::activation::Activation;
 
 use crate::bias::{Bias, ConstBias};
 use crate::util::Variant;
-
 
 pub struct HiddenLayer<T: Fn(f32) -> f32, TD: Fn(f32) -> f32> {
     pub lr_params: LearnParams,
@@ -104,6 +102,10 @@ where
 
         cfg.insert("size".to_owned(), Variant::Int(self.size as i32));
         cfg.insert("prev_size".to_owned(), Variant::Int(self.prev_size as i32));
+        cfg.insert(
+            "activation".to_owned(),
+            Variant::String(self.activation.name.clone()),
+        );
 
         cfg
     }
@@ -148,7 +150,6 @@ where
         }
     }
 
-    
     pub fn dropout(mut self, val: f32) -> Self {
         self.dropout = val;
         self.lr_params.drop_ws(val);
