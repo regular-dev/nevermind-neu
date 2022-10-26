@@ -49,7 +49,7 @@ pub fn sigmoid_on_vec(input: &DataVec, output: &mut DataVec) {
 pub struct Activation<T: Fn(f32) -> f32, TD: Fn(f32) -> f32> {
     pub func: T,
     pub func_deriv: TD,
-    name: String,
+    pub name: String,
 }
 
 impl<T, TD> Activation<T, TD>
