@@ -56,7 +56,7 @@ where
             test_dl: None,
             test_batch_size: 1,
             test_err: 0.0,
-            is_write_test_err: false,
+            is_write_test_err: true,
             solver,
             snap_iter: 0,
             test_iter: 0,
@@ -137,10 +137,10 @@ where
             let mut err_arr = Array1::zeros(out.shape()[0]);
 
             for i in 0..out.shape()[0] {
-                err_arr[i] = test_data.expected[i] - out[i];
+                err_arr[i] = (test_data.expected[i] - out[i]).powf(2.0);
             }
 
-            let out_err = (err_arr.sum() / err_arr.shape()[0] as f32).abs(); // TODO : root squared error
+            let out_err = (err_arr.sum() / err_arr.shape()[0] as f32).sqrt(); // TODO : root squared error
             err += out_err;
         }
 
@@ -226,8 +226,6 @@ where
                 if iter_num % self.test_iter == 0 && iter_num != 0 {
                     test_err = self.test_net();
 
-                    info!("On iter {} , error is {}", iter_num, test_err);
-
                     if test_err < err {
                         info!("Reached satisfying error value");
                         break;
@@ -241,7 +239,7 @@ where
             }
 
             // TODO : make an argument to display info
-            if iter_num != 0 && iter_num % 100 == 0 {
+            if iter_num != 0 && iter_num % 100 == 0 && self.is_bench_time {
                 let elapsed = bench_time.elapsed();
                 info!("Do {} Iteration for {:.4} secs", 100, elapsed.as_secs_f32());
                 bench_time = Instant::now();
@@ -254,8 +252,12 @@ where
                 self.save_solver_state(&filename)?;
             }
 
-            if self.test_iter != 0 && iter_num % self.test_iter == 0 && iter_num != 0 {
-                info!("on iter {} , error is : {}", iter_num, test_err);
+            if self.test_iter != 0
+                && iter_num % self.test_iter == 0
+                && iter_num != 0
+                && self.is_write_test_err
+            {
+                info!("On iter {} , error is : {}", iter_num, test_err);
                 self.append_error(&mut err_file, test_err)?;
             }
 
