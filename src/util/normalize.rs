@@ -1,26 +1,12 @@
 use ndarray::Zip;
 
 use crate::util::DataVec;
+use crate::util::array_helpers::*;
 
 /// With minmax normalising values will be between 0..1
 pub fn minmax_normalize(data: &mut DataVec) {
-    let min = data.fold(f32::MAX, 
-    |val_min, val| {
-        if *val < val_min {
-            return *val;
-        } else {
-            return val_min;
-        }
-    });
-
-    let max = data.fold(f32::MIN,
-    |val_max, val| {
-        if *val > val_max {
-            return *val;
-        } else {
-            return val_max;
-        }
-    });
+    let min = min(data);
+    let max = max(data);
 
     minmax_normalize_params(data, min, max);
 }
