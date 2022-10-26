@@ -26,9 +26,6 @@ impl ConstBias {
 impl Bias for ConstBias {
     fn forward(&mut self, ws: &WsMat) -> &DataVec {
         self.output = (self.val * ws).into_shape(self.output.len()).unwrap();
-
-        debug!("self.output : {}", &self.output);
-
         &self.output
     }
 }
