@@ -8,19 +8,15 @@ use clap::ArgMatches;
 
 
 pub fn dataset_info(args: &ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
-    if !args.contains_id("TrainData") {
-        error!("TrainData wasn't provided (--train_dataset)");
+    if !args.contains_id("Data") {
+        error!("Dataset wasn't provided (--dataset)");
         return Err(Box::new(CustomError::WrongArg));
     }
 
-    let filepath = args.get_one::<String>("TrainData").unwrap();
+    let filepath = args.get_one::<String>("Data").unwrap();
 
     let loader = ProtobufDataLoader::from_file(filepath)?;
     println!("Dataset length : {}", loader.data.len());
-
-    for i in loader.data {
-        println!("eval encoded : {}", i.expected.first().unwrap());
-    }
 
     Ok(())
 }

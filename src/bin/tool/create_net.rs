@@ -8,12 +8,12 @@ use clap::ArgMatches;
 
 use log::info;
 
-use regular_mind::err::*;
-use regular_mind::layers_storage::*;
-use regular_mind::solvers::*;
-use regular_mind::layers::*;
-use regular_mind::network::*;
 use regular_mind::activation::*;
+use regular_mind::err::*;
+use regular_mind::layers::*;
+use regular_mind::layers_storage::*;
+use regular_mind::network::*;
+use regular_mind::solvers::*;
 
 fn read_from_stdin<T: FromStr>(stdin: &io::Stdin) -> Result<T, Box<dyn Error>> {
     let mut inp_str = String::new();
@@ -96,17 +96,33 @@ fn create_layers<T: Solver + Serialize>(
 
             match answ.as_str() {
                 "sigmoid" => {
-                    ls.add_layer(Box::new(HiddenLayer::new(l_size, prev_s, activation_macros::sigmoid_activation!())));
-                },
+                    ls.add_layer(Box::new(HiddenLayer::new(
+                        l_size,
+                        prev_s,
+                        activation_macros::sigmoid_activation!(),
+                    )));
+                }
                 "tanh" => {
-                    ls.add_layer(Box::new(HiddenLayer::new(l_size, prev_s, activation_macros::tanh_activation!())));
-                },
+                    ls.add_layer(Box::new(HiddenLayer::new(
+                        l_size,
+                        prev_s,
+                        activation_macros::tanh_activation!(),
+                    )));
+                }
                 "relu" => {
-                    ls.add_layer(Box::new(HiddenLayer::new(l_size, prev_s, activation_macros::relu_activation!())));
-                },
+                    ls.add_layer(Box::new(HiddenLayer::new(
+                        l_size,
+                        prev_s,
+                        activation_macros::relu_activation!(),
+                    )));
+                }
                 "raw" => {
-                    ls.add_layer(Box::new(HiddenLayer::new(l_size, prev_s, activation_macros::raw_activation!())));
-                },
+                    ls.add_layer(Box::new(HiddenLayer::new(
+                        l_size,
+                        prev_s,
+                        activation_macros::raw_activation!(),
+                    )));
+                }
                 _ => {
                     return Err(Box::new(CustomError::WrongArg));
                 }
@@ -117,14 +133,21 @@ fn create_layers<T: Solver + Serialize>(
         }
     }
 
-    println!("Tell me output layer size");
-    let out_l_size:usize = read_from_stdin(stdin)?;
+    println!("Tell me output layer type [raw, softmax_loss]");
+    let out_l_type: String = read_from_stdin(stdin)?;
 
-    ls.add_layer(Box::new(HiddenLayer::new(
-        out_l_size,
-        prev_s,
-        activation_macros::raw_activation!(),
-    )));
+    println!("Tell me output layer size");
+    let out_l_size: usize = read_from_stdin(stdin)?;
+
+    if out_l_type == "raw" {
+        ls.add_layer(Box::new(ErrorLayer::new(
+            out_l_size,
+            prev_s,
+            activation_macros::raw_activation!(),
+        )));
+    } else if out_l_type == "softmax_loss" {
+        ls.add_layer(Box::new(SoftmaxLossLayer::new(out_l_size, prev_s)));
+    }
 
     println!("Finally network : {}", ls);
 

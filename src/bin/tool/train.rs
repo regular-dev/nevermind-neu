@@ -102,7 +102,7 @@ pub fn train_net(
     }
 
     if let Some(max_iter) = args.get_one::<usize>("MaxIter") {
-        info!("Satisfying error : {}", max_iter);
+        info!("Iteration limit : {}", max_iter);
         opt_max_iter = Some(max_iter);
     }
 
