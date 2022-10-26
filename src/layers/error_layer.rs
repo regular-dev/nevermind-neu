@@ -48,8 +48,6 @@ where
         expected_vec: &DataVec,
     ) -> LayerBackwardResult {
         let prev_input = &prev_input[0].output.borrow();
-        // let mut self_err_vals = self.lr_params.err_vals.borrow_mut();
-        // let self_output = self.lr_params.output.borrow();
         let mut self_err_vals = self.lr_params.err_vals.borrow_mut();
         let self_output = self.lr_params.output.borrow();
 
