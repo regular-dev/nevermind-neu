@@ -2,11 +2,10 @@ use std::collections::HashMap;
 
 use log::warn;
 
-use super::layers::{AbstractLayer, DummyLayer, ErrorLayer, HiddenLayer, InputDataLayer};
 use super::util::Variant;
 use crate::activation::Activation;
 use crate::activation::*;
-
+use crate::layers::*;
 
 /// Fabric used to create neural network layers, when deserialing and other cases
 /// TODO : create a macros for below implementation
@@ -16,13 +15,36 @@ pub fn create_layer(
 ) -> Option<Box<dyn AbstractLayer>> {
     match layer_type {
         "ErrorLayer" => {
-            let mut l = Box::new( layers_macros::raw_error_layer!() );
+            let mut l = Box::new(layers_macros::raw_error_layer!());
             if cfg.is_some() {
                 l.set_layer_cfg(cfg.unwrap());
             }
             return Some(l);
         }
         "HiddenLayer" => {
+            // TODO : deserialize activation function
+            if let Some(cfg_val) = cfg {
+                let mut l: Option<Box<dyn AbstractLayer>> = None;
+                let activation = cfg_val.get("activation").unwrap(); // TODO : refactor unwrap()
+
+                if let Variant::String(activation) = activation {
+                    if activation == "sigmoid" {
+                        l = Some(Box::new(layers_macros::sigmoid_hidden_layer!()));
+                    } else if activation == "tanh" {
+                        l = Some(Box::new(layers_macros::tanh_hidden_layer!()));
+                    } else if activation == "relu" {
+                        l = Some(Box::new(layers_macros::relu_hidden_layer!()));
+                    }
+                }
+
+                if l.is_none() {
+                    l = Some(Box::new(layers_macros::sigmoid_hidden_layer!()));
+                }
+
+                l.as_mut().unwrap().set_layer_cfg(cfg_val);
+                return l;
+            }
+
             let mut l = Box::new(layers_macros::sigmoid_hidden_layer!());
             if cfg.is_some() {
                 l.set_layer_cfg(cfg.unwrap());
@@ -40,6 +62,13 @@ pub fn create_layer(
             let l = Box::new(DummyLayer::default());
             return Some(l);
         }
+        "SoftmaxLossLayer" => {
+            let mut l = Box::new(SoftmaxLossLayer::default());
+            if let Some(cfg_val) = cfg {
+                l.set_layer_cfg(cfg_val);
+            }
+            return Some(l);
+        }
         _ => {
             warn!("Couldn't create a layer with name : {}", &layer_type);
             return None;
@@ -49,18 +78,20 @@ pub fn create_layer(
 
 pub mod layers_macros {
     macro_rules! sigmoid_hidden_layer {
-        (  ) => {
-            {
-                HiddenLayer::new(0, 0, activation_macros::sigmoid_activation!())                
-            }
-        };
+        (  ) => {{
+            HiddenLayer::new(0, 0, activation_macros::sigmoid_activation!())
+        }};
     }
 
     macro_rules! tanh_hidden_layer {
-        (  ) => {
-            {
-                HiddenLayer::new(0, 0, activation_macros::tanh_activation!())                
-            }
+        (  ) => {{
+            HiddenLayer::new(0, 0, activation_macros::tanh_activation!())
+        }};
+    }
+
+    macro_rules! relu_hidden_layer {
+        () => {
+            HiddenLayer::new(0, 0, activation_macros::relu_activation!())
         };
     }
 
@@ -82,9 +113,10 @@ pub mod layers_macros {
         };
     }
 
-    pub(crate) use sigmoid_hidden_layer; 
-    pub(crate) use tanh_hidden_layer;
-    pub(crate) use sigmoid_error_layer;
-    pub(crate) use tanh_error_layer;
     pub(crate) use raw_error_layer;
+    pub(crate) use relu_hidden_layer;
+    pub(crate) use sigmoid_error_layer;
+    pub(crate) use sigmoid_hidden_layer;
+    pub(crate) use tanh_error_layer;
+    pub(crate) use tanh_hidden_layer;
 }
