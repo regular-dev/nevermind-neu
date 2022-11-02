@@ -8,27 +8,28 @@ use std::str::FromStr;
 use crate::dataloader::DataBatch;
 use crate::layers_storage::LayersStorage;
 use crate::solvers::pb::{PbFloatVec, PbWsBlob};
-use crate::util::WsBlob;
+use crate::util::{Batch, WsBlob};
 
-pub fn feedforward(layers: &mut LayersStorage, train_data: &DataBatch, print_out: bool) {
+// TODO : handle error
+pub fn feedforward(layers: &mut LayersStorage, train_data: Batch, print_out: bool) {
     let mut out = None;
 
-    for (idx, l) in layers.iter_mut().enumerate() {
-        // handle input layer
-        if idx == 0 {
-            let result_out = l.forward_input(train_data.input.clone());
+    // for the first(input) layer
+    {
+        let l_first = layers.first_mut().unwrap();
+        let result_out = l_first.forward_input(train_data);
 
-            match result_out {
-                Err(_reason) => {
-                    return;
-                }
-                Ok(val) => {
-                    out = Some(val);
-                }
-            };
-            continue;
+        match result_out {
+            Err(_reason) => {
+                return;
+            }
+            Ok(val) => {
+                out = Some(val);
+            }
         }
+    }
 
+    for l in layers.iter_mut().skip(1) {
         let result_out = l.forward(out.unwrap());
 
         match result_out {
@@ -51,30 +52,46 @@ pub fn feedforward(layers: &mut LayersStorage, train_data: &DataBatch, print_out
     }
 }
 
-pub fn backpropagate(layers: &mut LayersStorage, train_data: &DataBatch) {
-    let expected_data = &train_data.expected;
+pub fn backpropagate(layers: &mut LayersStorage, train_data: Batch) {
+    let expected_data = train_data;
 
-    let mut prev_out = None;
     let mut out = None;
 
-    for idx in 0..layers.len() {
-        if idx == 0 {
-            prev_out = layers.at_mut(layers.len() - 2).learn_params();
+    // for the last layer
+    {
+        let prev_out = layers.at_mut(layers.len() - 2).learn_params();
+        let result_out = layers
+            .at_mut(layers.len() - 1)
+            .backward_output(vec![prev_out.unwrap()], expected_data);
 
-            let result_out = layers
-                .at_mut(layers.len() - 1)
-                .backward_output(vec![prev_out.unwrap()], expected_data);
-
-            match result_out {
-                Err(reason) => {
-                    return;
-                }
-                Ok(val) => {
-                    out = Some(val);
-                }
+        match result_out {
+            Err(_reason) => {
+                return;
             }
-            continue;
+            Ok(val) => {
+                out = Some(val);
+            }
         }
+    }
+
+    for idx in 1..layers.len() {
+        // if idx == 0 {
+        //     prev_out = layers.at_mut(layers.len() - 2).learn_params();
+
+        //     let result_out = layers
+        //         .at_mut(layers.len() - 1)
+        //         .backward_output(vec![prev_out.unwrap()], expected_data);
+
+        //     match result_out {
+        //         Err(reason) => {
+        //             return;
+        //         }
+        //         Ok(val) => {
+        //             out = Some(val);
+        //         }
+        //     }
+        //     continue;
+        // } TODO : clean comment
 
         if idx == layers.len() - 1 {
             continue;

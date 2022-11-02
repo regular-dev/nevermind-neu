@@ -146,7 +146,7 @@ fn create_layers<T: Solver + Serialize>(
             activation_macros::raw_activation!(),
         )));
     } else if out_l_type == "softmax_loss" {
-        ls.add_layer(Box::new(SoftmaxLossLayer::new(out_l_size, prev_s)));
+     //   ls.add_layer(Box::new(SoftmaxLossLayer::new(out_l_size, prev_s)));
     }
 
     println!("Finally network : {}", ls);

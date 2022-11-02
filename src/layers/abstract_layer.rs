@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
+use crate::dataloader::DataBatch;
 use crate::learn_params::{LearnParams, ParamsBlob};
-use crate::util::{DataVec, Variant, DataVecPtr};
+use crate::util::{Batch, DataVec, DataVecPtr, Variant};
 
 #[derive(Debug)]
 pub enum LayerError {
@@ -15,7 +16,7 @@ pub type LayerBackwardResult = Result<ParamsBlob, LayerError>;
 
 pub trait AbstractLayer {
     // for signature for input layers
-    fn forward_input(&mut self, input_data: DataVecPtr) -> LayerForwardResult {
+    fn forward_input(&mut self, input_data: Batch) -> LayerForwardResult {
         Err(LayerError::NotImpl)
     }
 
@@ -28,11 +29,7 @@ pub trait AbstractLayer {
         Err(LayerError::NotImpl)
     }
 
-    fn backward_output(
-        &mut self,
-        prev_input: ParamsBlob,
-        expected: &DataVec,
-    ) -> LayerBackwardResult {
+    fn backward_output(&mut self, prev_input: ParamsBlob, expected: Batch) -> LayerBackwardResult {
         Err(LayerError::NotImpl)
     }
 

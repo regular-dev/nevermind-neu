@@ -1,6 +1,8 @@
-use crate::dataloader::databatch::DataBatch;
+use crate::dataloader::databatch::{DataBatch, MiniBatch};
 
 pub trait DataLoader {
-    fn next(&mut self) -> &DataBatch;
+    fn next(&self) -> &DataBatch;
+    fn next_batch(&self, size: usize) -> MiniBatch;
+
     fn reset(&mut self) { }
 }

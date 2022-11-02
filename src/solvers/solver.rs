@@ -1,16 +1,16 @@
 use std::error::Error;
 use std::fs::File;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-use crate::dataloader::DataBatch;
+use crate::dataloader::{DataBatch, MiniBatch};
 use crate::layers_storage::LayersStorage;
-
+use crate::util::Batch;
 
 pub trait Solver {
     fn setup_network(&mut self, layers: LayersStorage);
-    fn feedforward(&mut self, train_data: &DataBatch, print_out: bool);
-    fn backpropagate(&mut self, train_data: &DataBatch);
+    fn feedforward(&mut self, train_data: Batch, print_out: bool); // TODO : remove print_out arg
+    fn backpropagate(&mut self, expected_data: Batch);
     fn optimize_network(&mut self);
 
     fn layers(&self) -> &LayersStorage;
@@ -23,8 +23,7 @@ pub trait Solver {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct SolverSerializeHelper
-{
+pub struct SolverSerializeHelper {
     solver_type: String,
 }
 

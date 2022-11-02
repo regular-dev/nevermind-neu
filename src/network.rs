@@ -13,7 +13,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Error, ErrorKind, Write};
 use std::time::Instant;
 
-use ndarray::Array1;
+use ndarray::Zip;
 
 use std::fs::OpenOptions;
 
@@ -21,6 +21,7 @@ use super::dataloader::DataLoader;
 use super::layers_storage::LayersStorage;
 use super::learn_params::LearnParams;
 use super::solvers::SolverRMS;
+use crate::util::Batch;
 
 use super::{
     dataloader::{DataBatch, SimpleDataLoader},
@@ -68,7 +69,8 @@ where
     /// Setup the network with [0] - input size, [...] - hidden neurons, [N] - output size
     /// TODO : make this function static and make as static constructor for Network class
     pub fn setup_simple_network(&mut self, layers: &Vec<usize>) {
-        let ls = LayersStorage::new_simple_network(layers);
+        let mut ls = LayersStorage::new_simple_network(layers);
+        ls.fit_to_batch_size(self.solver.batch_size());
         self.solver.setup_network(ls);
     }
 
@@ -125,29 +127,50 @@ where
         let test_dl = self.test_dl.as_mut().unwrap();
         let mut err = 0.0;
 
-        for _i in 0..self.test_batch_size {
-            let test_data = test_dl.next();
-            self.solver.feedforward(test_data, false);
+        let test_batch = test_dl.next_batch(self.test_batch_size);
+        self.solver.feedforward(test_batch.input, true);
 
-            let layers = self.solver.layers();
-            let last_layer = layers.last().unwrap();
+        let layers = self.solver.layers();
+        let last_layer = layers.last().unwrap();
 
-            let lr = last_layer.learn_params().unwrap();
-            let out = lr.output.borrow();
-            let mut err_arr = Array1::zeros(out.shape()[0]);
+        let lr = last_layer.learn_params().unwrap();
+        let out = lr.output.borrow();
+        let mut err_arr = Batch::zeros((out.shape()[0], out.shape()[1]));
 
-            for i in 0..out.shape()[0] {
-                err_arr[i] = (test_data.expected[i] - out[i]).powf(2.0);
-            }
+        Zip::from(out.rows())
+            .and(test_batch.output.rows())
+            .for_each(|out_r, exp_r| {
+                let mut local_err = 0.0;
 
-            let out_err = (err_arr.sum() / err_arr.shape()[0] as f32).sqrt(); // TODO : root squared error
-            err += out_err;
-        }
+                for i in 0..out_r.shape()[0] {
+                    local_err += (exp_r[i] - out_r[i]).powf(2.0);
+                }
+
+                err += local_err / out_r.shape()[0] as f32;
+            });
+        // for _i in 0..self.test_batch_size {
+        //     let test_data = test_dl.next_();
+        //     self.solver.feedforward(test_data, false);
+
+        //     let layers = self.solver.layers();
+        //     let last_layer = layers.last().unwrap();
+
+        //     let lr = last_layer.learn_params().unwrap();
+        //     let out = lr.output.borrow();
+        //     let mut err_arr = Array1::zeros(out.shape()[0]);
+
+        //     for i in 0..out.shape()[0] {
+        //         err_arr[i] = (test_data.expected[i] - out[i]).powf(2.0);
+        //     }
+
+        //     let out_err = (err_arr.sum() / err_arr.shape()[0] as f32).sqrt();
+        //     err += out_err;
+        // }
 
         err / self.test_batch_size as f32
     }
 
-    pub fn feedforward(&mut self, train_data: &DataBatch, print_out: bool) {
+    pub fn feedforward(&mut self, train_data: Batch, print_out: bool) {
         self.solver.feedforward(train_data, print_out);
     }
 
@@ -164,9 +187,9 @@ where
     }
 
     fn perform_step(&mut self) {
-        let data = self.train_dl.next();
-        self.solver.feedforward(data, false);
-        self.solver.backpropagate(&data);
+        let data = self.train_dl.next_batch(self.solver.batch_size());
+        self.solver.feedforward(data.input, false);
+        self.solver.backpropagate(data.output);
         self.solver.optimize_network();
 
         let lr = self.solver.layers().last().unwrap().learn_params().unwrap();

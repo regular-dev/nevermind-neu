@@ -13,15 +13,11 @@ use uuid::Uuid;
 
 use prost::Message;
 
-use super::solver::{
-    pb::{PbBatchCounter, PbSolverSgd},
-    BatchCounter, Solver,
-};
+use super::solver::{pb::PbSolverSgd, Solver};
 use super::solver_helper;
-use crate::dataloader::DataBatch;
 use crate::layers_storage::LayersStorage;
 use crate::learn_params::LearnParams;
-use crate::util::{DataVec, WsBlob, WsMat};
+use crate::util::{Batch, WsBlob, WsMat};
 
 // Train/Test Impl
 pub struct SolverSGD {
@@ -29,29 +25,25 @@ pub struct SolverSGD {
     pub momentum: f32,
     layers: LayersStorage,
     ws_delta: HashMap<Uuid, WsBlob>,
-    ws_batch: HashMap<Uuid, WsBlob>,
-    batch_cnt: BatchCounter,
+    batch_size: usize,
 }
 
 impl SolverSGD {
     pub fn new() -> Self {
         SolverSGD {
             layers: LayersStorage::new(),
-            learn_rate: 0.2,
+            learn_rate: 0.05,
             momentum: 0.2,
             ws_delta: HashMap::new(),
-            ws_batch: HashMap::new(),
-            batch_cnt: BatchCounter::new(1),
+            batch_size: 1,
         }
     }
 
     fn optimizer_functor(
         lr: &mut LearnParams,
         ws_delta: &mut HashMap<Uuid, WsBlob>,
-        ws_batch: &mut HashMap<Uuid, WsBlob>,
         learn_rate: &f32,
         alpha: &f32,
-        update_ws: bool,
     ) {
         let mut lr_ws = lr.ws.borrow_mut();
         let lr_grad = lr.ws_grad.borrow();
@@ -63,21 +55,17 @@ impl SolverSGD {
                 vec_init.push(ws_init);
             }
             ws_delta.insert(lr.uuid, vec_init.clone());
-            ws_batch.insert(lr.uuid, vec_init);
         }
 
         let ws_delta = ws_delta.get_mut(&lr.uuid).unwrap();
-        let batch_mat = ws_batch.get_mut(&lr.uuid).unwrap();
 
         for (ws_idx, ws_iter) in lr_ws.iter_mut().enumerate() {
             SolverSGD::optimize_layer_sgd(
                 ws_iter,
                 &lr_grad[ws_idx],
                 &mut ws_delta[ws_idx],
-                &mut batch_mat[ws_idx],
                 learn_rate,
                 alpha,
-                update_ws,
             );
         }
     }
@@ -86,31 +74,25 @@ impl SolverSGD {
         ws: &mut WsMat,
         ws_grad: &WsMat,
         ws_delta: &mut WsMat,
-        ws_batch: &mut WsMat,
         learn_rate: &f32,
         alpha: &f32,
-        update_ws: bool,
     ) {
         for neu_idx in 0..ws.shape()[0] {
             for prev_idx in 0..ws.shape()[1] {
                 let cur_ws_idx = [neu_idx, prev_idx];
                 // ALPHA
-                ws_batch[cur_ws_idx] += alpha * ws_delta[cur_ws_idx];
+                ws[cur_ws_idx] += alpha * ws_delta[cur_ws_idx];
                 // LEARNING RATE
                 ws_delta[cur_ws_idx] = learn_rate * ws_grad[cur_ws_idx];
 
-                ws_batch[cur_ws_idx] += ws_delta[cur_ws_idx];
-
-                if update_ws {
-                    ws[cur_ws_idx] += ws_batch[cur_ws_idx];
-                    ws_batch[cur_ws_idx] = 0.0;
-                }
+                ws[cur_ws_idx] += ws_delta[cur_ws_idx];
             }
         }
     }
 
     pub fn batch(mut self, batch_size: usize) -> Self {
-        self.batch_cnt.batch_size = batch_size;
+        self.batch_size = batch_size;
+        self.layers.fit_to_batch_size(batch_size);
         self
     }
 
@@ -127,20 +109,18 @@ impl Solver for SolverSGD {
     }
 
     fn batch_size(&self) -> usize {
-        self.batch_cnt.batch_size
+        self.batch_size
     }
 
-    fn feedforward(&mut self, train_data: &DataBatch, print_out: bool) {
+    fn feedforward(&mut self, train_data: Batch, print_out: bool) {
         solver_helper::feedforward(&mut self.layers, train_data, print_out);
     }
 
-    fn backpropagate(&mut self, train_data: &DataBatch) {
+    fn backpropagate(&mut self, train_data: Batch) {
         solver_helper::backpropagate(&mut self.layers, train_data);
     }
 
     fn optimize_network(&mut self) {
-        let is_upd = self.batch_cnt.is_update();
-
         for (idx, l) in self.layers.iter_mut().enumerate() {
             if idx == 0 {
                 continue;
@@ -153,14 +133,10 @@ impl Solver for SolverSGD {
             SolverSGD::optimizer_functor(
                 &mut lr_params,
                 &mut self.ws_delta,
-                &mut self.ws_batch,
                 &self.learn_rate,
                 &self.momentum,
-                is_upd,
             );
         }
-
-        self.batch_cnt.increment();
     }
 
     fn solver_type(&self) -> &str {
@@ -183,10 +159,7 @@ impl Solver for SolverSGD {
         let pb_solver = PbSolverSgd {
             learn_rate: self.learn_rate,
             momentum: self.momentum,
-            batch_cnt: Some(PbBatchCounter {
-                id: self.batch_cnt.batch_id() as i32,
-                max: self.batch_cnt.batch_size as i32,
-            }),
+            batch_cnt: self.batch_size as u32,
             ws_delta: solver_helper::convert_hash_ws_blob_to_pb(&self.ws_delta),
             layers: vec_lr,
         };
@@ -206,7 +179,7 @@ impl Solver for SolverSGD {
 
         self.learn_rate = solver_rms.learn_rate;
         self.momentum = solver_rms.momentum;
-        self.batch_cnt.batch_size = solver_rms.batch_cnt.unwrap().max as usize;
+        self.batch_size = solver_rms.batch_cnt as usize;
         self.ws_delta = solver_helper::convert_pb_to_hash_ws_blob(&mut solver_rms.ws_delta);
 
         for (self_l, l) in self.layers.iter_mut().zip(&mut solver_rms.layers) {
@@ -235,7 +208,7 @@ impl Serialize for SolverSGD {
         let mut solver_cfg = serializer.serialize_struct("SolverSGD Configuration", 3)?;
         solver_cfg.serialize_field("learn_rate", &self.learn_rate)?;
         solver_cfg.serialize_field("momentum", &self.momentum)?;
-        solver_cfg.serialize_field("batch_size", &self.batch_cnt.batch_size)?;
+        solver_cfg.serialize_field("batch_size", &self.batch_size)?;
         solver_cfg.serialize_field("layers_cfg", &self.layers)?;
         solver_cfg.serialize_field("solver_type", self.solver_type())?;
         solver_cfg.end()
@@ -255,7 +228,7 @@ impl<'de> Deserialize<'de> for SolverSGD {
         rms_solver.learn_rate = s_solver.learn_rate;
         rms_solver.momentum = s_solver.momentum;
         rms_solver.layers = layer_storage;
-        rms_solver.batch_cnt.batch_size = s_solver.batch_size;
+        rms_solver.batch_size = s_solver.batch_size;
 
         Ok(rms_solver)
     }

@@ -48,12 +48,13 @@ fn test_net_helper(
 
     let mut net = Network::new(ds, solver);
 
+    // TODO : check label impl
     for i in 0..*test_batch {
         info!("Test {} , evaluating", i);
-        let test_batch = ds_test.next();
+        let test_batch = ds_test.next_batch(1);
 
         let mut label = -1;
-        for (idx, it) in test_batch.expected.iter().enumerate() {
+        for (idx, it) in test_batch.output.iter().enumerate() {
             if *it == 1.0 {
                 label = idx as i32;
                 break;
@@ -61,7 +62,7 @@ fn test_net_helper(
         }
 
         info!("Below label is : {}", label);
-        net.feedforward(&test_batch, true);
+        net.feedforward(test_batch.input, true);
     }
 
     Ok(())

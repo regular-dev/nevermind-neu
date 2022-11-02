@@ -95,8 +95,8 @@ pub mod activation_macros {
         };
     }
 
-    pub use sigmoid_activation; // pub(crate) use sigmoid_activation
-    pub use tanh_activation;
     pub use raw_activation;
     pub use relu_activation;
+    pub use sigmoid_activation; // pub(crate) use sigmoid_activation
+    pub use tanh_activation;
 }

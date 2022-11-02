@@ -61,6 +61,13 @@ impl LayersStorage {
         ls
     }
 
+    pub fn fit_to_batch_size(&mut self, batch_size: usize) {
+        for i in &self.layers {
+            let mut lr = i.learn_params().unwrap();
+            lr.fit_to_batch_size(batch_size);
+        }
+    }
+
     pub fn iter_mut(&mut self) -> std::slice::IterMut<Box<dyn AbstractLayer>> {
         return self.layers.iter_mut();
     }
@@ -81,8 +88,20 @@ impl LayersStorage {
         &self.layers[id]
     }
 
+    pub fn first(&self) -> Option<&Box<dyn AbstractLayer>> {
+        self.layers.first()
+    }
+
+    pub fn first_mut(&mut self) -> Option<&mut Box<dyn AbstractLayer>> {
+        self.layers.first_mut()
+    }
+
     pub fn last(&self) -> Option<&Box<dyn AbstractLayer>> {
-        return self.layers.last();
+        self.layers.last()
+    }
+
+    pub fn last_mut(&mut self) -> Option<&mut Box<dyn AbstractLayer>> {
+        self.layers.last_mut()
     }
 }
 

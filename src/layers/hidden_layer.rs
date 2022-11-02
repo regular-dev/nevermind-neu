@@ -3,11 +3,11 @@ use std::ops::{Deref, DerefMut};
 
 use ndarray::Zip;
 
-use log::debug;
+use log::{debug, error, info};
 
 use crate::learn_params::{LearnParams, ParamsBlob};
 
-use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
+use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerError, LayerForwardResult};
 use crate::activation::Activation;
 
 use crate::bias::{Bias, ConstBias};
@@ -31,16 +31,32 @@ where
         let inp_m = input[0].output.borrow();
         let mut out_m = self.lr_params.output.borrow_mut();
         let ws = self.lr_params.ws.borrow();
+        let ws0 = &ws[0];
 
-        let mul_res = inp_m.deref() * &ws[0];
+        // Check output sizes
+        if out_m.nrows() != inp_m.nrows() {
+            error!(
+                "Invalid batch size. Income {}, self : {}",
+                inp_m.nrows(),
+                out_m.nrows()
+            );
+            return Err(LayerError::InvalidSize);
+        }
 
         let bias_out = self.bias.forward(&ws[1]);
 
-        Zip::from(out_m.deref_mut())
-            .and(mul_res.rows())
-            .and(bias_out)
-            .par_for_each(|out_el, in_row, bias_el| {
-                *out_el = (self.activation.func)(in_row.sum() + bias_el);
+        // for each input batch
+        Zip::from(inp_m.rows()) // esityt
+            .and(out_m.rows_mut())
+            .par_for_each(|inp_b, out_b| {
+                let mul_res = ws0.clone() * inp_b;
+
+                // for each neuron
+                Zip::from(out_b).and(mul_res.rows()).and(bias_out).for_each(
+                    |out_el, in_row, bias_el| {
+                        *out_el = (self.activation.func)(in_row.sum() + bias_el);
+                    },
+                );
             });
 
         debug!("[ok] HiddenLayer forward()");
@@ -53,14 +69,22 @@ where
         let next_ws = next_input[0].ws.borrow();
         let mut self_err_vals = self.lr_params.err_vals.borrow_mut();
         let self_output = self.lr_params.output.borrow();
+        let next_ws0 = &next_ws[0];
 
-        let err_mul = &next_ws[0] * next_err_vals[0];
+        // let err_mul = &next_ws[0] * next_err_vals[0];
 
-        Zip::from(self_err_vals.deref_mut())
-            .and(self_output.deref())
-            .and(err_mul.columns())
-            .par_for_each(|err_val, output, col| {
-                *err_val = (self.activation.func_deriv)(*output) * col.sum();
+        Zip::from(self_err_vals.rows_mut())
+            .and(next_err_vals.rows())
+            .and(self_output.rows())
+            .par_for_each(|err_val_r, next_err_val_r, output_r| {
+                let mul_res = next_ws0.clone() * next_err_val_r;
+
+                Zip::from(err_val_r)
+                    .and(output_r)
+                    .and(mul_res.columns())
+                    .for_each(|err_val, output, col| {
+                        *err_val = (self.activation.func_deriv)(*output) * col.sum();
+                    });
             });
 
         // calc per-weight gradient, TODO : refactor code below
@@ -72,7 +96,17 @@ where
         for neu_idx in 0..ws[0].shape()[0] {
             for prev_idx in 0..ws[0].shape()[1] {
                 let cur_ws_idx = [neu_idx, prev_idx];
-                ws_grad[0][cur_ws_idx] = prev_input[prev_idx] * self_err_vals[neu_idx];
+
+                let mut avg = 0.0;
+                Zip::from(prev_input.column(prev_idx))
+                    .and(self_err_vals.column(neu_idx))
+                    .for_each(|prev_val, err_val| {
+                        avg += prev_val * err_val;
+                    });
+
+                avg = avg / prev_input.column(prev_idx).len() as f32;
+
+                ws_grad[0][cur_ws_idx] = avg;
             }
         }
 
@@ -80,7 +114,17 @@ where
         for neu_idx in 0..ws[1].shape()[0] {
             for prev_idx in 0..ws[1].shape()[1] {
                 let cur_ws_idx = [neu_idx, prev_idx];
-                ws_grad[1][cur_ws_idx] = self.bias.val * self_err_vals[neu_idx];
+
+                let mut avg = 0.0;
+                Zip::from(prev_input.column(prev_idx))
+                    .and(self_err_vals.column(neu_idx))
+                    .for_each(|prev_val, err_val| {
+                        avg += self.bias.val * err_val;
+                    });
+
+                avg = avg / prev_input.column(prev_idx).len() as f32;
+
+                ws_grad[1][cur_ws_idx] = avg;
             }
         }
 

@@ -9,6 +9,8 @@ use std::time::Instant;
 
 use log4rs::config::{Appender, Config, Root};
 
+use ndarray::array;
+
 use env_logger::Env;
 
 use regular_mind::dataloader::*;
@@ -86,7 +88,7 @@ fn main() -> Result<(), Box<dyn std::error::Error> >{
 
     let now_time = Instant::now();
 
-    net.train_for_error_or_iter(0.01, 130_000)?;
+    net.train_for_error_or_iter(0.01, 10000)?;
 
     let elapsed_bench = now_time.elapsed();
 
@@ -103,10 +105,12 @@ fn main() -> Result<(), Box<dyn std::error::Error> >{
 
     info!("Now testing net !!!");
 
-    net.feedforward(&dataset_test[0], true);
-    net.feedforward(&dataset_test[1], true);
-    net.feedforward(&dataset_test[2], true);
-    net.feedforward(&dataset_test[3], true);
+    // net.feedforward(array![[0.0, 0.0]], true);
+    // net.feedforward(array![[0.0, 1.0]], true);
+    // net.feedforward(array![[1.0, 0.0]], true);
+    // net.feedforward(array![[1.0, 1.0]], true);
+
+   net.feedforward(array![[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]], true);
 
     Ok(())
 }

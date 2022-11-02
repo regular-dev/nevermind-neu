@@ -2,8 +2,9 @@ use std::collections::HashMap;
 
 use super::abstract_layer::{AbstractLayer, LayerError, LayerForwardResult};
 
-use crate::learn_params::{LearnParams};
-use crate::util::{Blob, Variant, DataVecPtr};
+use crate::dataloader::DataBatch;
+use crate::learn_params::LearnParams;
+use crate::util::{Batch, Blob, DataVecPtr, Variant};
 
 #[derive(Default)]
 pub struct InputDataLayer {
@@ -12,17 +13,16 @@ pub struct InputDataLayer {
 }
 
 impl AbstractLayer for InputDataLayer {
-    fn forward_input(&mut self, input: DataVecPtr) -> LayerForwardResult {
-        let input_bor = input.borrow();
-
-        if input_bor.len() != self.input_size {
-            eprintln!("Invalid input size for InputDataLayer : {}", input_bor.len());
+    fn forward_input(&mut self, input: Batch) -> LayerForwardResult {
+        if input.ncols() != self.input_size {
+            eprintln!(
+                "Invalid input size for InputDataLayer : {}",
+                input.shape()[1]
+            );
             return Err(LayerError::InvalidSize);
         }
 
-        drop(input_bor);
-
-        self.lr_params.output = input;
+        *self.lr_params.output.borrow_mut() = input;
 
         Ok(vec![self.lr_params.clone()])
     }
@@ -44,7 +44,7 @@ impl AbstractLayer for InputDataLayer {
     }
 
     fn set_layer_cfg(&mut self, cfg: &HashMap<String, Variant>) {
-        let mut size : usize = 0;
+        let mut size: usize = 0;
 
         if let Variant::Int(var_size) = cfg.get("size").unwrap() {
             size = *var_size as usize;

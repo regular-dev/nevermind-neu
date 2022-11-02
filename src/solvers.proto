@@ -2,12 +2,6 @@ syntax = "proto3";
 
 package mind.serial_pb;
 
-
-message PbBatchCounter {
-  int32 id = 1;
-  int32 max = 2;
-}
-
 message PbFloatVec {
   repeated float vals = 1;
   int32 shape_size = 2;
@@ -23,7 +17,7 @@ message PbSolverRMS {
   float momentum = 2;
   float alpha = 3;
   float theta = 4;
-  PbBatchCounter batch_cnt = 5;
+  uint32 batch_cnt = 5;
   map< string, PbWsBlob > rms = 6; // uuid - blob
   //map< string, PbWsBlob > ws_batch = 7;
 
@@ -33,7 +27,7 @@ message PbSolverRMS {
 message PbSolverSGD {
   float learn_rate = 1;
   float momentum = 2;
-  PbBatchCounter batch_cnt = 3;
+  uint32 batch_cnt = 3;
   map< string, PbWsBlob > ws_delta = 4; // uuid - blob
 
   repeated PbWsBlob layers = 6;

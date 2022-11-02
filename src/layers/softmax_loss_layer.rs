@@ -3,7 +3,7 @@ use std::ops::{Deref, DerefMut};
 use std::collections::HashMap;
 use std::f32::consts::E;
 
-use ndarray::{Axis, Zip, Array1};
+use ndarray::{Array1, Axis, Zip};
 
 use log::{debug, info, warn};
 
@@ -28,24 +28,23 @@ impl AbstractLayer for SoftmaxLossLayer {
         let inp_m = input[0].output.borrow();
         let mut out_m = self.lr_params.output.borrow_mut();
         let ws_mat = self.lr_params.ws.borrow();
+        let ws_mat0 = &ws_mat[0];
 
-        let mul_res = inp_m.deref() * &ws_mat[0];
+        Zip::from(inp_m.rows())
+            .and(out_m.rows_mut())
+            .par_for_each(|inp_b, out_b| {
+                let mul_res = ws_mat0.clone() * inp_b;
 
-        let mut e_rows = mul_res.map_axis(Axis(1), |row| row.sum());
-        let e_rows_max = array_helpers::max(&e_rows);
-        e_rows = e_rows - e_rows_max;
-        e_rows = e_rows.mapv_into(|v| {
-            E.powf(v)
-        });
-        let sum_rows = e_rows.sum();
+                let mut e_rows = mul_res.map_axis(Axis(1), |row| row.sum());
+                let e_rows_max = array_helpers::max(&e_rows);
+                e_rows = e_rows - e_rows_max;
+                e_rows = e_rows.mapv_into(|v| E.powf(v));
+                let sum_rows = e_rows.sum();
 
-        Zip::from(out_m.deref_mut())
-            .and(&e_rows)
-            .par_for_each(|out_el, in_e| {
-                *out_el = in_e / sum_rows;
+                Zip::from(out_b).and(&e_rows).par_for_each(|out_el, in_e| {
+                    *out_el = in_e / sum_rows;
+                });
             });
-
-        //info!("SoftmaxLossLayer output : {}", out_m.deref());
 
         debug!("[ok] SoftmaxLossLayer forward()");
 
@@ -55,7 +54,7 @@ impl AbstractLayer for SoftmaxLossLayer {
     fn backward_output(
         &mut self,
         prev_input: ParamsBlob,
-        expected_vec: &DataVec,
+        expected_vec: Batch,
     ) -> LayerBackwardResult {
         let prev_input = &prev_input[0].output.borrow();
         let mut self_err_vals = self.lr_params.err_vals.borrow_mut();
@@ -89,33 +88,38 @@ impl AbstractLayer for SoftmaxLossLayer {
 
         self.batch_id += 1;
 
-
         if self.batch_id % self.batch_size == 0 && self.batch_id != 0 {
-            warn!("Accuracy : {}", self.arr_accuracy.sum() / self.batch_size as f32);
+            warn!(
+                "Accuracy : {}",
+                self.arr_accuracy.sum() / self.batch_size as f32
+            );
             self.arr_accuracy = Array1::zeros(self.batch_size);
             self.batch_id = 0;
         }
 
         // TEST
-       // let err = self_output.get(expected_idx as usize).unwrap();
+        // let err = self_output.get(expected_idx as usize).unwrap();
 
-        let ce_err = self_output.get(expected_idx as usize).unwrap();
+        //let ce_err = self_output.get(expected_idx as usize).unwrap();
 
-        Zip::from(self_err_vals.deref_mut())
-            .and(self_output.deref())
-            .and(expected_vec)
-            .par_for_each(|err_val, output, expected| {
-                if *expected == 1.0 {
-                    debug!("expected == 1.0");
-                    *err_val = 1.0 - *output;  
-                } else {
-                    *err_val = (-1.0) * *output;
-                }
+        Zip::from(self_err_vals.rows_mut())
+            .and(self_output.rows())
+            .and(expected_vec.rows())
+            .par_for_each(|err_val_b, out_b, expected_b| {
+                Zip::from(err_val_b).and(out_b).and(expected_b).for_each(
+                    |err_val, output, expected| {
+                        if *expected == 1.0 {
+                            debug!("expected == 1.0");
+                            *err_val = 1.0 - *output;
+                        } else {
+                            *err_val = (-1.0) * *output;
+                        }
+                    },
+                );
             });
 
         //info!("SoftmaxLossLayer output : {}", self_output);
         //info!("SoftmaxLossLayer errors : {}", self_err_vals);
-
 
         // calc per-weight gradient, TODO : refactor code below
         // for prev_layer :
@@ -125,7 +129,17 @@ impl AbstractLayer for SoftmaxLossLayer {
         for neu_idx in 0..ws[0].shape()[0] {
             for prev_idx in 0..ws[0].shape()[1] {
                 let cur_ws_idx = [neu_idx, prev_idx];
-                ws_grad[0][cur_ws_idx] = prev_input[prev_idx] * self_err_vals[neu_idx];
+
+                let mut avg = 0.0;
+                Zip::from(prev_input.column(prev_idx))
+                    .and(self_err_vals.column(neu_idx))
+                    .for_each(|prev_val, err_val| {
+                        avg += prev_val * err_val;
+                    });
+
+                avg = avg / prev_input.column(prev_idx).len() as f32;
+
+                ws_grad[0][cur_ws_idx] = avg;
             }
         }
 
@@ -171,7 +185,7 @@ impl AbstractLayer for SoftmaxLossLayer {
             self.lr_params = LearnParams::new(self.size, self.prev_size);
         }
 
-        // test 
+        // test
         self.batch_id = 0;
         self.batch_size = 1000;
         self.arr_accuracy = Array1::zeros(self.batch_size);
@@ -191,7 +205,6 @@ impl SoftmaxLossLayer {
             batch_size: 1000,
             arr_accuracy: Array1::zeros(1000),
             batch_id: 0,
-            
         }
     }
 }

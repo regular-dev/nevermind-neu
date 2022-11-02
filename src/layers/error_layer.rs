@@ -3,13 +3,12 @@ use std::ops::{Deref, DerefMut};
 
 use ndarray::Zip;
 
-use log::debug;
+use log::{debug, info};
 
 use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
-use crate::activation::{Activation};
+use crate::activation::Activation;
 use crate::learn_params::{LearnParams, ParamsBlob};
-use crate::util::{DataVec, Variant};
-
+use crate::util::{Batch, DataVec, Variant};
 
 pub struct ErrorLayer<T: Fn(f32) -> f32, TD: Fn(f32) -> f32> {
     pub error: f32,
@@ -29,12 +28,18 @@ where
         let mut out_m = self.lr_params.output.borrow_mut();
         let ws_mat = &self.lr_params.ws.borrow()[0];
 
-        let mul_res = inp_m.deref() * ws_mat;
+        // for each input batch
+        Zip::from(inp_m.rows())
+            .and(out_m.rows_mut())
+            .par_for_each(|r, out_b| {
+                let mul_res = ws_mat.clone() * r;
 
-        Zip::from(out_m.deref_mut())
-            .and(mul_res.rows())
-            .par_for_each(|out_el, in_row| {
-                *out_el = (self.activation.func)(in_row.sum());
+                // for each neuron
+                Zip::from(out_b)
+                    .and(mul_res.rows())
+                    .for_each(|out_el, in_row| {
+                        *out_el = (self.activation.func)(in_row.sum());
+                    });
             });
 
         debug!("[ok] ErrorLayer forward()");
@@ -45,17 +50,22 @@ where
     fn backward_output(
         &mut self,
         prev_input: ParamsBlob,
-        expected_vec: &DataVec,
+        expected_vec: Batch,
     ) -> LayerBackwardResult {
         let prev_input = &prev_input[0].output.borrow();
         let mut self_err_vals = self.lr_params.err_vals.borrow_mut();
         let self_output = self.lr_params.output.borrow();
 
-        Zip::from(self_err_vals.deref_mut())
-            .and(self_output.deref())
-            .and(expected_vec)
-            .par_for_each(|err_val, output, expected| {
-                *err_val = (expected - output) * (self.activation.func_deriv)(*output);
+        // for each batch
+        Zip::from(self_err_vals.rows_mut())
+            .and(expected_vec.rows())
+            .and(self_output.rows())
+            .par_for_each(|err_val_r, expected_r, output_r| {
+                Zip::from(err_val_r).and(expected_r).and(output_r).for_each(
+                    |err_val, expected, output| {
+                        *err_val = expected - output;
+                    },
+                );
             });
 
         // calc per-weight gradient, TODO : refactor code below
@@ -66,7 +76,17 @@ where
         for neu_idx in 0..ws[0].shape()[0] {
             for prev_idx in 0..ws[0].shape()[1] {
                 let cur_ws_idx = [neu_idx, prev_idx];
-                ws_grad[0][cur_ws_idx] = prev_input[prev_idx] * self_err_vals[neu_idx];
+
+                let mut avg = 0.0;
+                Zip::from(prev_input.column(prev_idx))
+                    .and(self_err_vals.column(neu_idx))
+                    .for_each(|prev_val, err_val| {
+                        avg += prev_val * err_val;
+                    });
+
+                avg = avg / prev_input.column(prev_idx).len() as f32;
+
+                ws_grad[0][cur_ws_idx] = avg;
             }
         }
 

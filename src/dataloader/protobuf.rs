@@ -17,14 +17,14 @@ use crate::util::DataVecPtr;
 #[derive(Default)]
 pub struct ProtobufDataLoader {
     pub data: Vec<DataBatch>,
-    pub id: usize,
+    pub id: RefCell<usize>,
 }
 
 impl ProtobufDataLoader {
     pub fn empty() -> Self {
         Self {
             data: Vec::new(),
-            id: 0,
+            id: RefCell::new(0),
         }
     }
 
@@ -44,7 +44,7 @@ impl ProtobufDataLoader {
             let expected = Array::from_shape_vec(expected_vec.len(), expected_vec)?;
 
             dl.data.push(DataBatch{ 
-                input: DataVecPtr::new(RefCell::new(input)),
+                input: input,
                 expected: expected
             });
         }
@@ -56,7 +56,7 @@ impl ProtobufDataLoader {
         let mut pb_data = PbDataStorage::default();
 
         for i in &self.data {
-            let inp_bor = i.input.borrow();
+            let inp_bor = i.input.clone(); // TODO : check
 
             let inp_vec = inp_bor.to_vec();
             let out_vec = i.expected.to_vec();
@@ -76,18 +76,34 @@ impl ProtobufDataLoader {
 }
 
 impl DataLoader for ProtobufDataLoader {
-    fn next(&mut self) -> &DataBatch {
-        if self.id < self.data.len() {
-            let ret = &self.data[ self.id ];
-            self.id += 1;
+    fn next(&self) -> &DataBatch {
+        assert!(self.data.len() > 0);
+
+        let mut self_id = self.id.borrow_mut();
+
+        if *self_id < self.data.len() {
+            let ret = &self.data[ *self_id ];
+            *self_id += 1;
             return ret;
         } else {
-            self.id = 0;
+            *self_id = 0;
+            drop(self_id);
+
             return self.next();
         }
     }
 
+    fn next_batch(&self, size: usize) -> MiniBatch {
+        let mut mb = Vec::with_capacity(size);
+
+        for i in 0..size {
+            mb.push(self.next());
+        }
+
+        MiniBatch::new(mb)
+    }
+
     fn reset(&mut self) {
-        self.id = 0;
+        *self.id.borrow_mut() = 0;
     }
 }

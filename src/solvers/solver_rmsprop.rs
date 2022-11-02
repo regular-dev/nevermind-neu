@@ -2,25 +2,20 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
 use std::fs::File;
-use std::io::prelude::*;
 use std::ops::Deref;
 
-use log::{debug};
+use log::debug;
 
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use prost::Message;
 
-use super::solver::{
-    pb::{PbBatchCounter, PbSolverRms},
-    BatchCounter, Solver,
-};
+use super::solver::{pb::PbSolverRms, Solver};
 use super::solver_helper;
-use crate::dataloader::DataBatch;
-use crate::layers_storage::{LayersStorage};
+use crate::layers_storage::LayersStorage;
 use crate::learn_params::LearnParams;
-use crate::util::{WsBlob, WsMat};
+use crate::util::{Batch, WsBlob, WsMat};
 
 use uuid::Uuid;
 
@@ -30,38 +25,35 @@ pub struct SolverRMS {
     pub alpha: f32,
     pub theta: f32,
     layers: LayersStorage,
-    batch_cnt: BatchCounter,
+    batch_size: usize,
     rms: HashMap<Uuid, WsBlob>,
-    ws_batch: HashMap<Uuid, WsBlob>,
 }
 
 impl SolverRMS {
     pub fn new() -> Self {
         SolverRMS {
-            learn_rate: 0.02,
+            learn_rate: 0.2,
             momentum: 0.2,
             alpha: 0.9,
-            batch_cnt: BatchCounter::new(1),
+            batch_size: 1,
             theta: 0.00000001,
             layers: LayersStorage::new(),
             rms: HashMap::new(),
-            ws_batch: HashMap::new(),
         }
     }
 
     pub fn batch(mut self, batch_size: usize) -> Self {
-        self.batch_cnt.batch_size = batch_size;
+        self.batch_size = batch_size;
+        self.layers.fit_to_batch_size(batch_size);
         self
     }
 
     fn optimizer_functor(
         lr: &mut LearnParams,
         rms: &mut HashMap<Uuid, WsBlob>,
-        ws_batch: &mut HashMap<Uuid, WsBlob>,
         learn_rate: &f32,
         alpha: &f32,
         theta: &f32,
-        update_ws: bool,
     ) {
         let lr_grad = lr.ws_grad.borrow();
         let mut lr_ws = lr.ws.borrow_mut();
@@ -73,23 +65,19 @@ impl SolverRMS {
                 vec_init.push(ws_init);
             }
 
-            ws_batch.insert(lr.uuid, vec_init.clone());
             rms.insert(lr.uuid, vec_init);
         }
 
         let rms_mat = rms.get_mut(&lr.uuid).unwrap();
-        let batch_mat = ws_batch.get_mut(&lr.uuid).unwrap();
 
         for (ws_idx, ws_iter) in lr_ws.iter_mut().enumerate() {
             SolverRMS::optimize_layer_rms(
                 ws_iter,
                 &lr_grad[ws_idx],
                 &mut rms_mat[ws_idx],
-                &mut batch_mat[ws_idx],
                 learn_rate,
                 alpha,
                 theta,
-                update_ws,
             );
         }
     }
@@ -98,24 +86,17 @@ impl SolverRMS {
         ws: &mut WsMat,
         ws_grad: &WsMat,
         rms: &mut WsMat,
-        ws_batch: &mut WsMat,
         learn_rate: &f32,
         alpha: &f32,
         theta: &f32,
-        update_ws: bool,
     ) {
         for neu_idx in 0..ws.shape()[0] {
             for prev_idx in 0..ws.shape()[1] {
                 let cur_ws_idx = [neu_idx, prev_idx];
                 rms[cur_ws_idx] =
                     alpha * rms[cur_ws_idx] + (1.0 - alpha) * ws_grad[cur_ws_idx].powf(2.0);
-                ws_batch[cur_ws_idx] +=
+                ws[cur_ws_idx] +=
                     (learn_rate / (rms[cur_ws_idx] + theta).sqrt()) * ws_grad[cur_ws_idx];
-
-                if update_ws {
-                    ws[cur_ws_idx] += ws_batch[cur_ws_idx];
-                    ws_batch[cur_ws_idx] = 0.0;
-                }
             }
         }
     }
@@ -133,20 +114,18 @@ impl Solver for SolverRMS {
     }
 
     fn batch_size(&self) -> usize {
-        self.batch_cnt.batch_size
+        self.batch_size
     }
 
-    fn feedforward(&mut self, train_data: &DataBatch, print_out: bool) {
+    fn feedforward(&mut self, train_data: Batch, print_out: bool) {
         solver_helper::feedforward(&mut self.layers, train_data, print_out);
     }
 
-    fn backpropagate(&mut self, train_data: &DataBatch) {
+    fn backpropagate(&mut self, train_data: Batch) {
         solver_helper::backpropagate(&mut self.layers, train_data);
     }
 
     fn optimize_network(&mut self) {
-        let is_upd = self.batch_cnt.is_update();
-
         for (idx, l) in self.layers.iter_mut().enumerate() {
             if idx == 0 {
                 continue;
@@ -159,15 +138,11 @@ impl Solver for SolverRMS {
             SolverRMS::optimizer_functor(
                 &mut lr_params,
                 &mut self.rms,
-                &mut self.ws_batch,
                 &self.learn_rate,
                 &self.alpha,
                 &self.theta,
-                is_upd,
             );
         }
-
-        self.batch_cnt.increment();
     }
 
     fn solver_type(&self) -> &str {
@@ -187,23 +162,21 @@ impl Solver for SolverRMS {
             vec_lr.push(solver_helper::convert_ws_blob_to_pb(ws.deref()));
         }
 
-        let pb_solver = PbSolverRms {
-            learn_rate: self.learn_rate,
-            momentum: self.momentum,
-            alpha: self.alpha,
-            theta: self.theta,
-            batch_cnt: Some(PbBatchCounter {
-                id: self.batch_cnt.batch_id() as i32,
-                max: self.batch_cnt.batch_size as i32,
-            }),
-            rms: solver_helper::convert_hash_ws_blob_to_pb(&self.rms),
-            layers: vec_lr,
-        };
+        // let pb_solver = PbSolverRms {
+        //     learn_rate: self.learn_rate,
+        //     momentum: self.momentum,
+        //     alpha: self.alpha,
+        //     theta: self.theta,
+        //     batch_cnt: self.batch_size,
+        //     rms: solver_helper::convert_hash_ws_blob_to_pb(&self.rms),
+        //     layers: vec_lr,
 
-        // encode
-        let mut file = File::create(filepath)?;
+        // };
 
-        file.write_all(pb_solver.encode_to_vec().as_slice())?;
+        // // encode
+        // let mut file = File::create(filepath)?;
+
+        // file.write_all(pb_solver.encode_to_vec().as_slice())?;
 
         Ok(())
     }
@@ -217,7 +190,7 @@ impl Solver for SolverRMS {
         self.momentum = solver_rms.momentum;
         self.alpha = solver_rms.alpha;
         self.theta = solver_rms.theta;
-        self.batch_cnt.batch_size = solver_rms.batch_cnt.unwrap().max as usize;
+        self.batch_size = solver_rms.batch_cnt as usize;
         self.rms = solver_helper::convert_pb_to_hash_ws_blob(&mut solver_rms.rms);
 
         for (self_l, l) in self.layers.iter_mut().zip(&mut solver_rms.layers) {
@@ -250,7 +223,7 @@ impl Serialize for SolverRMS {
         solver_cfg.serialize_field("momentum", &self.momentum)?;
         solver_cfg.serialize_field("alpha", &self.alpha)?;
         solver_cfg.serialize_field("theta", &self.theta)?;
-        solver_cfg.serialize_field("batch_size", &self.batch_cnt.batch_size)?;
+        solver_cfg.serialize_field("batch_size", &self.batch_size)?;
         solver_cfg.serialize_field("layers_cfg", &self.layers)?;
         solver_cfg.serialize_field("solver_type", self.solver_type())?;
         solver_cfg.end()
@@ -272,7 +245,7 @@ impl<'de> Deserialize<'de> for SolverRMS {
         rms_solver.alpha = s_solver.alpha;
         rms_solver.theta = s_solver.theta;
         rms_solver.layers = layer_storage;
-        rms_solver.batch_cnt.batch_size = s_solver.batch_size;
+        rms_solver = rms_solver.batch(s_solver.batch_size);
 
         Ok(rms_solver)
     }
