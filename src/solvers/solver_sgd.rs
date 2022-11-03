@@ -193,7 +193,7 @@ impl Solver for SolverSGD {
 }
 
 #[derive(Serialize, Deserialize)]
-struct SerdeSolverRMS {
+struct SerdeSolverSGD {
     pub learn_rate: f32,
     pub momentum: f32,
     pub batch_size: usize,
@@ -211,6 +211,7 @@ impl Serialize for SolverSGD {
         solver_cfg.serialize_field("batch_size", &self.batch_size)?;
         solver_cfg.serialize_field("layers_cfg", &self.layers)?;
         solver_cfg.serialize_field("solver_type", self.solver_type())?;
+
         solver_cfg.end()
     }
 }
@@ -220,16 +221,16 @@ impl<'de> Deserialize<'de> for SolverSGD {
     where
         D: Deserializer<'de>,
     {
-        let mut s_solver = SerdeSolverRMS::deserialize(deserializer)?;
+        let mut s_solver = SerdeSolverSGD::deserialize(deserializer)?;
 
         let layer_storage = std::mem::replace(&mut s_solver.layers_cfg, LayersStorage::new());
 
-        let mut rms_solver = SolverSGD::new();
-        rms_solver.learn_rate = s_solver.learn_rate;
-        rms_solver.momentum = s_solver.momentum;
-        rms_solver.layers = layer_storage;
-        rms_solver.batch_size = s_solver.batch_size;
+        let mut sgd_solver = SolverSGD::new();
+        sgd_solver.learn_rate = s_solver.learn_rate;
+        sgd_solver.momentum = s_solver.momentum;
+        sgd_solver.layers = layer_storage;
+        let sgd_solver = sgd_solver.batch(s_solver.batch_size);
 
-        Ok(rms_solver)
+        Ok(sgd_solver)
     }
 }

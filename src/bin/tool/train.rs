@@ -49,6 +49,8 @@ pub fn train_net(
         return Err(Box::new(CustomError::WrongArg));
     }
 
+    info!("Train batch size : {}", solver.batch_size());
+
     let train_ds = args.get_one::<String>("TrainData").unwrap();
     let train_ds = Box::new(ProtobufDataLoader::from_file(train_ds)?);
 

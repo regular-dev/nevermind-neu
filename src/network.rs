@@ -15,6 +15,8 @@ use std::time::Instant;
 
 use ndarray::Zip;
 
+use ndarray_stats::QuantileExt;
+
 use std::fs::OpenOptions;
 
 use super::dataloader::DataLoader;
@@ -43,6 +45,7 @@ where
     solver: T,
     snap_iter: usize,
     test_iter: usize,
+    show_accuracy: bool,
     is_bench_time: bool,
     name: String,
 }
@@ -62,6 +65,7 @@ where
             snap_iter: 0,
             test_iter: 0,
             is_bench_time: false,
+            show_accuracy: true,
             name: "network".to_owned(),
         }
     }
@@ -135,12 +139,17 @@ where
 
         let lr = last_layer.learn_params().unwrap();
         let out = lr.output.borrow();
-        let mut err_arr = Batch::zeros((out.shape()[0], out.shape()[1]));
+
+        let mut accuracy_cnt = 0.0;
 
         Zip::from(out.rows())
             .and(test_batch.output.rows())
             .for_each(|out_r, exp_r| {
                 let mut local_err = 0.0;
+
+                if out_r.argmax() == exp_r.argmax() {
+                    accuracy_cnt += 1.0;
+                }
 
                 for i in 0..out_r.shape()[0] {
                     local_err += (exp_r[i] - out_r[i]).powf(2.0);
@@ -148,24 +157,12 @@ where
 
                 err += local_err / out_r.shape()[0] as f32;
             });
-        // for _i in 0..self.test_batch_size {
-        //     let test_data = test_dl.next_();
-        //     self.solver.feedforward(test_data, false);
 
-        //     let layers = self.solver.layers();
-        //     let last_layer = layers.last().unwrap();
+        accuracy_cnt = accuracy_cnt / self.test_batch_size as f32;
 
-        //     let lr = last_layer.learn_params().unwrap();
-        //     let out = lr.output.borrow();
-        //     let mut err_arr = Array1::zeros(out.shape()[0]);
-
-        //     for i in 0..out.shape()[0] {
-        //         err_arr[i] = (test_data.expected[i] - out[i]).powf(2.0);
-        //     }
-
-        //     let out_err = (err_arr.sum() / err_arr.shape()[0] as f32).sqrt();
-        //     err += out_err;
-        // }
+        if self.show_accuracy {
+            info!("Accuracy : {}", accuracy_cnt);
+        }
 
         err / self.test_batch_size as f32
     }

@@ -72,20 +72,37 @@ where
         let next_ws0 = &next_ws[0];
 
         // let err_mul = &next_ws[0] * next_err_vals[0];
+        debug!(
+            "[hidden layer] i am here : {} | {} | {}",
+            self_err_vals.nrows(),
+            next_err_vals.nrows(),
+            self_output.nrows()
+        );
 
         Zip::from(self_err_vals.rows_mut())
             .and(next_err_vals.rows())
             .and(self_output.rows())
             .par_for_each(|err_val_r, next_err_val_r, output_r| {
-                let mul_res = next_ws0.clone() * next_err_val_r;
+                debug!("before dot product");
+
+                let mul_res = next_ws0.t().dot(&next_err_val_r);
+
+                debug!(
+                    "[hidden layer zip : {} | {} | {}",
+                    err_val_r.shape()[0],
+                    output_r.shape()[0],
+                    mul_res.len()
+                );
 
                 Zip::from(err_val_r)
                     .and(output_r)
-                    .and(mul_res.columns())
+                    .and(&mul_res)
                     .for_each(|err_val, output, col| {
-                        *err_val = (self.activation.func_deriv)(*output) * col.sum();
+                        *err_val = (self.activation.func_deriv)(*output) * col;
                     });
             });
+
+        debug!("[hidden layer] i am here 2");
 
         // calc per-weight gradient, TODO : refactor code below
         // for prev_layer :
