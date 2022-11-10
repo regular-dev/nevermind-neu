@@ -35,7 +35,7 @@ use super::solvers::Solver;
 /// Neural-Network
 pub struct Network<T>
 where
-    T: Solver + Serialize,
+    T: Solver + Serialize + Clone,
 {
     train_dl: Box<dyn DataLoader>,
     test_dl: Option<Box<dyn DataLoader>>,
@@ -43,6 +43,7 @@ where
     test_err: f32,
     is_write_test_err: bool,
     solver: T,
+    test_solver: Option<T>,
     snap_iter: usize,
     test_iter: usize,
     show_accuracy: bool,
@@ -52,7 +53,7 @@ where
 
 impl<T> Network<T>
 where
-    T: Solver + Serialize,
+    T: Solver + Serialize + Clone,
 {
     pub fn new(train_dl: Box<dyn DataLoader>, solver: T) -> Self {
         Network {
@@ -62,6 +63,7 @@ where
             test_err: 0.0,
             is_write_test_err: true,
             solver,
+            test_solver: None,
             snap_iter: 0,
             test_iter: 0,
             is_bench_time: false,
@@ -89,8 +91,19 @@ where
 
     pub fn test_dataloader(mut self, test_dl: Box<dyn DataLoader>) -> Self {
         self.test_dl = Some(test_dl);
+
+        // self.test_solver = Some(self.solver.clone());
+        self.create_test_solver();
+
         self
     }
+
+    fn create_test_solver(&mut self) {
+        let test_solver = self.solver.clone();
+        test_solver.layers().prepare_for_tests(self.test_batch_size);
+        self.test_solver = Some(test_solver);
+    }
+
     pub fn write_test_err_to_file(mut self, state: bool) -> Self {
         self.is_write_test_err = state;
         self
@@ -110,6 +123,7 @@ where
         self.test_iter = err_iter;
         self
     }
+
     pub fn is_bench_time(mut self, state: bool) -> Self {
         self.is_bench_time = state;
         self

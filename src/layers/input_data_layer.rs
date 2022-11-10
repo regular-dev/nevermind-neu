@@ -6,7 +6,7 @@ use crate::dataloader::DataBatch;
 use crate::learn_params::LearnParams;
 use crate::util::{Batch, Blob, DataVecPtr, Variant};
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct InputDataLayer {
     pub input_size: usize,
     pub lr_params: LearnParams,
@@ -58,6 +58,16 @@ impl AbstractLayer for InputDataLayer {
 
     fn size(&self) -> usize {
         self.input_size
+    }
+
+    fn copy_layer(&self) -> Box<dyn AbstractLayer> {
+        let copy_l = InputDataLayer::new(self.input_size);
+        copy_l.set_learn_params(self.lr_params.copy());
+        Box::new(copy_l)
+    }
+
+    fn clone_layer(&self) -> Box<dyn AbstractLayer> {
+        Box::new(self.clone())
     }
 }
 

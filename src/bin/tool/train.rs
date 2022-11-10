@@ -41,7 +41,7 @@ pub fn train_new(
 }
 
 pub fn train_net(
-    mut solver: impl Solver + Serialize,
+    mut solver: impl Solver + Serialize + Clone,
     args: &ArgMatches
 ) -> Result<(), Box<dyn std::error::Error>> {
     if !args.contains_id("TrainData") {

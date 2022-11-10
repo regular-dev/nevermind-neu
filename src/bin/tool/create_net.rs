@@ -72,7 +72,7 @@ fn create_layers<T: Solver + Serialize>(
     stdin: &io::Stdin,
     mut solver: T,
 ) -> Result<T, Box<dyn Error>> {
-    let mut ls = LayersStorage::new();
+    let mut ls = LayersStorage::empty();
 
     // Input layer
     println!("Now tell me the input layer size");

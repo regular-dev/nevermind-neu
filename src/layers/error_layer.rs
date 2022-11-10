@@ -6,12 +6,12 @@ use ndarray::Zip;
 use log::{debug, info};
 
 use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
-use crate::activation::Activation;
+use crate::activation::*;
 use crate::learn_params::{LearnParams, ParamsBlob};
 use crate::util::{Batch, DataVec, Variant};
 
-pub struct ErrorLayer<T: Fn(f32) -> f32, TD: Fn(f32) -> f32> {
-    pub error: f32,
+#[derive(Clone)]
+pub struct ErrorLayer<T: Fn(f32) -> f32 + Clone, TD: Fn(f32) -> f32 + Clone> {
     pub size: usize,
     pub prev_size: usize,
     pub lr_params: LearnParams,
@@ -20,8 +20,8 @@ pub struct ErrorLayer<T: Fn(f32) -> f32, TD: Fn(f32) -> f32> {
 
 impl<T, TD> AbstractLayer for ErrorLayer<T, TD>
 where
-    T: Fn(f32) -> f32 + Sync,
-    TD: Fn(f32) -> f32 + Sync,
+    T: Fn(f32) -> f32 + Sync + Clone + 'static,
+    TD: Fn(f32) -> f32 + Sync + Clone + 'static,
 {
     fn forward(&mut self, input: ParamsBlob) -> LayerForwardResult {
         let inp_m = input[0].output.borrow();
@@ -133,18 +133,27 @@ where
     fn size(&self) -> usize {
         self.size
     }
+
+    fn copy_layer(&self) -> Box<dyn AbstractLayer> {
+        let copy_l = ErrorLayer::new(self.size, self.prev_size, self.activation.clone());
+        copy_l.set_learn_params(self.lr_params.copy());
+        Box::new(copy_l)
+    }
+
+    fn clone_layer(&self) -> Box<dyn AbstractLayer> {
+        Box::new(self.clone())
+    }
 }
 
 impl<T, TD> ErrorLayer<T, TD>
 where
-    T: Fn(f32) -> f32,
-    TD: Fn(f32) -> f32,
+    T: Fn(f32) -> f32 + Clone,
+    TD: Fn(f32) -> f32 + Clone,
 {
     pub fn new(size: usize, prev_size: usize, activation: Activation<T, TD>) -> Self {
         Self {
             size,
             prev_size,
-            error: 0.0,
             lr_params: LearnParams::new(size, prev_size),
             activation,
         }

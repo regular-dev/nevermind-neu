@@ -1,15 +1,15 @@
 use uuid::Uuid;
 
 use std::cell::RefCell;
-use std::rc::Rc;
 use std::ops::DerefMut;
+use std::rc::Rc;
 
-use ndarray_rand::rand_distr::{Uniform, Distribution};
-use ndarray_rand::rand::{SeedableRng};
 use ndarray_rand::rand::rngs::SmallRng;
+use ndarray_rand::rand::SeedableRng;
+use ndarray_rand::rand_distr::{Distribution, Uniform};
 use ndarray_rand::RandomExt;
 
-use super::util::{DataVec, WsBlob, WsMat, Batch};
+use super::util::{Batch, DataVec, WsBlob, WsMat};
 
 #[derive(Clone, Default)]
 pub struct LearnParams {
@@ -65,7 +65,7 @@ impl LearnParams {
     }
 
     pub fn fit_to_batch_size(&mut self, new_batch_size: usize) {
-        let mut out_m = self.output.borrow_mut();    
+        let mut out_m = self.output.borrow_mut();
         let mut err_m = self.err_vals.borrow_mut();
         let size = out_m.ncols();
 
@@ -73,6 +73,11 @@ impl LearnParams {
             *out_m = Batch::zeros((new_batch_size, size));
             *err_m = Batch::zeros((new_batch_size, size));
         }
+    }
+
+    pub fn prepare_for_tests(&mut self, batch_size: usize) {
+        let out_size = self.output.borrow().ncols();
+        self.output = Rc::new(RefCell::new(Batch::zeros((batch_size, out_size))));
     }
 
     pub fn drop_ws(&mut self, dropout: f32) {
@@ -89,5 +94,28 @@ impl LearnParams {
                 }
             }
         }
+    }
+
+    /// Copies learn_params memory of (weights, gradients, output...)
+    /// This function do copy memory
+    /// To clone only Rc<...> use .clone() function
+    pub fn copy(&self) -> Self {
+        let mut lp = LearnParams::default();
+
+        {
+            let mut ws_b = lp.ws.borrow_mut();
+            let mut ws_grad_b = lp.ws_grad.borrow_mut();
+            let mut output_b = lp.output.borrow_mut();
+            let mut err_val_b = lp.err_vals.borrow_mut();
+            let uuid_b = lp.uuid.clone();
+
+            *ws_b = self.ws.borrow().clone();
+            *ws_grad_b = self.ws_grad.borrow().clone();
+            *output_b = self.output.borrow().clone();
+            *err_val_b = self.err_vals.borrow().clone();
+            lp.uuid = uuid_b;
+        }
+
+        lp
     }
 }

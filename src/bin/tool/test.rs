@@ -38,7 +38,7 @@ pub fn test_net(args: &ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
 
 fn test_net_helper(
     args: &ArgMatches,
-    solver: impl Solver + Serialize,
+    solver: impl Solver + Serialize + Clone,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let ds_path = args.get_one::<String>("Data").unwrap();
     let ds = Box::new(ProtobufDataLoader::from_file(ds_path)?);

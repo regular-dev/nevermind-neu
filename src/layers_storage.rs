@@ -13,25 +13,25 @@ use super::layers::HiddenLayer;
 use super::layers::InputDataLayer;
 use super::util::Variant;
 
-use crate::activation::Activation;
 use crate::activation::*;
 
+#[derive(Default)]
 pub struct LayersStorage {
     layers: Vec<Box<dyn AbstractLayer>>,
 }
 
 impl LayersStorage {
-    pub fn new() -> Self {
+    pub fn empty() -> Self {
         LayersStorage { layers: Vec::new() }
     }
 
     /// Setup the network with [0] - input size, [...] - hidden neurons, [N] - output size
     pub fn new_simple_network(layers: &Vec<usize>) -> Self {
-        let mut ls = LayersStorage::new();
+        let mut ls = LayersStorage::empty();
 
         if layers.len() < 3 {
             eprintln!("Invalid layers length !!!");
-            return LayersStorage::new();
+            return LayersStorage::empty();
         }
 
         for (idx, val) in layers.iter().enumerate() {
@@ -65,6 +65,13 @@ impl LayersStorage {
         for i in &self.layers {
             let mut lr = i.learn_params().unwrap();
             lr.fit_to_batch_size(batch_size);
+        }
+    }
+
+    pub fn prepare_for_tests(&self, batch_size: usize) {
+        for i in &self.layers {
+            let mut lr = i.learn_params().unwrap();
+            lr.prepare_for_tests(batch_size);
         }
     }
 
@@ -114,7 +121,7 @@ impl fmt::Display for LayersStorage {
             out += "-";
         }
 
-        write!(f, "{}", &out.as_str()[0..out.len()-1])
+        write!(f, "{}", &out.as_str()[0..out.len() - 1])
     }
 }
 
@@ -172,5 +179,21 @@ impl<'de> Deserialize<'de> for LayersStorage {
         }
 
         Ok(ls)
+    }
+}
+
+impl Clone for LayersStorage {
+    fn clone(&self) -> Self {
+        let mut ls = LayersStorage::empty();
+
+        for i in &self.layers {
+            ls.add_layer(i.clone_layer());
+        }
+
+        ls
+    }
+
+    fn clone_from(&mut self, _source: &Self) {
+        todo!()
     }
 }

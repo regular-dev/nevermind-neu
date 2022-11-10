@@ -4,6 +4,7 @@ use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
 use std::ops::Deref;
+use std::clone::Clone;
 
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -13,13 +14,13 @@ use uuid::Uuid;
 
 use prost::Message;
 
-use super::solver::{pb::PbSolverSgd, Solver};
-use super::solver_helper;
-use crate::layers_storage::LayersStorage;
-use crate::learn_params::LearnParams;
-use crate::util::{Batch, WsBlob, WsMat};
+use crate::layers_storage::*;
+use crate::util::*;
+use crate::solvers::*;
+use crate::learn_params::*;
+use crate::solvers::pb::PbSolverSgd;
 
-// Train/Test Impl
+#[derive(Default, Clone)]
 pub struct SolverSGD {
     pub learn_rate: f32,
     pub momentum: f32,
@@ -31,7 +32,7 @@ pub struct SolverSGD {
 impl SolverSGD {
     pub fn new() -> Self {
         SolverSGD {
-            layers: LayersStorage::new(),
+            layers: LayersStorage::empty(),
             learn_rate: 0.05,
             momentum: 0.2,
             ws_delta: HashMap::new(),
@@ -223,7 +224,7 @@ impl<'de> Deserialize<'de> for SolverSGD {
     {
         let mut s_solver = SerdeSolverSGD::deserialize(deserializer)?;
 
-        let layer_storage = std::mem::replace(&mut s_solver.layers_cfg, LayersStorage::new());
+        let layer_storage = std::mem::replace(&mut s_solver.layers_cfg, LayersStorage::empty());
 
         let mut sgd_solver = SolverSGD::new();
         sgd_solver.learn_rate = s_solver.learn_rate;
@@ -234,3 +235,15 @@ impl<'de> Deserialize<'de> for SolverSGD {
         Ok(sgd_solver)
     }
 }
+
+// impl Clone for SolverSGD {
+//     fn clone(&self) -> Self {
+//         let mut s = SolverSGD::default();
+
+//         s.learn_rate = self.learn_rate;
+//         s.momentum = self.momentum;
+//         s.layers = self.layers.clone();
+
+//         s
+//     }
+// }

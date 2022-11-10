@@ -11,7 +11,7 @@ use crate::layers::*;
 use crate::learn_params::*;
 use crate::util::*;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct SoftmaxLossLayer {
     pub size: usize,
     pub prev_size: usize,
@@ -199,6 +199,16 @@ impl AbstractLayer for SoftmaxLossLayer {
 
     fn size(&self) -> usize {
         self.size
+    }
+
+    fn copy_layer(&self) -> Box<dyn AbstractLayer> {
+        let copy_l = SoftmaxLossLayer::new(self.size, self.prev_size);
+        copy_l.set_learn_params(self.lr_params.copy());
+        Box::new(copy_l)
+    }
+
+    fn clone_layer(&self) -> Box<dyn AbstractLayer> {
+        Box::new(self.clone())
     }
 }
 

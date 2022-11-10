@@ -46,7 +46,8 @@ pub fn sigmoid_on_vec(input: &DataVec, output: &mut DataVec) {
     }
 }
 
-pub struct Activation<T: Fn(f32) -> f32, TD: Fn(f32) -> f32> {
+#[derive(Clone)]
+pub struct Activation<T: Fn(f32) -> f32 + Clone, TD: Fn(f32) -> f32 + Clone> {
     pub func: T,
     pub func_deriv: TD,
     pub name: String,
@@ -54,8 +55,8 @@ pub struct Activation<T: Fn(f32) -> f32, TD: Fn(f32) -> f32> {
 
 impl<T, TD> Activation<T, TD>
 where
-    T: Fn(f32) -> f32,
-    TD: Fn(f32) -> f32,
+    T: Fn(f32) -> f32 + Clone,
+    TD: Fn(f32) -> f32 + Clone,
 {
     pub fn new(name: &str, func: T, func_deriv: TD) -> Self {
         Self {
@@ -95,8 +96,25 @@ pub mod activation_macros {
         };
     }
 
+    #[macro_export]
+    macro_rules! activation_by_name {
+        ("sigmoid") => {
+            Activation::new("sigmoid", sigmoid, sigmoid_deriv)
+        };
+        ("tanh") => {
+            Activation::new("tanh", tanh, tanh_deriv)
+        };
+        ("relu") => {
+            Activation::new("relu", relu, relu_deriv)
+        };
+        ("raw") => {
+            Activation::new("raw", raw, raw_deriv)
+        }
+    }
+
     pub use raw_activation;
     pub use relu_activation;
     pub use sigmoid_activation; // pub(crate) use sigmoid_activation
     pub use tanh_activation;
+    pub use activation_by_name;
 }

@@ -13,7 +13,8 @@ use crate::activation::Activation;
 use crate::bias::{Bias, ConstBias};
 use crate::util::Variant;
 
-pub struct HiddenLayer<T: Fn(f32) -> f32, TD: Fn(f32) -> f32> {
+#[derive(Clone)]
+pub struct HiddenLayer<T: Fn(f32) -> f32 + Clone, TD: Fn(f32) -> f32 + Clone> {
     pub lr_params: LearnParams,
     pub size: usize,
     pub prev_size: usize,
@@ -24,8 +25,8 @@ pub struct HiddenLayer<T: Fn(f32) -> f32, TD: Fn(f32) -> f32> {
 
 impl<T, TD> AbstractLayer for HiddenLayer<T, TD>
 where
-    T: Fn(f32) -> f32 + Sync,
-    TD: Fn(f32) -> f32 + Sync,
+    T: Fn(f32) -> f32 + Sync + Clone + 'static,
+    TD: Fn(f32) -> f32 + Sync + Clone + 'static,
 {
     fn forward(&mut self, input: ParamsBlob) -> LayerForwardResult {
         let inp_m = input[0].output.borrow();
@@ -193,12 +194,22 @@ where
     fn size(&self) -> usize {
         self.size
     }
+
+    fn copy_layer(&self) -> Box<dyn AbstractLayer> {
+        let copy_l = Box::new(HiddenLayer::new(self.size, self.prev_size, self.activation.clone()));
+        copy_l.set_learn_params(self.lr_params.copy());
+        copy_l
+    }
+
+    fn clone_layer(&self) -> Box<dyn AbstractLayer> {
+        Box::new(self.clone())
+    }
 }
 
 impl<T, TD> HiddenLayer<T, TD>
 where
-    T: Fn(f32) -> f32,
-    TD: Fn(f32) -> f32,
+    T: Fn(f32) -> f32 + Clone,
+    TD: Fn(f32) -> f32 + Clone,
 {
     pub fn new(size: usize, prev_size: usize, activation: Activation<T, TD>) -> Self {
         Self {

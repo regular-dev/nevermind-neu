@@ -39,10 +39,25 @@ pub trait AbstractLayer {
 
     fn learn_params(&self) -> Option<LearnParams>;
 
+    fn set_learn_params(&self, lp: LearnParams) {
+        let mut self_lp = self.learn_params().unwrap();
+        self_lp.ws = lp.ws;
+        self_lp.ws_grad = lp.ws_grad;
+        self_lp.output = lp.output;
+        self_lp.err_vals = lp.err_vals;
+        self_lp.uuid = lp.uuid.clone();
+    }
+
     fn layer_cfg(&self) -> HashMap<String, Variant> {
         let mut cfg: HashMap<String, Variant> = HashMap::new();
         cfg
     }
 
     fn set_layer_cfg(&mut self, _cfg: &HashMap<String, Variant>) {}
+
+    // Do copy layer memory(ws, output, ...)
+    fn copy_layer(&self) -> Box<dyn AbstractLayer>;
+
+    // Do copy only Rc
+    fn clone_layer(&self) -> Box<dyn AbstractLayer>;
 }

@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
 use std::fs::File;
+use std::io::prelude::*;
+
 use std::ops::Deref;
 
 use log::debug;
@@ -11,14 +13,15 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use prost::Message;
 
-use super::solver::{pb::PbSolverRms, Solver};
-use super::solver_helper;
-use crate::layers_storage::LayersStorage;
-use crate::learn_params::LearnParams;
-use crate::util::{Batch, WsBlob, WsMat};
+use crate::layers_storage::*;
+use crate::util::*;
+use crate::solvers::*;
+use crate::learn_params::*;
+use crate::solvers::pb::PbSolverRms;
 
 use uuid::Uuid;
 
+#[derive(Default, Clone)]
 pub struct SolverRMS {
     pub learn_rate: f32,
     pub momentum: f32,
@@ -37,7 +40,7 @@ impl SolverRMS {
             alpha: 0.9,
             batch_size: 1,
             theta: 0.00000001,
-            layers: LayersStorage::new(),
+            layers: LayersStorage::empty(),
             rms: HashMap::new(),
         }
     }
@@ -162,21 +165,21 @@ impl Solver for SolverRMS {
             vec_lr.push(solver_helper::convert_ws_blob_to_pb(ws.deref()));
         }
 
-        // let pb_solver = PbSolverRms {
-        //     learn_rate: self.learn_rate,
-        //     momentum: self.momentum,
-        //     alpha: self.alpha,
-        //     theta: self.theta,
-        //     batch_cnt: self.batch_size,
-        //     rms: solver_helper::convert_hash_ws_blob_to_pb(&self.rms),
-        //     layers: vec_lr,
+        let pb_solver = PbSolverRms {
+            learn_rate: self.learn_rate,
+            momentum: self.momentum,
+            alpha: self.alpha,
+            theta: self.theta,
+            batch_cnt: self.batch_size as u32,
+            rms: solver_helper::convert_hash_ws_blob_to_pb(&self.rms),
+            layers: vec_lr,
 
-        // };
+        };
 
-        // // encode
-        // let mut file = File::create(filepath)?;
+        // encode
+        let mut file = File::create(filepath)?;
 
-        // file.write_all(pb_solver.encode_to_vec().as_slice())?;
+        file.write_all(pb_solver.encode_to_vec().as_slice())?;
 
         Ok(())
     }
@@ -237,7 +240,7 @@ impl<'de> Deserialize<'de> for SolverRMS {
     {
         let mut s_solver = SerdeSolverRMS::deserialize(deserializer)?;
 
-        let layer_storage = std::mem::replace(&mut s_solver.layers_cfg, LayersStorage::new());
+        let layer_storage = std::mem::replace(&mut s_solver.layers_cfg, LayersStorage::empty());
 
         let mut rms_solver = SolverRMS::new();
         rms_solver.learn_rate = s_solver.learn_rate;

@@ -5,7 +5,7 @@ use crate::util::DataVec;
 use crate::layers::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
 
 // not used
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct DummyLayer {
     output: DataVec,
     fake_lr: LearnParams,
@@ -34,6 +34,14 @@ impl AbstractLayer for DummyLayer {
 
     fn size(&self) -> usize {
         0
+    }
+
+    fn copy_layer(&self) -> Box<dyn AbstractLayer> {
+        Box::new(self.clone())
+    }
+
+    fn clone_layer(&self) -> Box<dyn AbstractLayer> {
+        self.copy_layer()
     }
 }
 

@@ -6,7 +6,7 @@ pub trait Bias {
     fn forward(&mut self, ws: &WsMat) -> &DataVec;
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct ConstBias {
     pub val: Num,
     pub output: DataVec,
