@@ -8,8 +8,8 @@ use serde_yaml;
 
 use log::{debug, error, info, warn};
 
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use std::error::*;
 use std::fs::File;
@@ -34,6 +34,8 @@ use super::{
 };
 
 use super::solvers::Solver;
+
+const BENCH_ITER: usize = 500;
 
 /// Neural-Network
 pub struct Network<T>
@@ -71,7 +73,7 @@ where
             test_solver,
             snap_iter: 0,
             test_iter: 0,
-            is_bench_time: false,
+            is_bench_time: true,
             show_accuracy: true,
             name: "network".to_owned(),
         }
@@ -300,9 +302,9 @@ where
                 break;
             }
 
-            if iter_num != 0 && iter_num % 100 == 0 && self.is_bench_time {
+            if iter_num != 0 && iter_num % BENCH_ITER == 0 && self.is_bench_time {
                 let elapsed = bench_time.elapsed();
-                info!("Do {} Iteration for {:.4} secs", 100, elapsed.as_secs_f32());
+                info!("Do {} Iteration for {} millisecs", BENCH_ITER, elapsed.as_millis());
                 bench_time = Instant::now();
             }
 
