@@ -113,6 +113,11 @@ impl Solver for SolverSGD {
         self.batch_size
     }
 
+    fn set_batch_size(&mut self, batch_size: usize) {
+        self.batch_size = batch_size;
+        self.layers.fit_to_batch_size(batch_size);
+    }
+
     fn feedforward(&mut self, train_data: Batch, print_out: bool) {
         solver_helper::feedforward(&mut self.layers, train_data, print_out);
     }
@@ -122,11 +127,7 @@ impl Solver for SolverSGD {
     }
 
     fn optimize_network(&mut self) {
-        for (idx, l) in self.layers.iter_mut().enumerate() {
-            if idx == 0 {
-                continue;
-            }
-
+        for l in self.layers.iter_mut().skip(1) {
             debug!("current optimizing layer : {}", l.layer_type());
 
             let mut lr_params = l.learn_params().unwrap();
@@ -146,6 +147,10 @@ impl Solver for SolverSGD {
 
     fn layers(&self) -> &LayersStorage {
         &self.layers
+    }
+
+    fn layers_mut(&mut self) -> &mut LayersStorage {
+        &mut self.layers
     }
 
     fn save_state(&self, filepath: &str) -> Result<(), Box<dyn Error>> {
@@ -235,15 +240,3 @@ impl<'de> Deserialize<'de> for SolverSGD {
         Ok(sgd_solver)
     }
 }
-
-// impl Clone for SolverSGD {
-//     fn clone(&self) -> Self {
-//         let mut s = SolverSGD::default();
-
-//         s.learn_rate = self.learn_rate;
-//         s.momentum = self.momentum;
-//         s.layers = self.layers.clone();
-
-//         s
-//     }
-// }

@@ -43,6 +43,10 @@ impl AbstractLayer for DummyLayer {
     fn clone_layer(&self) -> Box<dyn AbstractLayer> {
         self.copy_layer()
     }
+
+    fn set_learn_params(&mut self, lp: LearnParams) {
+        self.fake_lr = lp;
+    }
 }
 
 impl DummyLayer {

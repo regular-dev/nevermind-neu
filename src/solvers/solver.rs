@@ -3,7 +3,6 @@ use std::fs::File;
 
 use serde::{Deserialize, Serialize};
 
-use crate::dataloader::{DataBatch, MiniBatch};
 use crate::layers_storage::LayersStorage;
 use crate::util::Batch;
 
@@ -14,7 +13,10 @@ pub trait Solver {
     fn optimize_network(&mut self);
 
     fn layers(&self) -> &LayersStorage;
+    fn layers_mut(&mut self) -> &mut LayersStorage;
+
     fn batch_size(&self) -> usize;
+    fn set_batch_size(&mut self, batch_size: usize);
 
     fn solver_type(&self) -> &str;
 

@@ -5,7 +5,6 @@ use uuid::Uuid;
 use ndarray::Array2;
 use std::str::FromStr;
 
-use crate::dataloader::DataBatch;
 use crate::layers_storage::LayersStorage;
 use crate::solvers::pb::{PbFloatVec, PbWsBlob};
 use crate::util::{Batch, WsBlob};
@@ -43,7 +42,6 @@ pub fn feedforward(layers: &mut LayersStorage, train_data: Batch, print_out: boo
     }
 
     let out_v = out.as_ref().unwrap()[0].output.borrow();
-    // let out_val = out_v.output.borrow();
 
     if print_out {
         for i in out_v.iter() {
@@ -75,24 +73,6 @@ pub fn backpropagate(layers: &mut LayersStorage, train_data: Batch) {
     }
 
     for idx in 1..layers.len() {
-        // if idx == 0 {
-        //     prev_out = layers.at_mut(layers.len() - 2).learn_params();
-
-        //     let result_out = layers
-        //         .at_mut(layers.len() - 1)
-        //         .backward_output(vec![prev_out.unwrap()], expected_data);
-
-        //     match result_out {
-        //         Err(reason) => {
-        //             return;
-        //         }
-        //         Ok(val) => {
-        //             out = Some(val);
-        //         }
-        //     }
-        //     continue;
-        // } TODO : clean comment
-
         if idx == layers.len() - 1 {
             continue;
         }

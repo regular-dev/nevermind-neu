@@ -120,6 +120,11 @@ impl Solver for SolverRMS {
         self.batch_size
     }
 
+    fn set_batch_size(&mut self, batch_size: usize) {
+        self.batch_size = batch_size;
+        self.layers.fit_to_batch_size(batch_size);
+    }
+
     fn feedforward(&mut self, train_data: Batch, print_out: bool) {
         solver_helper::feedforward(&mut self.layers, train_data, print_out);
     }
@@ -154,6 +159,10 @@ impl Solver for SolverRMS {
 
     fn layers(&self) -> &LayersStorage {
         &self.layers
+    }
+
+    fn layers_mut(&mut self) -> &mut LayersStorage {
+        &mut self.layers
     }
 
     fn save_state(&self, filepath: &str) -> Result<(), Box<dyn Error>> {

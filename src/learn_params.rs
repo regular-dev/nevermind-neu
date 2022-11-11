@@ -4,6 +4,8 @@ use std::cell::RefCell;
 use std::ops::DerefMut;
 use std::rc::Rc;
 
+use log::debug;
+
 use ndarray_rand::rand::rngs::SmallRng;
 use ndarray_rand::rand::SeedableRng;
 use ndarray_rand::rand_distr::{Distribution, Uniform};
@@ -77,6 +79,8 @@ impl LearnParams {
 
     pub fn prepare_for_tests(&mut self, batch_size: usize) {
         let out_size = self.output.borrow().ncols();
+
+        self.err_vals = Rc::new(RefCell::new(Batch::zeros((0, 0))));
         self.output = Rc::new(RefCell::new(Batch::zeros((batch_size, out_size))));
     }
 

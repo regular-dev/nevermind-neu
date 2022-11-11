@@ -8,7 +8,6 @@ use crate::activation::*;
 use crate::layers::*;
 
 /// Fabric used to create neural network layers, when deserialing and other cases
-/// TODO : create a macros for below implementation
 pub fn create_layer(
     layer_type: &str,
     cfg: Option<&HashMap<String, Variant>>,

@@ -35,6 +35,10 @@ impl AbstractLayer for InputDataLayer {
         Some(self.lr_params.clone())
     }
 
+    fn set_learn_params(&mut self, lp: LearnParams) {
+        self.lr_params = lp;
+    }
+
     fn layer_cfg(&self) -> HashMap<String, Variant> {
         let mut cfg: HashMap<String, Variant> = HashMap::new();
 
@@ -61,7 +65,7 @@ impl AbstractLayer for InputDataLayer {
     }
 
     fn copy_layer(&self) -> Box<dyn AbstractLayer> {
-        let copy_l = InputDataLayer::new(self.input_size);
+        let mut copy_l = InputDataLayer::new(self.input_size);
         copy_l.set_learn_params(self.lr_params.copy());
         Box::new(copy_l)
     }

@@ -162,6 +162,10 @@ impl AbstractLayer for SoftmaxLossLayer {
         Some(self.lr_params.clone())
     }
 
+    fn set_learn_params(&mut self, lp: LearnParams) {
+        self.lr_params = lp;
+    }
+
     fn layer_cfg(&self) -> HashMap<String, Variant> {
         let mut cfg = HashMap::new();
 
@@ -202,7 +206,7 @@ impl AbstractLayer for SoftmaxLossLayer {
     }
 
     fn copy_layer(&self) -> Box<dyn AbstractLayer> {
-        let copy_l = SoftmaxLossLayer::new(self.size, self.prev_size);
+        let mut copy_l = SoftmaxLossLayer::new(self.size, self.prev_size);
         copy_l.set_learn_params(self.lr_params.copy());
         Box::new(copy_l)
     }

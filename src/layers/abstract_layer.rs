@@ -37,16 +37,8 @@ pub trait AbstractLayer {
 
     fn size(&self) -> usize;
 
-    fn learn_params(&self) -> Option<LearnParams>;
-
-    fn set_learn_params(&self, lp: LearnParams) {
-        let mut self_lp = self.learn_params().unwrap();
-        self_lp.ws = lp.ws;
-        self_lp.ws_grad = lp.ws_grad;
-        self_lp.output = lp.output;
-        self_lp.err_vals = lp.err_vals;
-        self_lp.uuid = lp.uuid.clone();
-    }
+    fn learn_params(&self) -> Option<LearnParams>; // TODO : return &LearnParams
+    fn set_learn_params(&mut self, lp: LearnParams);
 
     fn layer_cfg(&self) -> HashMap<String, Variant> {
         let mut cfg: HashMap<String, Variant> = HashMap::new();

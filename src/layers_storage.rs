@@ -68,10 +68,11 @@ impl LayersStorage {
         }
     }
 
-    pub fn prepare_for_tests(&self, batch_size: usize) {
-        for i in &self.layers {
+    pub fn prepare_for_tests(&mut self, batch_size: usize) {
+        for i in self.layers.iter_mut() {
             let mut lr = i.learn_params().unwrap();
             lr.prepare_for_tests(batch_size);
+            i.set_learn_params(lr);
         }
     }
 

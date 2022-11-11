@@ -73,7 +73,6 @@ where
     }
 
     /// Setup the network with [0] - input size, [...] - hidden neurons, [N] - output size
-    /// TODO : make this function static and make as static constructor for Network class
     pub fn setup_simple_network(&mut self, layers: &Vec<usize>) {
         let mut ls = LayersStorage::new_simple_network(layers);
         ls.fit_to_batch_size(self.solver.batch_size());
@@ -84,23 +83,30 @@ where
         self.solver.setup_network(ls);
     }
 
-    pub fn test_batch_num(mut self, num: usize) -> Self {
-        self.test_batch_size = num;
+    pub fn test_batch_num(mut self, batch_size: usize) -> Self {
+        self.test_batch_size = batch_size;
+
+        if let Some(ts) = self.test_solver.as_mut() {
+            ts.set_batch_size(batch_size); // set_batch_size change for prepare_for_tests ? 
+        }
+
         self
     }
 
     pub fn test_dataloader(mut self, test_dl: Box<dyn DataLoader>) -> Self {
         self.test_dl = Some(test_dl);
 
-        // self.test_solver = Some(self.solver.clone());
         self.create_test_solver();
 
         self
     }
 
     fn create_test_solver(&mut self) {
-        let test_solver = self.solver.clone();
-        test_solver.layers().prepare_for_tests(self.test_batch_size);
+        let mut test_solver = self.solver.clone();
+
+        debug!("self.test_batch_size : {}", self.test_batch_size);
+
+        test_solver.layers_mut().prepare_for_tests(self.test_batch_size);
         self.test_solver = Some(test_solver);
     }
 
@@ -109,7 +115,6 @@ where
         self
     }
 
-    /// TODO : rename this method. it make a confusion with save_solver_cfg ?
     pub fn save_network_cfg(&mut self, path: &str) -> std::io::Result<()> {
         save_solver_cfg(&self.solver, path)
     }
@@ -139,16 +144,18 @@ where
         if self.test_dl.is_none() {
             let err = self.test_err / self.test_batch_size as f32; // error average
             self.test_err = 0.0;
-            return err.abs();
+            return err;
         }
+
+        let test_solver = self.test_solver.as_mut().unwrap();
 
         let test_dl = self.test_dl.as_mut().unwrap();
         let mut err = 0.0;
 
         let test_batch = test_dl.next_batch(self.test_batch_size);
-        self.solver.feedforward(test_batch.input, true);
+        test_solver.feedforward(test_batch.input, true);
 
-        let layers = self.solver.layers();
+        let layers = test_solver.layers();
         let last_layer = layers.last().unwrap();
 
         let lr = last_layer.learn_params().unwrap();
@@ -193,7 +200,7 @@ where
             return sq_sum;
         });
 
-        let test_err = (sq_sum / err.shape()[0] as f32).sqrt();
+        let test_err = (sq_sum / err.nrows() as f32).sqrt();
         return test_err;
     }
 
@@ -272,7 +279,6 @@ where
                 break;
             }
 
-            // TODO : make an argument to display info
             if iter_num != 0 && iter_num % 100 == 0 && self.is_bench_time {
                 let elapsed = bench_time.elapsed();
                 info!("Do {} Iteration for {:.4} secs", 100, elapsed.as_secs_f32());

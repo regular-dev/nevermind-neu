@@ -47,15 +47,15 @@ where
         let bias_out = self.bias.forward(&ws[1]);
 
         // for each input batch
-        Zip::from(inp_m.rows()) // esityt
+        Zip::from(inp_m.rows())
             .and(out_m.rows_mut())
             .par_for_each(|inp_b, out_b| {
-                let mul_res = ws0.clone() * inp_b;
+                let mul_res = ws0.clone().dot(&inp_b);
 
                 // for each neuron
-                Zip::from(out_b).and(mul_res.rows()).and(bias_out).for_each(
+                Zip::from(out_b).and(&mul_res).and(bias_out).for_each(
                     |out_el, in_row, bias_el| {
-                        *out_el = (self.activation.func)(in_row.sum() + bias_el);
+                        *out_el = (self.activation.func)(in_row + bias_el);
                     },
                 );
             });
@@ -95,12 +95,11 @@ where
                     mul_res.len()
                 );
 
-                Zip::from(err_val_r)
-                    .and(output_r)
-                    .and(&mul_res)
-                    .for_each(|err_val, output, col| {
+                Zip::from(err_val_r).and(output_r).and(&mul_res).for_each(
+                    |err_val, output, col| {
                         *err_val = (self.activation.func_deriv)(*output) * col;
-                    });
+                    },
+                );
             });
 
         debug!("[hidden layer] i am here 2");
@@ -129,18 +128,17 @@ where
         }
 
         // for bias :
-        for neu_idx in 0..ws[1].shape()[0] {
-            for prev_idx in 0..ws[1].shape()[1] {
+        for neu_idx in 0..ws[1].shape()[0] { // self.size
+            for prev_idx in 0..ws[1].shape()[1] { // 1
                 let cur_ws_idx = [neu_idx, prev_idx];
 
                 let mut avg = 0.0;
-                Zip::from(prev_input.column(prev_idx))
-                    .and(self_err_vals.column(neu_idx))
-                    .for_each(|prev_val, err_val| {
+                Zip::from(self_err_vals.column(neu_idx))
+                    .for_each(|err_val| {
                         avg += self.bias.val * err_val;
                     });
 
-                avg = avg / prev_input.column(prev_idx).len() as f32;
+                avg = avg / self_err_vals.column(prev_idx).len() as f32;
 
                 ws_grad[1][cur_ws_idx] = avg;
             }
@@ -153,6 +151,10 @@ where
 
     fn learn_params(&self) -> Option<LearnParams> {
         Some(self.lr_params.clone())
+    }
+
+    fn set_learn_params(&mut self, lp: LearnParams) {
+        self.lr_params = lp;
     }
 
     fn layer_type(&self) -> &str {
@@ -196,7 +198,11 @@ where
     }
 
     fn copy_layer(&self) -> Box<dyn AbstractLayer> {
-        let copy_l = Box::new(HiddenLayer::new(self.size, self.prev_size, self.activation.clone()));
+        let mut copy_l = Box::new(HiddenLayer::new(
+            self.size,
+            self.prev_size,
+            self.activation.clone(),
+        ));
         copy_l.set_learn_params(self.lr_params.copy());
         copy_l
     }
