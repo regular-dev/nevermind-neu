@@ -153,7 +153,7 @@ where
         let mut err = 0.0;
 
         let test_batch = test_dl.next_batch(self.test_batch_size);
-        test_solver.feedforward(test_batch.input, true);
+        test_solver.feedforward(test_batch.input);
 
         let layers = test_solver.layers();
         let last_layer = layers.last().unwrap();
@@ -188,8 +188,8 @@ where
         err / self.test_batch_size as f32
     }
 
-    pub fn feedforward(&mut self, train_data: Batch, print_out: bool) {
-        self.solver.feedforward(train_data, print_out);
+    pub fn feedforward(&mut self, train_data: Batch) {
+        self.solver.feedforward(train_data);
     }
 
     fn calc_avg_err(last_layer_lr: &LearnParams) -> f32 {
@@ -206,12 +206,14 @@ where
 
     fn perform_step(&mut self) {
         let data = self.train_dl.next_batch(self.solver.batch_size());
-        self.solver.feedforward(data.input, false);
+        self.solver.feedforward(data.input);
         self.solver.backpropagate(data.output);
         self.solver.optimize_network();
 
-        let lr = self.solver.layers().last().unwrap().learn_params().unwrap();
-        self.test_err += Self::calc_avg_err(&lr);
+        if self.test_dl.is_none() {
+            let lr = self.solver.layers().last().unwrap().learn_params().unwrap();
+            self.test_err += Self::calc_avg_err(&lr);
+        }
     }
 
     pub fn train_for_n_times(&mut self, times: usize) -> Result<(), Box<dyn std::error::Error>> {

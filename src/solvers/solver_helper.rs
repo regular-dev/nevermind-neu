@@ -10,7 +10,7 @@ use crate::solvers::pb::{PbFloatVec, PbWsBlob};
 use crate::util::{Batch, WsBlob};
 
 // TODO : handle error
-pub fn feedforward(layers: &mut LayersStorage, train_data: Batch, print_out: bool) {
+pub fn feedforward(layers: &mut LayersStorage, train_data: Batch) {
     let mut out = None;
 
     // for the first(input) layer
@@ -39,14 +39,6 @@ pub fn feedforward(layers: &mut LayersStorage, train_data: Batch, print_out: boo
                 out = Some(val);
             }
         };
-    }
-
-    let out_v = out.as_ref().unwrap()[0].output.borrow();
-
-    if print_out {
-        for i in out_v.iter() {
-            println!("out val : {}", i);
-        }
     }
 }
 

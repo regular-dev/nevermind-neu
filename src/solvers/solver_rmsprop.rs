@@ -125,8 +125,8 @@ impl Solver for SolverRMS {
         self.layers.fit_to_batch_size(batch_size);
     }
 
-    fn feedforward(&mut self, train_data: Batch, print_out: bool) {
-        solver_helper::feedforward(&mut self.layers, train_data, print_out);
+    fn feedforward(&mut self, train_data: Batch) {
+        solver_helper::feedforward(&mut self.layers, train_data);
     }
 
     fn backpropagate(&mut self, train_data: Batch) {

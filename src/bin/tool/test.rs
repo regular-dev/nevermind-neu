@@ -62,7 +62,7 @@ fn test_net_helper(
         }
 
         info!("Below label is : {}", label);
-        net.feedforward(test_batch.input, true);
+        net.feedforward(test_batch.input);
     }
 
     Ok(())

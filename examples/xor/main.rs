@@ -110,7 +110,7 @@ fn main() -> Result<(), Box<dyn std::error::Error> >{
     // net.feedforward(array![[1.0, 0.0]], true);
     // net.feedforward(array![[1.0, 1.0]], true);
 
-   net.feedforward(array![[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]], true);
+   net.feedforward(array![[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]]);
 
     Ok(())
 }

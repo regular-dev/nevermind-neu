@@ -8,7 +8,7 @@ use crate::util::Batch;
 
 pub trait Solver {
     fn setup_network(&mut self, layers: LayersStorage);
-    fn feedforward(&mut self, train_data: Batch, print_out: bool); // TODO : remove print_out arg
+    fn feedforward(&mut self, train_data: Batch);
     fn backpropagate(&mut self, expected_data: Batch);
     fn optimize_network(&mut self);
 
