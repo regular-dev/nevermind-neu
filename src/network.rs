@@ -8,6 +8,9 @@ use serde_yaml;
 
 use log::{debug, error, info, warn};
 
+use std::rc::Rc;
+use std::cell::RefCell;
+
 use std::error::*;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Error, ErrorKind, Write};
@@ -42,8 +45,8 @@ where
     test_batch_size: usize,
     test_err: f32,
     is_write_test_err: bool,
-    solver: T,
-    test_solver: Option<T>,
+    train_solver: T,
+    test_solver: T,
     snap_iter: usize,
     test_iter: usize,
     show_accuracy: bool,
@@ -56,14 +59,16 @@ where
     T: Solver + Serialize + Clone,
 {
     pub fn new(train_dl: Box<dyn DataLoader>, solver: T) -> Self {
+        let test_solver = solver.clone();
+
         Network {
             train_dl,
             test_dl: None,
             test_batch_size: 1,
             test_err: 0.0,
             is_write_test_err: true,
-            solver,
-            test_solver: None,
+            train_solver: solver,
+            test_solver,
             snap_iter: 0,
             test_iter: 0,
             is_bench_time: false,
@@ -75,20 +80,19 @@ where
     /// Setup the network with [0] - input size, [...] - hidden neurons, [N] - output size
     pub fn setup_simple_network(&mut self, layers: &Vec<usize>) {
         let mut ls = LayersStorage::new_simple_network(layers);
-        ls.fit_to_batch_size(self.solver.batch_size());
-        self.solver.setup_network(ls);
+        ls.fit_to_batch_size(self.train_solver.batch_size());
+        self.train_solver.setup_network(ls);
+        self.create_test_solver();
     }
 
     pub fn set_layer_storage(&mut self, ls: LayersStorage) {
-        self.solver.setup_network(ls);
+        self.train_solver.setup_network(ls);
     }
 
     pub fn test_batch_num(mut self, batch_size: usize) -> Self {
         self.test_batch_size = batch_size;
 
-        if let Some(ts) = self.test_solver.as_mut() {
-            ts.set_batch_size(batch_size); // set_batch_size change for prepare_for_tests ? 
-        }
+        self.test_solver.set_batch_size(batch_size); // TODO : set_batch_size change for prepare_for_tests ?
 
         self
     }
@@ -96,18 +100,19 @@ where
     pub fn test_dataloader(mut self, test_dl: Box<dyn DataLoader>) -> Self {
         self.test_dl = Some(test_dl);
 
-        self.create_test_solver();
+        self.prepare_test_solver();
 
         self
     }
 
-    fn create_test_solver(&mut self) {
-        let mut test_solver = self.solver.clone();
+    fn prepare_test_solver(&mut self) {
+        self.test_solver
+            .layers_mut()
+            .prepare_for_tests(self.test_batch_size);
+    }
 
-        debug!("self.test_batch_size : {}", self.test_batch_size);
-
-        test_solver.layers_mut().prepare_for_tests(self.test_batch_size);
-        self.test_solver = Some(test_solver);
+    pub fn create_test_solver(&mut self) {
+        self.test_solver = self.train_solver.clone();
     }
 
     pub fn write_test_err_to_file(mut self, state: bool) -> Self {
@@ -116,7 +121,7 @@ where
     }
 
     pub fn save_network_cfg(&mut self, path: &str) -> std::io::Result<()> {
-        save_solver_cfg(&self.solver, path)
+        save_solver_cfg(&self.train_solver, path)
     }
 
     pub fn snap_iter(mut self, snap_each_iter: usize) -> Self {
@@ -135,7 +140,7 @@ where
     }
 
     pub fn save_solver_state(&self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
-        self.solver.save_state(path)?;
+        self.train_solver.save_state(path)?;
         Ok(())
     }
 
@@ -147,15 +152,13 @@ where
             return err;
         }
 
-        let test_solver = self.test_solver.as_mut().unwrap();
-
         let test_dl = self.test_dl.as_mut().unwrap();
         let mut err = 0.0;
 
         let test_batch = test_dl.next_batch(self.test_batch_size);
-        test_solver.feedforward(test_batch.input);
+        self.test_solver.feedforward(test_batch.input);
 
-        let layers = test_solver.layers();
+        let layers = self.test_solver.layers();
         let last_layer = layers.last().unwrap();
 
         let lr = last_layer.learn_params().unwrap();
@@ -188,8 +191,18 @@ where
         err / self.test_batch_size as f32
     }
 
-    pub fn feedforward(&mut self, train_data: Batch) {
-        self.solver.feedforward(train_data);
+    pub fn eval(&mut self, train_data: Batch) -> Rc<RefCell<Batch>> {
+        self.test_solver.feedforward(train_data);
+
+        let last_lp = self
+            .test_solver
+            .layers()
+            .last()
+            .unwrap()
+            .learn_params()
+            .unwrap();
+
+        last_lp.output.clone()
     }
 
     fn calc_avg_err(last_layer_lr: &LearnParams) -> f32 {
@@ -205,13 +218,19 @@ where
     }
 
     fn perform_step(&mut self) {
-        let data = self.train_dl.next_batch(self.solver.batch_size());
-        self.solver.feedforward(data.input);
-        self.solver.backpropagate(data.output);
-        self.solver.optimize_network();
+        let data = self.train_dl.next_batch(self.train_solver.batch_size());
+        self.train_solver.feedforward(data.input);
+        self.train_solver.backpropagate(data.output);
+        self.train_solver.optimize_network();
 
         if self.test_dl.is_none() {
-            let lr = self.solver.layers().last().unwrap().learn_params().unwrap();
+            let lr = self
+                .train_solver
+                .layers()
+                .last()
+                .unwrap()
+                .learn_params()
+                .unwrap();
             self.test_err += Self::calc_avg_err(&lr);
         }
     }

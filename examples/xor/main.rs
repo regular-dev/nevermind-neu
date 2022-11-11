@@ -1,6 +1,6 @@
 use std::fs::File;
 
-use log::{LevelFilter, SetLoggerError, info};
+use log::{info, LevelFilter, SetLoggerError};
 use log4rs::append::console::ConsoleAppender;
 use log4rs::append::file::FileAppender;
 use log4rs::encode::pattern::PatternEncoder;
@@ -54,7 +54,6 @@ fn init_logger() {
         }
     } else {
         panic!("Couldn't initialize logger !!!");
-
     }
 }
 
@@ -63,7 +62,7 @@ fn init_logger() {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error> >{
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_logger();
     log::info!("Regular-mind 0.1 test app starting...");
 
@@ -77,14 +76,14 @@ fn main() -> Result<(), Box<dyn std::error::Error> >{
     let dataloader = Box::new(SimpleDataLoader::new(dataset_train));
 
     //let mut solver_rms = SolverRMS::from_file("network.cfg")?;
-   // solver_rms.load_state("solver_state.proto")?;
+    // solver_rms.load_state("solver_state.proto")?;
 
     // create a network
     let mut net = Network::new(dataloader, SolverRMS::new().batch(4));
-    let net_cfg = vec![2, 10, 1];
+    let net_cfg = vec![2, 5, 1];
     net.setup_simple_network(&net_cfg);
 
-  //  net.save_network_cfg("network.cfg")?;
+    //  net.save_network_cfg("network.cfg")?;
 
     let now_time = Instant::now();
 
@@ -94,7 +93,7 @@ fn main() -> Result<(), Box<dyn std::error::Error> >{
 
     info!("Elapsed for training : {} ms", elapsed_bench.as_millis());
 
-   //net.save_solver_state("solver_state.proto")?;
+    //net.save_solver_state("solver_state.proto")?;
 
     // test dataset
     let mut dataset_test: Vec<DataBatch> = Vec::new();
@@ -105,12 +104,10 @@ fn main() -> Result<(), Box<dyn std::error::Error> >{
 
     info!("Now testing net !!!");
 
-    // net.feedforward(array![[0.0, 0.0]], true);
-    // net.feedforward(array![[0.0, 1.0]], true);
-    // net.feedforward(array![[1.0, 0.0]], true);
-    // net.feedforward(array![[1.0, 1.0]], true);
+    let out = net.eval(array![[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]]);
+    let out_b = out.borrow();
 
-   net.feedforward(array![[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]]);
+    info!("Trained-net XOR out : {}", out_b);
 
     Ok(())
 }
