@@ -24,7 +24,6 @@ use uuid::Uuid;
 #[derive(Default, Clone)]
 pub struct SolverRMS {
     pub learn_rate: f32,
-    pub momentum: f32,
     pub alpha: f32,
     pub theta: f32,
     layers: LayersStorage,
@@ -36,7 +35,6 @@ impl SolverRMS {
     pub fn new() -> Self {
         SolverRMS {
             learn_rate: 0.2,
-            momentum: 0.2,
             alpha: 0.9,
             batch_size: 1,
             theta: 0.00000001,
@@ -176,7 +174,6 @@ impl Solver for SolverRMS {
 
         let pb_solver = PbSolverRms {
             learn_rate: self.learn_rate,
-            momentum: self.momentum,
             alpha: self.alpha,
             theta: self.theta,
             batch_cnt: self.batch_size as u32,
@@ -199,7 +196,6 @@ impl Solver for SolverRMS {
         let mut solver_rms = PbSolverRms::decode(buf.as_slice())?;
 
         self.learn_rate = solver_rms.learn_rate;
-        self.momentum = solver_rms.momentum;
         self.alpha = solver_rms.alpha;
         self.theta = solver_rms.theta;
         self.batch_size = solver_rms.batch_cnt as usize;
@@ -218,7 +214,6 @@ impl Solver for SolverRMS {
 #[derive(Serialize, Deserialize)]
 struct SerdeSolverRMS {
     pub learn_rate: f32,
-    pub momentum: f32,
     pub alpha: f32,
     pub theta: f32,
     pub batch_size: usize,
@@ -232,7 +227,6 @@ impl Serialize for SolverRMS {
     {
         let mut solver_cfg = serializer.serialize_struct("SolverRMS Configuration", 3)?;
         solver_cfg.serialize_field("learn_rate", &self.learn_rate)?;
-        solver_cfg.serialize_field("momentum", &self.momentum)?;
         solver_cfg.serialize_field("alpha", &self.alpha)?;
         solver_cfg.serialize_field("theta", &self.theta)?;
         solver_cfg.serialize_field("batch_size", &self.batch_size)?;
@@ -253,7 +247,6 @@ impl<'de> Deserialize<'de> for SolverRMS {
 
         let mut rms_solver = SolverRMS::new();
         rms_solver.learn_rate = s_solver.learn_rate;
-        rms_solver.momentum = s_solver.momentum;
         rms_solver.alpha = s_solver.alpha;
         rms_solver.theta = s_solver.theta;
         rms_solver.layers = layer_storage;

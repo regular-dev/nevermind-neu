@@ -14,11 +14,10 @@ message PbWsBlob {
 
 message PbSolverRMS {
   float learn_rate = 1;
-  float momentum = 2;
-  float alpha = 3;
-  float theta = 4;
-  uint32 batch_cnt = 5;
-  map< string, PbWsBlob > rms = 6; // uuid - blob
+  float alpha = 2;
+  float theta = 3;
+  uint32 batch_cnt = 4;
+  map< string, PbWsBlob > rms = 5; // uuid - blob
   //map< string, PbWsBlob > ws_batch = 7;
 
   repeated PbWsBlob layers = 8;  
