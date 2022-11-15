@@ -178,10 +178,10 @@ where
                 }
 
                 for i in 0..out_r.shape()[0] {
-                    local_err += exp_r[i] - out_r[i];
+                    local_err += (exp_r[i] - out_r[i]).powf(2.0);
                 }
 
-                err += local_err.powf(2.0) / out_r.shape()[0] as f32;
+                err += (local_err / out_r.shape()[0] as f32).sqrt();
             });
 
         accuracy_cnt = accuracy_cnt / self.test_batch_size as f32;
