@@ -14,8 +14,8 @@ Cargo.lock
 *.pdb
 
 .vscode/
-examples/mnist
 network.cfg
 *.proto
 err.log
 *.state
+*.zip
