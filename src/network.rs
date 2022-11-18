@@ -7,6 +7,7 @@ use serde_json;
 use serde_yaml;
 
 use log::{debug, error, info, warn};
+use uuid::fmt::Simple;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -77,6 +78,15 @@ where
             show_accuracy: true,
             name: "network".to_owned(),
         }
+    }
+
+    /// Creates Network with empty simple dataloader
+    pub fn new_for_test(solver: T, test_batch_size: usize) -> Self {
+        let simple_dl = Box::new(SimpleDataLoader::empty());
+        let mut s = Self::new(simple_dl, solver);
+        s.prepare_test_solver();
+        s = s.test_batch_num(test_batch_size);
+        s
     }
 
     /// Setup the network with [0] - input size, [...] - hidden neurons, [N] - output size

@@ -47,4 +47,11 @@ impl SimpleDataLoader {
             data,
         }
     }
+
+    pub fn empty() -> Self {
+        Self {
+            id: RefCell::new(0),
+            data: vec![],
+        }
+    }
 }
