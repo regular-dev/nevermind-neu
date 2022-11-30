@@ -1,4 +1,5 @@
 use log::{error, info};
+use regular_mind::with_open_cfg_network;
 
 use std::time::Instant;
 
@@ -64,6 +65,15 @@ fn test_net_helper(
         info!("Below label is : {}", label);
         net.eval(test_batch.input);
     }
+
+    Ok(())
+}
+
+pub fn test_net_with_macro(args: &ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
+    with_open_cfg_network!(net, "some.cfg", 
+    { 
+        
+    });
 
     Ok(())
 }

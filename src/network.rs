@@ -38,6 +38,7 @@ use super::solvers::Solver;
 
 const BENCH_ITER: usize = 500;
 
+
 /// Neural-Network
 pub struct Network<T>
 where
