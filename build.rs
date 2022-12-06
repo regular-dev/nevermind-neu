@@ -8,5 +8,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rustc-link-lib={}=openblas", "dylib");
     println!("cargo:rustc-link-lib={}=cblas", "dylib");
 
+    println!("caceshka");
+
     Ok(())
 }

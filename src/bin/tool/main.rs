@@ -24,30 +24,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .help("Provides a file path to train dataset")
                 .action(ArgAction::Set)
                 .require_equals(true)
+                .required(true)
         )
         .arg(
             Arg::new("TestData")
                 .long("test_dataset")
                 .help("Provides a file path to test dataset")
-                .action(ArgAction::Set)
                 .require_equals(true)
+                .takes_value(true)
         )
         .arg(
-            Arg::new("SolverState")
+            Arg::new("ModelState")
                 .short('s')
                 .long("state")
                 .help("Provide solver state. Weights state to start training")
-                .action(ArgAction::Set)
+                .takes_value(true)
                 .require_equals(true)
         )
         .arg(
-            Arg::new("SolverCfgYaml")
+            Arg::new("ModelCfg")
                 .long("solver_cfg_yaml")
                 .help("Provide solver configuration")
                 .required(true)
-                .action(ArgAction::Set)
+                .takes_value(true)
                 .require_equals(true)
         )
+        .arg(Arg::new("OptCfg")
+                .short('o')
+                .long("optimizer_cfg")
+                .help("Provide optimizer configuration yaml file")
+                .takes_value(true)
+                .require_equals(true))
         .arg(
             Arg::new("MaxIter")
                 .long("max_iter")
@@ -96,18 +103,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .require_equals(true)
             .required(true)
         )
-        .arg(Arg::new("SolverCfgYaml")
-                .long("solver_cfg_yaml")
-                .help("Provide solver configuration")
+        .arg(Arg::new("ModelCfg")
+                .long("model_cfg")
+                .help("Provide model configuration yaml file")
                 .required(true)
                 .takes_value(true)
                 .require_equals(true))
-        .arg(Arg::new("SolverState")
+        .arg(Arg::new("ModelState")
                 .short('s')
                 .long("state")
-                .help("Provide solver state. Weights state to start training")
+                .help("Provide state state. Weights state to continue training")
                 .action(ArgAction::Set)
                 .takes_value(true)
+                .required(true)
                 .require_equals(true))
         .arg(Arg::new("TestBatch")
                 .long("test_batch")
@@ -128,10 +136,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Arg::new("OutFile")
                 .long("out")
                 .short('o')
-                .help("Specifies net configuration output file")
+                .help("Specifies model configuration output file")
                 .default_value("net.cfg")
                 .action(ArgAction::Set))
-            )
+        .arg(Arg::new("OptimFile")
+            .long("optim_out")
+            .help("Specify optimizer configuration output file")
+            .default_value("optim.cfg")))
         .after_help("after help message. TODO : expand with examples")
         .get_matches();
 
@@ -143,7 +154,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     if cmd.0 == "train" {
         let (_subcmd, args) = matches.subcommand().unwrap();
-        train::train_new(&args)?;
+        //  train::train_new(&args)?;
     }
     if cmd.0 == "test" {
         let (_subcmd, args) = matches.subcommand().unwrap();

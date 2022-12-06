@@ -3,6 +3,7 @@ use std::fmt;
 #[derive(Debug)]
 pub enum CustomError {
     WrongArg,
+    InvalidFormat,
     Other
 }
 

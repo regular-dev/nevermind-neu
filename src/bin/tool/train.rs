@@ -9,57 +9,35 @@ use clap::ArgMatches;
 // regular_mind
 use regular_mind::dataloader::*;
 use regular_mind::network::*;
-use regular_mind::solvers::*;
 use regular_mind::err::*;
+use regular_mind::models::*;
+use regular_mind::optimizers::*;
+
 
 /// Starts train a network with required net configuration
 /// and train dataset
-pub fn train_new(
-    args: &ArgMatches
-) -> Result<(), Box<dyn std::error::Error>> {
-    if !args.contains_id("SolverCfgYaml") {
-        error!("Solver configuration wasn't provided (--solver_cfg_yaml)");
-        return Err(Box::new(CustomError::WrongArg));
-    }
-
-    let solver_cfg = args.get_one::<String>("SolverCfgYaml").unwrap();
-    let solver_type = solver_type_from_file(solver_cfg)?;
-
-    match solver_type.as_str() {
-        "rmsprop" => {
-            let solver = SolverRMS::from_file(solver_cfg)?;
-            train_net(solver, args)
-        },
-        "sgd" => {
-            let solver = SolverSGD::from_file(solver_cfg)?;
-            train_net(solver, args)
-        }
-        _ => {
-            Err(Box::new(CustomError::Other))
-        }
-    }
-}
-
 pub fn train_net(
-    mut solver: impl Solver + Serialize + Clone,
     args: &ArgMatches
 ) -> Result<(), Box<dyn std::error::Error>> {
-    if !args.contains_id("TrainData") {
-        error!("TrainData wasn't provided (--train_dataset)");
-        return Err(Box::new(CustomError::WrongArg));
-    }
-
-    info!("Train batch size : {}", solver.batch_size());
+    let model_cfg = args.get_one::<String>("ModelCfg").unwrap();
+    let mut model = Sequential::from_file(&model_cfg)?;
 
     let train_ds = args.get_one::<String>("TrainData").unwrap();
     let train_ds = Box::new(ProtobufDataLoader::from_file(train_ds)?);
 
-    if let Some(state_file) = args.get_one::<String>("SolverState") {
-        info!("Loading solver state from file {}", *state_file);
-        solver.load_state(state_file)?;
+    if let Some(model_state) = args.get_one::<String>("ModelState") {
+        model.load_state(&model_state)?;
     }
 
-    let mut net = Network::new(train_ds, solver);
+    let mut net = Network::new(model, false);
+
+    net.set_train_dataset(train_ds);
+
+    if let Some(optimizer_cfg) = args.get_one::<String>("OptCfg") {
+        info!("Setting up optimizer : {}", optimizer_cfg);
+        let opt = optimizer_from_file(optimizer_cfg)?;
+        net.set_optimizer(opt);
+    }
 
     // Set test data if exists argument
     if let Some(test_ds) = args.get_one::<String>("TestData") {

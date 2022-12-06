@@ -1,9 +1,10 @@
 /// Folder
 pub mod bias;
 pub mod layers;
-pub mod solvers;
+pub mod optimizers;
 pub mod util;
 pub mod dataloader;
+pub mod models;
 
 /// Files
 pub mod activation;
@@ -14,6 +15,6 @@ pub mod network;
 pub mod err;
 
 pub mod prelude {
-    pub use crate::network::save_solver_cfg;
+    pub use crate::network::save_model_cfg;
     // pub use crate::network::* and etc...
 }

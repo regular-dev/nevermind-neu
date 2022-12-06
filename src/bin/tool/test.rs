@@ -1,58 +1,35 @@
 use log::{error, info};
-use regular_mind::with_open_cfg_network;
+use regular_mind::models::Model;
+use regular_mind::models::Sequential;
 
 use std::time::Instant;
-
-use serde::Serialize;
 
 use clap::ArgMatches;
 
 // regular_mind
 use regular_mind::dataloader::*;
-use regular_mind::err::*;
 use regular_mind::network::*;
-use regular_mind::solvers::*;
 
-pub fn test_net(args: &ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
-    let solver_cfg = args.get_one::<String>("SolverCfgYaml").unwrap();
-    let solver_state = args.get_one::<String>("SolverState").unwrap();
-    let solver_type = solver_type_from_file(solver_cfg)?;
-
-    match solver_type.as_str() {
-        "rmsprop" => {
-            let mut solver = SolverRMS::from_file(solver_cfg)?;
-            solver.load_state(solver_state)?;
-            test_net_helper(args, solver)?;
-        }
-        "sgd" => {
-            let mut solver = SolverSGD::from_file(solver_cfg)?;
-            solver.load_state(solver_state)?;
-            test_net_helper(args, solver)?;
-        }
-        _ => {
-            return Err(Box::new(CustomError::Other));
-        }
-    }
-
-    Ok(())
-}
-
-fn test_net_helper(
+pub fn test_net(
     args: &ArgMatches,
-    solver: impl Solver + Serialize + Clone,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let model_cfg = args.get_one::<String>("ModelCfg").unwrap();
+    let mut model = Sequential::from_file(&model_cfg)?;
+
+    let model_state_file = args.get_one::<String>("ModelState").unwrap();
+    model.load_state(&model_state_file);
+
     let ds_path = args.get_one::<String>("Data").unwrap();
-    let ds = Box::new(ProtobufDataLoader::from_file(ds_path)?);
-    let mut ds_test = Box::new(ProtobufDataLoader::from_file(ds_path)?);
+    let test_data = Box::new(ProtobufDataLoader::from_file(ds_path)?);
 
     let test_batch = args.get_one::<usize>("TestBatch").unwrap();
 
-    let mut net = Network::new(ds, solver);
+    let mut net = Network::new(model, true);
 
     // TODO : check label impl
     for i in 0..*test_batch {
         info!("Test {} , evaluating", i);
-        let test_batch = ds_test.next_batch(1);
+        let test_batch = test_data.next_batch(1);
 
         let mut label = -1;
         for (idx, it) in test_batch.output.iter().enumerate() {
@@ -65,15 +42,6 @@ fn test_net_helper(
         info!("Below label is : {}", label);
         net.eval(test_batch.input);
     }
-
-    Ok(())
-}
-
-pub fn test_net_with_macro(args: &ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
-    with_open_cfg_network!(net, "some.cfg", 
-    { 
-        
-    });
 
     Ok(())
 }

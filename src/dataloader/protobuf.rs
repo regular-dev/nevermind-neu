@@ -4,7 +4,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::cell::RefCell;
 
-use crate::solvers::pb::{PbDataStorage, PbDataBatch};
+use crate::models::pb::{PbDataStorage, PbDataBatch};
 
 use prost::Message;
 

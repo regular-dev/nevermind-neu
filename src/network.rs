@@ -17,16 +17,14 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Error, ErrorKind, Write};
 use std::time::Instant;
 
-use ndarray::Zip;
+use ndarray::{Zip, Data};
 
 use ndarray_stats::QuantileExt;
 
 use std::fs::OpenOptions;
 
 use super::dataloader::DataLoader;
-use super::layers_storage::LayersStorage;
 use super::learn_params::LearnParams;
-use super::solvers::SolverRMS;
 use crate::util::Batch;
 
 use super::{
@@ -34,7 +32,8 @@ use super::{
     layers::InputDataLayer,
 };
 
-use super::solvers::Solver;
+use super::optimizers::*;
+use crate::models::Model;
 
 const BENCH_ITER: usize = 500;
 
@@ -42,15 +41,16 @@ const BENCH_ITER: usize = 500;
 /// Neural-Network
 pub struct Network<T>
 where
-    T: Solver + Serialize + Clone,
+    T: Model + Serialize + Clone,
 {
-    train_dl: Box<dyn DataLoader>,
+    train_dl: Option<Box<dyn DataLoader>>,
     test_dl: Option<Box<dyn DataLoader>>,
-    test_batch_size: usize,
+    optim: Box<dyn Optimizer>,
     test_err: f32,
+    test_batch_size: usize,
     is_write_test_err: bool,
-    train_solver: T,
-    test_solver: T,
+    train_model: Option<T>,
+    test_model: Option<T>,
     snap_iter: usize,
     test_iter: usize,
     show_accuracy: bool,
@@ -60,19 +60,24 @@ where
 
 impl<T> Network<T>
 where
-    T: Solver + Serialize + Clone,
+    T: Model + Serialize + Clone,
 {
-    pub fn new(train_dl: Box<dyn DataLoader>, solver: T) -> Self {
-        let test_solver = solver.clone();
+    pub fn new(model: T, just_for_tests: bool) -> Self {
+        let mut test_model = None;
+
+        if just_for_tests {
+            test_model = Some(model.clone());
+        }
 
         Network {
-            train_dl,
+            train_dl: None,
             test_dl: None,
-            test_batch_size: 1,
+            optim: Box::new(OptimizerSGD::new(1e-1, 0.8)),
             test_err: 0.0,
+            test_batch_size: 10,
             is_write_test_err: true,
-            train_solver: solver,
-            test_solver,
+            train_model: Some(model),
+            test_model,
             snap_iter: 0,
             test_iter: 0,
             is_bench_time: true,
@@ -81,51 +86,25 @@ where
         }
     }
 
-    /// Creates Network with empty simple dataloader
-    pub fn new_for_test(solver: T, test_batch_size: usize) -> Self {
-        let simple_dl = Box::new(SimpleDataLoader::empty());
-        let mut s = Self::new(simple_dl, solver);
-        s.prepare_test_solver();
-        s = s.test_batch_num(test_batch_size);
-        s
-    }
-
-    /// Setup the network with [0] - input size, [...] - hidden neurons, [N] - output size
-    pub fn setup_simple_network(&mut self, layers: &Vec<usize>) {
-        let mut ls = LayersStorage::new_simple_network(layers);
-        ls.fit_to_batch_size(self.train_solver.batch_size());
-        self.train_solver.setup_network(ls);
-        self.create_test_solver();
-    }
-
-    pub fn set_layer_storage(&mut self, ls: LayersStorage) {
-        self.train_solver.setup_network(ls);
-    }
-
     pub fn test_batch_num(mut self, batch_size: usize) -> Self {
-        self.test_batch_size = batch_size;
-
-        self.test_solver.set_batch_size(batch_size); // TODO : set_batch_size change for prepare_for_tests ?
+        if let Some(test_model) = self.test_model.as_mut() {
+            // TODO : set_batch_size change for prepare_for_tests ?
+            test_model.set_batch_size_for_tests(batch_size);
+        } else {
+            self.test_batch_size = batch_size;
+        }
 
         self
     }
 
     pub fn test_dataloader(mut self, test_dl: Box<dyn DataLoader>) -> Self {
         self.test_dl = Some(test_dl);
-
-        self.prepare_test_solver();
-
-        self
-    }
-
-    fn prepare_test_solver(&mut self) {
-        self.test_solver
-            .layers_mut()
-            .prepare_for_tests(self.test_batch_size);
+        let s = self.test_batch_num(1);
+        s
     }
 
     pub fn create_test_solver(&mut self) {
-        self.test_solver = self.train_solver.clone();
+        self.test_model = self.train_model.clone();
     }
 
     pub fn write_test_err_to_file(mut self, state: bool) -> Self {
@@ -134,7 +113,8 @@ where
     }
 
     pub fn save_network_cfg(&mut self, path: &str) -> std::io::Result<()> {
-        save_solver_cfg(&self.train_solver, path)
+      //  save_solver_cfg(&self.train_model, path)
+        todo!() // TODO : need to save net.cfg with layers_cfg and optimizer_cfg
     }
 
     pub fn snap_iter(mut self, snap_each_iter: usize) -> Self {
@@ -152,9 +132,23 @@ where
         self
     }
 
-    pub fn save_solver_state(&self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
-        self.train_solver.save_state(path)?;
-        Ok(())
+    pub fn save_model_state(&self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(train_model) = self.train_model.as_ref() {
+            train_model.save_state(path)?
+        }
+        Ok(()) // TODO : Return error if there is no train_model
+    }
+
+    pub fn set_train_dataset(&mut self, data: Box<dyn DataLoader>) {
+        self.train_dl = Some(data)
+    }
+
+    pub fn set_test_dataset(&mut self, data: Box<dyn DataLoader>) {
+        self.test_dl = Some(data)
+    }
+
+    pub fn set_optimizer(&mut self, optim: Box<dyn Optimizer>) {
+        self.optim = optim
     }
 
     /// Test net and returns and average error
@@ -169,10 +163,10 @@ where
         let mut err = 0.0;
 
         let test_batch = test_dl.next_batch(self.test_batch_size);
-        self.test_solver.feedforward(test_batch.input);
+        self.test_model.as_mut().unwrap().feedforward(test_batch.input);
 
-        let layers = self.test_solver.layers();
-        let last_layer = layers.last().unwrap();
+        let len_layers = self.test_model.as_ref().unwrap().layers_count(); // TODO : maybe somehow refactor ?
+        let last_layer = self.test_model.as_ref().unwrap().layer(len_layers - 1);
 
         let lr = last_layer.learn_params().unwrap();
         let out = lr.output.borrow();
@@ -205,17 +199,29 @@ where
     }
 
     pub fn eval(&mut self, train_data: Batch) -> Rc<RefCell<Batch>> {
-        self.test_solver.feedforward(train_data);
+        if let Some(test_model) = self.test_model.as_mut() {
+            info!("TEST");
+            test_model.feedforward(train_data);
 
-        let last_lp = self
-            .test_solver
-            .layers()
-            .last()
-            .unwrap()
-            .learn_params()
-            .unwrap();
+            let last_lp = test_model
+                .last_layer()
+                .learn_params()
+                .unwrap();
+    
+            return last_lp.output.clone();
+        }
 
-        last_lp.output.clone()
+        if let Some(train_model) = self.train_model.as_mut() {
+            train_model.feedforward(train_data);
+
+            let last_lp = train_model.last_layer().learn_params().unwrap();
+
+            return last_lp.output.clone();
+        }
+
+        error!("Error evaluation !!!");
+
+        return Rc::new(RefCell::new(Batch::zeros((1,1)))); // TODO : return some error
     }
 
     fn calc_avg_err(last_layer_lr: &LearnParams) -> f32 {
@@ -231,20 +237,34 @@ where
     }
 
     fn perform_step(&mut self) {
-        let data = self.train_dl.next_batch(self.train_solver.batch_size());
-        self.train_solver.feedforward(data.input);
-        self.train_solver.backpropagate(data.output);
-        self.train_solver.optimize_network();
+        if self.train_dl.is_none() {
+            error!("Train dataset isn't set !!!");
+            return;
+        }
 
-        if self.test_dl.is_none() {
-            let lr = self
-                .train_solver
-                .layers()
-                .last()
-                .unwrap()
-                .learn_params()
-                .unwrap();
-            self.test_err += Self::calc_avg_err(&lr);
+        if let Some(train_model) = self.train_model.as_mut() {
+            let data = self.train_dl.as_ref().unwrap().next_batch(train_model.batch_size());
+            train_model.feedforward(data.input);
+            train_model.backpropagate(data.output);
+
+            Network::optimize_model(train_model, &mut self.optim);
+            
+            if self.test_dl.is_none() {
+                let lr = train_model.last_layer()
+                    .learn_params()
+                    .unwrap();
+                self.test_err += Self::calc_avg_err(&lr);
+            }
+        }
+    }
+
+    fn optimize_model(train_model: &mut T, optimizer: &mut Box<dyn Optimizer>) {
+        for i in 0..train_model.layers_count() {
+            let l = train_model.layer(i);
+
+            let mut lp = l.learn_params().unwrap();
+
+            optimizer.optimize_network(&mut lp);
         }
     }
 
@@ -323,7 +343,7 @@ where
 
             if self.snap_iter != 0 && iter_num % self.snap_iter == 0 && iter_num != 0 {
                 let filename = format!("{}_{}.state", self.name, iter_num);
-                self.save_solver_state(&filename)?;
+                self.save_model_state(&filename)?;
             }
 
             if self.test_iter != 0
@@ -342,21 +362,21 @@ where
         info!("Iterations : {}", iter_num);
 
         let filename = format!("{}_{}_final.state", self.name, iter_num);
-        self.save_solver_state(&filename)?;
+        self.save_model_state(&filename)?;
 
         Ok(())
     }
 }
 
 /// TODO : rename this method. it make a confusion with save_network_cfg ?
-pub fn save_solver_cfg<S: Solver + Serialize>(solver: &S, path: &str) -> std::io::Result<()> {
-    let json_str_result = serde_yaml::to_string(solver);
+pub fn save_model_cfg<S: Model + Serialize>(solver: &S, path: &str) -> std::io::Result<()> {
+    let yaml_str_result = serde_yaml::to_string(solver);
 
     let mut output = File::create(path)?;
 
-    match json_str_result {
-        Ok(json_str) => {
-            output.write_all(json_str.as_bytes())?;
+    match yaml_str_result {
+        Ok(yaml_str) => {
+            output.write_all(yaml_str.as_bytes())?;
         }
         Err(x) => {
             eprintln!("Error (serde-yaml) serializing net layers !!!");

@@ -6,6 +6,8 @@ use log::debug;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use std::slice::IterMut;
+
 use super::layer_fabric::*;
 use super::layers::AbstractLayer;
 use super::layers::ErrorLayer;
@@ -15,23 +17,31 @@ use super::util::Variant;
 
 use crate::activation::*;
 
+
+pub trait LayersStorage {
+    fn fit_to_batch_size(&mut self, batch_size: usize);
+    fn prepare_for_tests(&mut self, batch_size: usize);
+    fn iter_mut(&mut self) -> IterMut<Box<dyn AbstractLayer>>;
+    
+}
+
 #[derive(Default)]
-pub struct LayersStorage {
+pub struct SequentialLayersStorage {
     layers: Vec<Box<dyn AbstractLayer>>,
 }
 
-impl LayersStorage {
+impl SequentialLayersStorage {
     pub fn empty() -> Self {
-        LayersStorage { layers: Vec::new() }
+        SequentialLayersStorage { layers: Vec::new() }
     }
 
     /// Setup the network with [0] - input size, [...] - hidden neurons, [N] - output size
     pub fn new_simple_network(layers: &Vec<usize>) -> Self {
-        let mut ls = LayersStorage::empty();
+        let mut ls = SequentialLayersStorage::empty();
 
         if layers.len() < 3 {
             eprintln!("Invalid layers length !!!");
-            return LayersStorage::empty();
+            return SequentialLayersStorage::empty();
         }
 
         for (idx, val) in layers.iter().enumerate() {
@@ -113,7 +123,7 @@ impl LayersStorage {
     }
 }
 
-impl fmt::Display for LayersStorage {
+impl fmt::Display for SequentialLayersStorage {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut out = String::new();
 
@@ -139,7 +149,7 @@ pub struct SerdeLayersStorage {
     layers_cfg: Vec<SerdeLayerParam>,
 }
 
-impl Serialize for LayersStorage {
+impl Serialize for SequentialLayersStorage {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -158,14 +168,14 @@ impl Serialize for LayersStorage {
     }
 }
 
-impl<'de> Deserialize<'de> for LayersStorage {
-    fn deserialize<D>(deserializer: D) -> Result<LayersStorage, D::Error>
+impl<'de> Deserialize<'de> for SequentialLayersStorage {
+    fn deserialize<D>(deserializer: D) -> Result<SequentialLayersStorage, D::Error>
     where
         D: Deserializer<'de>,
     {
         let s_layers_storage = SerdeLayersStorage::deserialize(deserializer)?;
 
-        let mut ls = LayersStorage { layers: Vec::new() };
+        let mut ls = SequentialLayersStorage { layers: Vec::new() };
 
         for i in &s_layers_storage.layers_cfg {
             let l_opt = create_layer(i.name.as_str(), Some(&i.params));
@@ -183,9 +193,9 @@ impl<'de> Deserialize<'de> for LayersStorage {
     }
 }
 
-impl Clone for LayersStorage {
+impl Clone for SequentialLayersStorage {
     fn clone(&self) -> Self {
-        let mut ls = LayersStorage::empty();
+        let mut ls = SequentialLayersStorage::empty();
 
         for i in &self.layers {
             ls.add_layer(i.clone_layer());

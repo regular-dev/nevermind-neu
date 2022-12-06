@@ -32,6 +32,10 @@ message PbSolverSGD {
   repeated PbWsBlob layers = 6;
 }
 
+message PbSequentialModel {
+  repeated PbWsBlob layers = 1;  
+}
+
 message PbDataBatch {
   repeated float input = 1;
   repeated float expected = 2;

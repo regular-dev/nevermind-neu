@@ -16,6 +16,7 @@ use env_logger::Env;
 use regular_mind::dataloader::*;
 use regular_mind::network::*;
 use regular_mind::solvers::*;
+use regular_mind::models::*;
 
 #[cfg(feature = "log_log4rs")]
 fn init_logger() {
@@ -78,10 +79,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //let mut solver_rms = SolverRMS::from_file("network.cfg")?;
     // solver_rms.load_state("solver_state.proto")?;
 
-    // create a network
-    let mut net = Network::new(dataloader, SolverRMS::new().batch(4));
-    let net_cfg = vec![2, 5, 1];
-    net.setup_simple_network(&net_cfg);
+    let net_cfg = vec![2, 10, 1];
+    let mut seq_mdl = Sequential::new_simple(&net_cfg);
+    seq_mdl.set_batch_size(4);
+
+    let mut net = Network::new(seq_mdl, false).test_batch_num(4);
+
+    net.set_train_dataset(dataloader);
 
     //  net.save_network_cfg("network.cfg")?;
 

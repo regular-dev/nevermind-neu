@@ -13,7 +13,9 @@ use regular_mind::err::*;
 use regular_mind::layers::*;
 use regular_mind::layers_storage::*;
 use regular_mind::network::*;
-use regular_mind::solvers::*;
+use regular_mind::models::*;
+use regular_mind::optimizers::*;
+
 
 fn read_from_stdin<T: FromStr>(stdin: &io::Stdin) -> Result<T, Box<dyn Error>> {
     let mut inp_str = String::new();
@@ -31,48 +33,68 @@ fn read_from_stdin<T: FromStr>(stdin: &io::Stdin) -> Result<T, Box<dyn Error>> {
 
 pub fn create_net(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
     let out_file = args.get_one::<String>("OutFile").unwrap();
+    let out_optim = args.get_one::<String>("OptimFile").unwrap();
 
     let stdin = io::stdin();
 
-    println!("Greetings traveller, tell me solver type : [sgd, rmsprop]");
-    let solver_type: String = read_from_stdin(&stdin)?;
+    println!("Greetings traveller...");
 
-    if solver_type.as_str() == "sgd" {
-        let solver = create_net_sgd(&stdin)?;
+    let seq_mdl = create_layers(&stdin)?;
+    info!("Writing model configuration to file {}", out_file);
+    seq_mdl.to_file(out_file)?;
 
-        info!("Writing net configuration to file : {}", out_file);
-        save_solver_cfg(&solver, out_file)?;
-    } else if solver_type.as_str() == "rmsprop" {
-        let solver = create_net_rms(&stdin)?;
+    handle_optimizer(&stdin, &out_optim)?;
 
-        info!("Writing net configuration to file : {}", out_file);
-        save_solver_cfg(&solver, out_file)?;
-    } else {
-        return Err(Box::new(CustomError::Other));
+    Ok(())
+}
+
+fn handle_optimizer(stdin: &io::Stdin, filepath: &str) -> Result<(), Box<dyn Error>> {
+    println!("Would you like to create an optimizator configuration ? [y/n]");
+
+    let yn: String = read_from_stdin(stdin)?;
+
+    if yn == "n" || yn == "N" {
+        return Ok(());
+    }
+
+    println!("Tell me optimizer type : [sgd, rmsprop]");
+    let opt_type: String = read_from_stdin(&stdin)?;
+
+    if opt_type == "sgd" {
+        let mut optimizer = OptimizerSGD::default();
+
+        println!("Tell me learning rate [0.01 format]");
+        let lr: f32 = read_from_stdin(&stdin)?;
+
+        println!("Tell me momentum [0.8 format]");
+        let momentum: f32 = read_from_stdin(&stdin)?;
+
+        optimizer.learn_rate = lr;
+        optimizer.momentum = momentum;
+
+        optimizer_to_file(optimizer, filepath)?;
+    } else if opt_type == "rmsprop" {
+        let mut optimizer = OptimizerRMS::default();
+
+        println!("Tell me learning rate [0.01 format]");
+        let lr: f32 = read_from_stdin(&stdin)?;
+
+        println!("Tell me alpha [0.8 format]");
+        let alpha: f32 = read_from_stdin(&stdin)?;
+
+        optimizer.learn_rate = lr;
+        optimizer.alpha = alpha;
+
+        optimizer_to_file(optimizer, filepath)?;
     }
 
     Ok(())
 }
 
-fn create_net_rms(stdin: &io::Stdin) -> Result<SolverRMS, Box<dyn Error>> {
-    let solver = SolverRMS::new();
-    let solver = create_layers(stdin, solver);
-
-    solver
-}
-
-fn create_net_sgd(stdin: &io::Stdin) -> Result<SolverSGD, Box<dyn Error>> {
-    let solver = SolverSGD::new();
-    let solver = create_layers(stdin, solver);
-
-    solver
-}
-
-fn create_layers<T: Solver + Serialize>(
+fn create_layers(
     stdin: &io::Stdin,
-    mut solver: T,
-) -> Result<T, Box<dyn Error>> {
-    let mut ls = LayersStorage::empty();
+) -> Result<Sequential, Box<dyn Error>> {
+    let mut ls = SequentialLayersStorage::empty();
 
     // Input layer
     println!("Now tell me the input layer size");
@@ -151,7 +173,7 @@ fn create_layers<T: Solver + Serialize>(
 
     println!("Finally network : {}", ls);
 
-    solver.setup_network(ls);
+    let seq_mdl = Sequential::new_with_layers(ls);
 
-    Ok(solver)
+    Ok(seq_mdl)
 }
