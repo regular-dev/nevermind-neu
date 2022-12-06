@@ -5,9 +5,8 @@ use uuid::Uuid;
 use ndarray::Array2;
 use std::str::FromStr;
 
-use crate::layers_storage::SequentialLayersStorage;
 use crate::models::pb::{PbFloatVec, PbWsBlob};
-use crate::util::{Batch, WsBlob};
+use crate::util::WsBlob;
 
 
 pub fn convert_ws_blob_to_pb(ws_blob: &WsBlob) -> PbWsBlob {

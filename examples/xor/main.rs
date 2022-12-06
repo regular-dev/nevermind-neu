@@ -15,8 +15,8 @@ use env_logger::Env;
 
 use regular_mind::dataloader::*;
 use regular_mind::network::*;
-use regular_mind::solvers::*;
 use regular_mind::models::*;
+use regular_mind::optimizers::*;
 
 #[cfg(feature = "log_log4rs")]
 fn init_logger() {
@@ -83,8 +83,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut seq_mdl = Sequential::new_simple(&net_cfg);
     seq_mdl.set_batch_size(4);
 
+    let opt = Box::new(OptimizerRMS::new(1e-2, 0.8));
+
     let mut net = Network::new(seq_mdl, false).test_batch_num(4);
 
+    net.set_optimizer(opt);
     net.set_train_dataset(dataloader);
 
     //  net.save_network_cfg("network.cfg")?;

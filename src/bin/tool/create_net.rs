@@ -2,8 +2,6 @@ use std::error::Error;
 use std::io;
 use std::str::FromStr;
 
-use serde::Serialize;
-
 use clap::ArgMatches;
 
 use log::info;
@@ -12,7 +10,6 @@ use regular_mind::activation::*;
 use regular_mind::err::*;
 use regular_mind::layers::*;
 use regular_mind::layers_storage::*;
-use regular_mind::network::*;
 use regular_mind::models::*;
 use regular_mind::optimizers::*;
 

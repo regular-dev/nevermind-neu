@@ -154,7 +154,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     if cmd.0 == "train" {
         let (_subcmd, args) = matches.subcommand().unwrap();
-        //  train::train_new(&args)?;
+         train::train_net(&args)?;
     }
     if cmd.0 == "test" {
         let (_subcmd, args) = matches.subcommand().unwrap();
