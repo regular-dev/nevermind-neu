@@ -85,7 +85,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let opt = Box::new(OptimizerRMS::new(1e-2, 0.8));
 
-    let mut net = Network::new(seq_mdl, false).test_batch_num(4);
+    let mut net = Network::new(seq_mdl).test_batch_num(4);
 
     net.set_optimizer(opt);
     net.set_train_dataset(dataloader);

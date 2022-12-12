@@ -29,7 +29,7 @@ pub fn train_net(
         model.load_state(&model_state)?;
     }
 
-    let mut net = Network::new(model, false);
+    let mut net = Network::new(model);
 
     net.set_train_dataset(train_ds);
 

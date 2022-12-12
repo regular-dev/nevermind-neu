@@ -24,7 +24,7 @@ pub fn test_net(
 
     let test_batch = args.get_one::<usize>("TestBatch").unwrap();
 
-    let mut net = Network::new(model, true);
+    let mut net = Network::new_for_eval(model);
 
     // TODO : check label impl
     for i in 0..*test_batch {

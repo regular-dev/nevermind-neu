@@ -62,12 +62,8 @@ impl<T> Network<T>
 where
     T: Model + Serialize + Clone,
 {
-    pub fn new(model: T, just_for_tests: bool) -> Self {
-        let mut test_model = None;
-
-        if just_for_tests {
-            test_model = Some(model.clone());
-        }
+    pub fn new(model: T) -> Self {
+        let test_model = Some(model.clone());
 
         Network {
             train_dl: None,
@@ -76,8 +72,26 @@ where
             test_err: 0.0,
             test_batch_size: 10,
             is_write_test_err: true,
-            train_model: Some(model),
+            train_model: Some(model), 
             test_model,
+            snap_iter: 0,
+            test_iter: 0,
+            is_bench_time: true,
+            show_accuracy: true,
+            name: "network".to_owned(),
+        }
+    }
+
+    pub fn new_for_eval(model: T) -> Self {
+        Network {
+            train_dl: None,
+            test_dl: None,
+            optim: Box::new(OptimizerSGD::new(1e-1, 0.8)),
+            test_err: 0.0,
+            test_batch_size: 10,
+            is_write_test_err: true,
+            train_model: None, 
+            test_model: Some(model),
             snap_iter: 0,
             test_iter: 0,
             is_bench_time: true,
@@ -90,9 +104,9 @@ where
         if let Some(test_model) = self.test_model.as_mut() {
             // TODO : set_batch_size change for prepare_for_tests ?
             test_model.set_batch_size_for_tests(batch_size);
-        } else {
-            self.test_batch_size = batch_size;
         }
+
+        self.test_batch_size = batch_size;
 
         self
     }
