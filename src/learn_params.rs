@@ -84,22 +84,6 @@ impl LearnParams {
         self.output = Rc::new(RefCell::new(Batch::zeros((batch_size, out_size))));
     }
 
-    pub fn drop_ws(&mut self, dropout: f32) {
-        let mut ws = self.ws.borrow_mut();
-        let between = Uniform::from((0.0)..(1.0));
-        let mut rng = SmallRng::from_entropy();
-
-        for i in ws.deref_mut() {
-            for it_ws in i.iter_mut() {
-                let n = between.sample(&mut rng);
-
-                if n > dropout {
-                    *it_ws = 0.0;
-                }
-            }
-        }
-    }
-
     /// Copies learn_params memory of (weights, gradients, output...)
     /// This function do copy memory
     /// To clone only Rc<...> use .clone() function

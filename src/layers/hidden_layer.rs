@@ -8,7 +8,7 @@ use log::{debug, error, info};
 use crate::learn_params::{LearnParams, ParamsBlob};
 
 use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerError, LayerForwardResult};
-use crate::activation::Activation;
+use crate::activation::{Activation, sign};
 
 use crate::bias::{Bias, ConstBias};
 use crate::util::Variant;
@@ -20,6 +20,8 @@ pub struct HiddenLayer<T: Fn(f32) -> f32 + Clone, TD: Fn(f32) -> f32 + Clone> {
     pub prev_size: usize,
     pub dropout: f32,
     pub bias: ConstBias,
+    pub l2_regul: f32,
+    pub l1_regul: f32,
     pub activation: Activation<T, TD>,
 }
 
@@ -123,7 +125,17 @@ where
 
                 avg = avg / prev_input.column(prev_idx).len() as f32;
 
-                ws_grad[0][cur_ws_idx] = avg;
+                let mut l2_penalty = 0.0;
+                if self.l2_regul != 0.0 {
+                    l2_penalty = self.l2_regul * ws[0][cur_ws_idx];
+                }
+
+                let mut l1_penalty = 0.0;
+                if self.l1_regul == 0.0 {
+                    l1_penalty = self.l1_regul * sign(ws[0][cur_ws_idx]);
+                }
+
+                ws_grad[0][cur_ws_idx] = avg - l2_penalty - l1_penalty;
             }
         }
 
@@ -225,12 +237,25 @@ where
             lr_params: LearnParams::new_with_const_bias(size, prev_size),
             bias: ConstBias::new(size, 1.0),
             activation,
+            l2_regul: 0.0,
+            l1_regul: 0.0,
         }
     }
 
     pub fn dropout(mut self, val: f32) -> Self {
-        self.dropout = val;
-        self.lr_params.drop_ws(val);
+        todo!()
+        // self.dropout = val;
+        // self.lr_params.drop_ws(val);
+        // self
+    }
+
+    pub fn l2_regularization(mut self, coef: f32) -> Self {
+        self.l2_regul = coef;
+        self
+    }
+
+    pub fn l1_regularization(mut self, coef: f32) -> Self {
+        self.l1_regul = coef;
         self
     }
 }

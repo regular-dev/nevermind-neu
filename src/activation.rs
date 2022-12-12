@@ -32,6 +32,15 @@ pub fn relu(val: f32) -> f32 {
     }
 }
 
+pub fn sign(val: f32) -> f32 {
+    if val < 0.0 {
+        return -1.0;
+    } else if val > 0.0 {
+        return 1.0;
+    }
+    0.0
+}
+
 pub fn relu_deriv(val: f32) -> f32 {
     1.0
 }
