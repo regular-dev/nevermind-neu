@@ -63,7 +63,7 @@ where
             .par_for_each(|err_val_r, expected_r, output_r| {
                 Zip::from(err_val_r).and(expected_r).and(output_r).for_each(
                     |err_val, expected, output| {
-                        *err_val = expected - output;
+                        *err_val = (expected - output) * (self.activation.func_deriv)(*output);
                     },
                 );
             });

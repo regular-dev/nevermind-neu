@@ -79,9 +79,6 @@ impl AbstractLayer for SoftmaxLossLayer {
             }
         }
 
-        //info!("Predicted : {} | Expected : {}", v_idx, expected_idx);
-        //*self.arr_accuracy.get_mut(self.batch_id).unwrap() = (v_idx == expected_idx as usize) as i32 as f32;
-
         if v_idx == expected_idx as usize {
             *self.arr_accuracy.get_mut(self.batch_id).unwrap() = 1.0;
         }
@@ -89,29 +86,17 @@ impl AbstractLayer for SoftmaxLossLayer {
         self.batch_id += 1;
 
         if self.batch_id % self.batch_size == 0 && self.batch_id != 0 {
-            // warn!(
-            //     "Accuracy : {}",
-            //     self.arr_accuracy.sum() / self.batch_size as f32
-            // );
             self.arr_accuracy = Array1::zeros(self.batch_size);
             self.batch_id = 0;
         }
-
-        // TEST
-        // let err = self_output.get(expected_idx as usize).unwrap();
-
-        //let ce_err = self_output.get(expected_idx as usize).unwrap();
 
         Zip::from(self_err_vals.rows_mut())
             .and(self_output.rows())
             .and(expected_vec.rows())
             .par_for_each(|err_val_b, out_b, expected_b| {
-                
-
                 Zip::from(err_val_b).and(out_b).and(expected_b).for_each(
                     |err_val, output, expected| {
                         if *expected == 1.0 {
-                            //debug!("expected == 1.0");
                             *err_val = 1.0 - *output;
                         } else {
                             *err_val = (-1.0) * *output;
@@ -120,15 +105,10 @@ impl AbstractLayer for SoftmaxLossLayer {
                 );
             });
 
-        //info!("SoftmaxLossLayer output : {}", self_output);
-        //info!("SoftmaxLossLayer errors : {}", self_err_vals);
-
         // calc per-weight gradient, TODO : refactor code below
         // for prev_layer :
         let ws = self.lr_params.ws.borrow();
         let mut ws_grad = self.lr_params.ws_grad.borrow_mut();
-
-        debug!("i am here 1");
 
         for neu_idx in 0..ws[0].shape()[0] {
             for prev_idx in 0..ws[0].shape()[1] {
@@ -146,8 +126,6 @@ impl AbstractLayer for SoftmaxLossLayer {
                 ws_grad[0][cur_ws_idx] = avg;
             }
         }
-
-        debug!("i am here 2");
 
         debug!("[ok] SoftmaxLossLayer backward()");
 
