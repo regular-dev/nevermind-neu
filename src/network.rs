@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::hash::Hash;
 use std::vec::Vec;
 
 use serde::ser::{SerializeSeq, SerializeStruct};
@@ -25,7 +26,7 @@ use std::fs::OpenOptions;
 
 use super::dataloader::DataLoader;
 use super::learn_params::LearnParams;
-use crate::util::Batch;
+use crate::util::*;
 
 use super::{
     dataloader::{DataBatch, SimpleDataLoader},
@@ -53,6 +54,8 @@ where
     test_model: Option<T>,
     snap_iter: usize,
     test_iter: usize,
+    learn_rate_decay: f32,
+    decay_step: usize,
     show_accuracy: bool,
     is_bench_time: bool,
     name: String,
@@ -76,6 +79,8 @@ where
             test_model,
             snap_iter: 0,
             test_iter: 0,
+            learn_rate_decay: 1.0,
+            decay_step: 0,
             is_bench_time: true,
             show_accuracy: true,
             name: "network".to_owned(),
@@ -94,6 +99,8 @@ where
             test_model: Some(model),
             snap_iter: 0,
             test_iter: 0,
+            learn_rate_decay: 1.0,
+            decay_step: 0,
             is_bench_time: true,
             show_accuracy: true,
             name: "network".to_owned(),
@@ -163,6 +170,14 @@ where
 
     pub fn set_optimizer(&mut self, optim: Box<dyn Optimizer>) {
         self.optim = optim
+    }
+
+    pub fn set_learn_rate_decay(&mut self, decay: f32) {
+        self.learn_rate_decay = decay
+    }
+
+    pub fn set_learn_rate_decay_step(&mut self, step: usize) {
+        self.decay_step = step;
     }
 
     /// Test net and returns and average error
@@ -248,6 +263,22 @@ where
 
         let test_err = (sq_sum / err.nrows() as f32).sqrt();
         return test_err;
+    }
+
+    fn perform_learn_rate_decay(&mut self) {
+        let opt_params = self.optim.cfg();
+
+        if let Some(lr) = opt_params.get("learn_rate") {
+            if let Variant::Float(lr) = lr {
+                let decayed_lr = lr * self.learn_rate_decay;
+
+                info!("Perfoming learning rate decay : from {}, to {}", lr, decayed_lr);
+
+                let mut m = HashMap::new();
+                m.insert("learn_rate".to_owned(), Variant::Float(decayed_lr));
+                self.optim.set_cfg(&m);
+            }
+        }
     }
 
     fn perform_step(&mut self) {
@@ -355,6 +386,10 @@ where
 
             self.perform_step();
 
+            if iter_num != 0 && self.decay_step != 0 && iter_num % self.decay_step == 0 {
+                self.perform_learn_rate_decay();
+            }
+            
             if self.snap_iter != 0 && iter_num % self.snap_iter == 0 && iter_num != 0 {
                 let filename = format!("{}_{}.state", self.name, iter_num);
                 self.save_model_state(&filename)?;
