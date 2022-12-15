@@ -18,6 +18,17 @@ pub fn dataset_info(args: &ArgMatches) -> Result<(), Box<dyn std::error::Error>>
     let loader = ProtobufDataLoader::from_file(filepath)?;
     println!("Dataset length : {}", loader.data.len());
 
+    if let Some(n) = args.get_one::<usize>("ShowN") {
+        for i in 0..*n {
+            let db = loader.next();
+
+            println!("======================");
+            println!("{} batch input : {}", i, db.input);
+            println!("{} batch output : {}", i, db.expected);
+            println!("======================");
+        }
+    }
+
     Ok(())
 }
 
