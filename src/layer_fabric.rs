@@ -14,40 +14,52 @@ pub fn create_layer(
 ) -> Option<Box<dyn AbstractLayer>> {
     match layer_type {
         "ErrorLayer" => {
-            let mut l = Box::new(layers_macros::raw_error_layer!());
-            if cfg.is_some() {
-                l.set_layer_cfg(cfg.unwrap());
-            }
-            return Some(l);
-        }
-        "HiddenLayer" => {
-            // TODO : deserialize activation function
             if let Some(cfg_val) = cfg {
-                let mut l: Option<Box<dyn AbstractLayer>> = None;
-                let activation = cfg_val.get("activation").unwrap(); // TODO : refactor unwrap()
+                let mut l: Box<dyn AbstractLayer>;
+                let activation = cfg_val.get("activation").unwrap();
 
                 if let Variant::String(activation) = activation {
                     if activation == "sigmoid" {
-                        l = Some(Box::new(layers_macros::sigmoid_hidden_layer!()));
+                        l = Box::new(layers_macros::sigmoid_error_layer!());
                     } else if activation == "tanh" {
-                        l = Some(Box::new(layers_macros::tanh_hidden_layer!()));
-                    } else if activation == "relu" {
-                        l = Some(Box::new(layers_macros::relu_hidden_layer!()));
+                        l = Box::new(layers_macros::tanh_error_layer!());
+                    } else { 
+                        l = Box::new(layers_macros::raw_error_layer!());
                     }
+                } else {
+                    l = Box::new(layers_macros::raw_error_layer!()); 
                 }
 
-                if l.is_none() {
-                    l = Some(Box::new(layers_macros::sigmoid_hidden_layer!()));
+                l.set_layer_cfg(cfg_val);
+
+                return Some(l);
+            } else {
+                let l = Box::new(layers_macros::raw_error_layer!());
+                return Some(l);
+            }
+        }
+        "HiddenLayer" => {
+            if let Some(cfg_val) = cfg {
+                let mut l: Box<dyn AbstractLayer>;
+                let activation = cfg_val.get("activation").unwrap(); // TODO : handle unwrap()
+
+                if let Variant::String(activation) = activation {
+                    if activation == "sigmoid" {
+                        l = Box::new(layers_macros::sigmoid_hidden_layer!());
+                    } else if activation == "tanh" {
+                        l = Box::new(layers_macros::tanh_hidden_layer!());
+                    } else {
+                        l = Box::new(layers_macros::relu_hidden_layer!());
+                    }
+                } else {
+                    l = Box::new(layers_macros::relu_hidden_layer!());
                 }
 
-                l.as_mut().unwrap().set_layer_cfg(cfg_val);
-                return l;
+                l.set_layer_cfg(cfg_val);
+                return Some(l);
             }
 
-            let mut l = Box::new(layers_macros::sigmoid_hidden_layer!());
-            if cfg.is_some() {
-                l.set_layer_cfg(cfg.unwrap());
-            }
+            let l = Box::new(layers_macros::sigmoid_hidden_layer!());
             return Some(l);
         }
         "InputDataLayer" => {
