@@ -15,6 +15,8 @@ pub struct ErrorLayer<T: Fn(f32) -> f32 + Clone, TD: Fn(f32) -> f32 + Clone> {
     pub size: usize,
     pub prev_size: usize,
     pub lr_params: LearnParams,
+    pub l2_regul: f32,
+    pub l1_regul: f32,
     pub activation: Activation<T, TD>,
 }
 
@@ -113,6 +115,11 @@ where
         cfg.insert("size".to_owned(), Variant::Int(self.size as i32));
         cfg.insert("prev_size".to_owned(), Variant::Int(self.prev_size as i32));
 
+        cfg.insert("activation".to_owned(), Variant::String(self.activation.name.clone()));
+
+        cfg.insert("l2_regul".to_owned(), Variant::Float(self.l2_regul));
+        cfg.insert("l1_regul".to_owned(), Variant::Float(self.l1_regul));
+
         cfg
     }
 
@@ -131,6 +138,14 @@ where
             self.size = size;
             self.prev_size = prev_size;
             self.lr_params = LearnParams::new(self.size, self.prev_size);
+        }
+
+        if let Variant::Float(l1_regul) = cfg.get("l1_regul").unwrap() {
+            self.l1_regul = *l1_regul;
+        }
+
+        if let Variant::Float(l2_regul) = cfg.get("l2_regul").unwrap() {
+            self.l2_regul = *l2_regul;
         }
     }
 
@@ -160,6 +175,18 @@ where
             prev_size,
             lr_params: LearnParams::new(size, prev_size),
             activation,
+            l1_regul: 0.0,
+            l2_regul: 0.0,
         }
+    }
+
+    pub fn l2_regularization(mut self, coef: f32) -> Self {
+        self.l2_regul = coef;
+        self
+    }
+
+    pub fn l1_regularization(mut self, coef: f32) -> Self {
+        self.l1_regul = coef;
+        self
     }
 }

@@ -5,10 +5,12 @@ use ndarray::Zip;
 
 use log::{debug, error, info};
 
+use rand::{thread_rng, Rng};
+
 use crate::learn_params::{LearnParams, ParamsBlob};
 
 use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerError, LayerForwardResult};
-use crate::activation::{Activation, sign};
+use crate::activation::{sign, Activation};
 
 use crate::bias::{Bias, ConstBias};
 use crate::util::Variant;
@@ -55,11 +57,12 @@ where
                 let mul_res = ws0.clone().dot(&inp_b);
 
                 // for each neuron
-                Zip::from(out_b).and(&mul_res).and(bias_out).for_each(
-                    |out_el, in_row, bias_el| {
+                Zip::from(out_b)
+                    .and(&mul_res)
+                    .and(bias_out)
+                    .for_each(|out_el, in_row, bias_el| {
                         *out_el = (self.activation.func)(in_row + bias_el);
-                    },
-                );
+                    });
             });
 
         debug!("[ok] HiddenLayer forward()");
@@ -112,9 +115,24 @@ where
         let ws = self.lr_params.ws.borrow();
         let mut ws_grad = self.lr_params.ws_grad.borrow_mut();
 
-        for neu_idx in 0..ws[0].shape()[0] {
-            for prev_idx in 0..ws[0].shape()[1] {
+        let ws0_shape = ws[0].shape();
+        let params_len = ws0_shape[0] * ws0_shape[1];
+
+        let mut rng = thread_rng();
+        let dropout_len = (params_len as f32 * self.dropout) as usize;
+        let dropout_n = rng.gen_range(0, params_len - dropout_len as usize);
+        let dropout_y = dropout_n + dropout_len;
+        let mut counter_ws = 0;
+
+        for neu_idx in 0..ws0_shape[0] {
+            for prev_idx in 0..ws0_shape[1] {
                 let cur_ws_idx = [neu_idx, prev_idx];
+
+                if counter_ws >= dropout_n && counter_ws < dropout_y {
+                    ws_grad[0][cur_ws_idx] = 0.0;
+                    counter_ws += 1;
+                    continue;
+                }
 
                 let mut avg = 0.0;
                 Zip::from(prev_input.column(prev_idx))
@@ -136,19 +154,21 @@ where
                 }
 
                 ws_grad[0][cur_ws_idx] = avg - l2_penalty - l1_penalty;
+                counter_ws += 1;
             }
         }
 
         // for bias :
-        for neu_idx in 0..ws[1].shape()[0] { // self.size
-            for prev_idx in 0..ws[1].shape()[1] { // 1
+        for neu_idx in 0..ws[1].shape()[0] {
+            // self.size
+            for prev_idx in 0..ws[1].shape()[1] {
+                // 1
                 let cur_ws_idx = [neu_idx, prev_idx];
 
                 let mut avg = 0.0;
-                Zip::from(self_err_vals.column(neu_idx))
-                    .for_each(|err_val| {
-                        avg += self.bias.val * err_val;
-                    });
+                Zip::from(self_err_vals.column(neu_idx)).for_each(|err_val| {
+                    avg += self.bias.val * err_val;
+                });
 
                 avg = avg / self_err_vals.column(prev_idx).len() as f32;
 
@@ -182,6 +202,9 @@ where
             "activation".to_owned(),
             Variant::String(self.activation.name.clone()),
         );
+        cfg.insert("l2_regul".to_owned(), Variant::Float(self.l2_regul));
+        cfg.insert("l1_regul".to_owned(), Variant::Float(self.l1_regul));
+        cfg.insert("dropout".to_owned(), Variant::Float(self.dropout));
 
         cfg
     }
@@ -202,6 +225,18 @@ where
             self.prev_size = prev_size;
             self.lr_params = LearnParams::new_with_const_bias(self.size, self.prev_size);
             self.bias = ConstBias::new(self.size, 1.0);
+        }
+
+        if let Variant::Float(dropout) = cfg.get("dropout").unwrap() {
+            self.dropout = *dropout;
+        }
+
+        if let Variant::Float(l1_regul) = cfg.get("l1_regul").unwrap() {
+            self.l1_regul = *l1_regul;
+        }
+
+        if let Variant::Float(l2_regul) = cfg.get("l2_regul").unwrap() {
+            self.l2_regul = *l2_regul;
         }
     }
 
@@ -233,7 +268,7 @@ where
         Self {
             size,
             prev_size,
-            dropout: 1.0,
+            dropout: 0.0,
             lr_params: LearnParams::new_with_const_bias(size, prev_size),
             bias: ConstBias::new(size, 1.0),
             activation,
@@ -243,10 +278,8 @@ where
     }
 
     pub fn dropout(mut self, val: f32) -> Self {
-        todo!()
-        // self.dropout = val;
-        // self.lr_params.drop_ws(val);
-        // self
+        self.dropout = val;
+        self
     }
 
     pub fn l2_regularization(mut self, coef: f32) -> Self {

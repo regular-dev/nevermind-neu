@@ -32,11 +32,14 @@ impl OptimizerSGD {
         for neu_idx in 0..ws.shape()[0] {
             for prev_idx in 0..ws.shape()[1] {
                 let cur_ws_idx = [neu_idx, prev_idx];
-                // ALPHA
-                ws[cur_ws_idx] += momentum * ws_delta[cur_ws_idx];
-                // LEARNING RATE
-                ws_delta[cur_ws_idx] = learn_rate * ws_grad[cur_ws_idx];
 
+                // grad is 0.0 when weights is in dropout selection
+                if ws[cur_ws_idx] == 0.0 {
+                    continue;
+                }
+
+                ws[cur_ws_idx] += momentum * ws_delta[cur_ws_idx];
+                ws_delta[cur_ws_idx] = learn_rate * ws_grad[cur_ws_idx];
                 ws[cur_ws_idx] += ws_delta[cur_ws_idx];
             }
         }
