@@ -37,14 +37,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Arg::new("ModelState")
                 .short('s')
                 .long("state")
-                .help("Provide solver state. Weights state to start training")
+                .help("Provide model state. Weights state to start training")
                 .takes_value(true)
                 .require_equals(true)
         )
         .arg(
             Arg::new("ModelCfg")
-                .long("solver_cfg_yaml")
-                .help("Provide solver configuration")
+                .long("model_cfg")
+                .help("Provide model configuration")
                 .required(true)
                 .takes_value(true)
                 .require_equals(true)
@@ -80,7 +80,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .arg(
             Arg::new("SnapIter")
                 .long("snap_iter")
-                .help("Each snap_iter solver state will be saved")
+                .help("Each snap_iter model state will be saved")
                 .action(ArgAction::Set).takes_value(true).value_parser(clap::value_parser!(usize))
                 .require_equals(true)
         )
@@ -131,6 +131,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .short('d')
             .takes_value(true)
             .require_equals(true)
+            
+        ).arg( 
+            Arg::new("ShowN")
+            .long("show_n")
+            .takes_value(true)
+            .require_equals(true)
+            .value_parser(clap::value_parser!(usize))
         ))
         .subcommand(Command::new("create_net").about("Create a new net configuration").arg(
             Arg::new("OutFile")
