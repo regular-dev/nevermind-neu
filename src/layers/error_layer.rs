@@ -7,6 +7,7 @@ use log::{debug, info};
 
 use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
 use crate::activation::*;
+use crate::bias::{Bias, ConstBias};
 use crate::learn_params::{LearnParams, ParamsBlob};
 use crate::util::{Batch, DataVec, Variant};
 
@@ -14,6 +15,7 @@ use crate::util::{Batch, DataVec, Variant};
 pub struct ErrorLayer<T: Fn(f32) -> f32 + Clone, TD: Fn(f32) -> f32 + Clone> {
     pub size: usize,
     pub prev_size: usize,
+    pub bias: ConstBias,
     pub lr_params: LearnParams,
     pub l2_regul: f32,
     pub l1_regul: f32,
@@ -28,19 +30,24 @@ where
     fn forward(&mut self, input: ParamsBlob) -> LayerForwardResult {
         let inp_m = input[0].output.borrow();
         let mut out_m = self.lr_params.output.borrow_mut();
-        let ws_mat = &self.lr_params.ws.borrow()[0];
+        let ws = self.lr_params.ws.borrow();
+        let ws0 = &ws[0]; // for neurons
+        let ws1 = &ws[1]; // for bias
+
+        let bias_out = self.bias.forward(ws1);
 
         // for each input batch
         Zip::from(inp_m.rows())
             .and(out_m.rows_mut())
-            .par_for_each(|r, out_b| {
-                let mul_res = ws_mat.clone() * r;
+            .par_for_each(|inp_r, out_b| {
+                let mul_res = ws0.clone().dot(&inp_r);
 
                 // for each neuron
                 Zip::from(out_b)
-                    .and(mul_res.rows())
-                    .for_each(|out_el, in_row| {
-                        *out_el = (self.activation.func)(in_row.sum());
+                    .and(&mul_res)
+                    .and(bias_out)
+                    .for_each(|out_el, in_row, bias_el| {
+                        *out_el = (self.activation.func)(*in_row + bias_el);
                     });
             });
 
@@ -92,6 +99,24 @@ where
             }
         }
 
+        // grad for bias
+        for neu_idx in 0..ws[1].shape()[0] {
+            // self.size
+            for prev_idx in 0..ws[1].shape()[1] {
+                // 1
+                let cur_ws_idx = [neu_idx, prev_idx];
+
+                let mut avg = 0.0;
+                Zip::from(self_err_vals.column(neu_idx)).for_each(|err_val| {
+                    avg += self.bias.val * err_val;
+                });
+
+                avg = avg / self_err_vals.column(prev_idx).len() as f32;
+
+                ws_grad[1][cur_ws_idx] = avg;
+            }
+        }
+
         debug!("[ok] ErrorLayer backward()");
 
         Ok(vec![self.lr_params.clone()])
@@ -115,7 +140,10 @@ where
         cfg.insert("size".to_owned(), Variant::Int(self.size as i32));
         cfg.insert("prev_size".to_owned(), Variant::Int(self.prev_size as i32));
 
-        cfg.insert("activation".to_owned(), Variant::String(self.activation.name.clone()));
+        cfg.insert(
+            "activation".to_owned(),
+            Variant::String(self.activation.name.clone()),
+        );
 
         cfg.insert("l2_regul".to_owned(), Variant::Float(self.l2_regul));
         cfg.insert("l1_regul".to_owned(), Variant::Float(self.l1_regul));
@@ -173,7 +201,8 @@ where
         Self {
             size,
             prev_size,
-            lr_params: LearnParams::new(size, prev_size),
+            lr_params: LearnParams::new_with_const_bias(size, prev_size),
+            bias: ConstBias::new(size, 1.0),
             activation,
             l1_regul: 0.0,
             l2_regul: 0.0,
