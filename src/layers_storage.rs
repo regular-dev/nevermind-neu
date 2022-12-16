@@ -175,7 +175,7 @@ impl<'de> Deserialize<'de> for SequentialLayersStorage {
     {
         let s_layers_storage = SerdeLayersStorage::deserialize(deserializer)?;
 
-        let mut ls = SequentialLayersStorage { layers: Vec::new() };
+        let mut ls = SequentialLayersStorage::empty();
 
         for i in &s_layers_storage.layers_cfg {
             let l_opt = create_layer(i.name.as_str(), Some(&i.params));
