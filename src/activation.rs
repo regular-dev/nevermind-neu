@@ -20,12 +20,12 @@ pub fn raw(val: f32) -> f32 {
     val
 }
 
-pub fn raw_deriv(val: f32) -> f32 {
+pub fn raw_deriv(_val: f32) -> f32 {
     1.0
 }
 
 pub fn relu(val: f32) -> f32 {
-    if val >= 0.0 {
+    if val > 0.0 {
         val
     } else {
         0.0
@@ -42,7 +42,11 @@ pub fn sign(val: f32) -> f32 {
 }
 
 pub fn relu_deriv(val: f32) -> f32 {
-    1.0
+    if val > 0.0 {
+        1.0
+    } else {
+        0.0
+    }
 }
 
 pub fn sigmoid_on_vec(input: &DataVec, output: &mut DataVec) {
