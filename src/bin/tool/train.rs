@@ -29,6 +29,8 @@ pub fn train_net(
         model.load_state(&model_state)?;
     }
 
+    info!("Train batch size : {}", model.batch_size());
+
     let mut net = Network::new(model);
 
     net.set_train_dataset(train_ds);
@@ -59,6 +61,16 @@ pub fn train_net(
     if let Some(test_batch) = args.get_one::<usize>("TestBatch") {
         info!("Test batch size : {}", test_batch);
         net = net.test_batch_num(*test_batch);
+    }
+
+    if let Some(lr_decay) = args.get_one::<f32>("LrDecay") {
+        info!("Setting learning rate decay to : {}", lr_decay);
+        net.set_learn_rate_decay(*lr_decay);
+    }
+
+    if let Some(lr_step) = args.get_one::<usize>("LrStep") {
+        info!("Setting learning rate decay step to : {}", lr_step);
+        net.set_learn_rate_decay_step(*lr_step);
     }
 
     if let Some(write_test_err) = args.get_one::<String>("WriteErrToFile") {
@@ -112,6 +124,17 @@ pub fn train_net(
     let elapsed_bench = now_time.elapsed();
     
     info!("Elapsed for training : {} ms", elapsed_bench.as_millis());
+
+    Ok(())
+}
+
+pub fn gen_init_state(args: &ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
+    let model_cfg = args.get_one::<String>("ModelCfg").unwrap();
+    let out_file = args.get_one::<String>("OutFile").unwrap();
+    let model = Sequential::from_file(&model_cfg)?;
+    model.save_state(out_file)?;
+
+    info!("Saved initialized state for model {} to file {}", model_cfg, out_file);
 
     Ok(())
 }

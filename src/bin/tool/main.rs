@@ -71,6 +71,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .require_equals(true)
         )
         .arg(
+            Arg::new("LrDecay")
+                .long("lr_decay")
+                .help("Sets the learning rate decay coefficient. Value between 0.0 - 1.0")
+                .require_equals(true)
+                .action(ArgAction::Set)
+                .value_parser(clap::value_parser!(f32))
+        )
+        .arg(
+            Arg::new("LrStep")
+                .long("lr_step")
+                .help("Sets the step of learning rate decay")
+                .require_equals(true)
+                .action(ArgAction::Set)
+                .value_parser(clap::value_parser!(usize))
+        )
+        .arg(
             Arg::new("TestIter")
                 .long("test_iter")
                 .help("Each test_iter network will be tested for satisfying error")
@@ -139,12 +155,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .require_equals(true)
             .value_parser(clap::value_parser!(usize))
         ))
+        .subcommand(Command::new("gen_init_state").about("Generate initial training state (with random weights)")
+        .arg(
+            Arg::new("ModelCfg")
+            .long("model_cfg")
+            .takes_value(true)
+            .require_equals(true)
+            .required(true)
+        )
+        .arg(
+            Arg::new("OutFile")
+            .long("out")
+            .takes_value(true)
+            .require_equals(true)
+            .default_value("init.state")
+        ))
         .subcommand(Command::new("create_net").about("Create a new net configuration").arg(
             Arg::new("OutFile")
                 .long("out")
                 .short('o')
                 .help("Specifies model configuration output file")
                 .default_value("net.cfg")
+                .require_equals(true)
+                .takes_value(true)
                 .action(ArgAction::Set))
         .arg(Arg::new("OptimFile")
             .long("optim_out")
@@ -166,6 +199,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if cmd.0 == "test" {
         let (_subcmd, args) = matches.subcommand().unwrap();
         test::test_net(&args)?;
+    }
+    if cmd.0 == "gen_init_state" {
+        let (_subcmd, args) = matches.subcommand().unwrap();
+        train::gen_init_state(&args)?;
     }
     if cmd.0 == "create_net" {
         let (_subcmd, args) = matches.subcommand().unwrap();
