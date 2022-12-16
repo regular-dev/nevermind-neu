@@ -134,7 +134,6 @@ where
     }
 
     pub fn save_network_cfg(&mut self, path: &str) -> std::io::Result<()> {
-      //  save_solver_cfg(&self.train_model, path)
         todo!() // TODO : need to save net.cfg with layers_cfg and optimizer_cfg
     }
 
@@ -229,7 +228,6 @@ where
 
     pub fn eval(&mut self, train_data: Batch) -> Rc<RefCell<Batch>> {
         if let Some(test_model) = self.test_model.as_mut() {
-            info!("TEST");
             test_model.feedforward(train_data);
 
             let last_lp = test_model
