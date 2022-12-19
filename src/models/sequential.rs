@@ -14,7 +14,7 @@ use log::error;
 use std::io::ErrorKind;
 
 use prost::Message;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::layers::*;
 use crate::models::*;

@@ -1,5 +1,4 @@
 /// Folder
-pub mod bias;
 pub mod layers;
 pub mod optimizers;
 pub mod util;

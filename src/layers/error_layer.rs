@@ -7,7 +7,6 @@ use log::{debug, info};
 
 use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
 use crate::activation::*;
-use crate::bias::{Bias, ConstBias};
 use crate::learn_params::{LearnParams, ParamsBlob};
 use crate::util::{Batch, DataVec, Variant};
 
@@ -15,7 +14,6 @@ use crate::util::{Batch, DataVec, Variant};
 pub struct ErrorLayer<T: Fn(f32) -> f32 + Clone, TD: Fn(f32) -> f32 + Clone> {
     pub size: usize,
     pub prev_size: usize,
-    pub bias: ConstBias,
     pub lr_params: LearnParams,
     pub l2_regul: f32,
     pub l1_regul: f32,
@@ -32,21 +30,18 @@ where
         let mut out_m = self.lr_params.output.borrow_mut();
         let ws = self.lr_params.ws.borrow();
         let ws0 = &ws[0]; // for neurons
-        let ws1 = &ws[1]; // for bias
+        let bias_out = ws[1].row(0); // for bias
 
-        let bias_out = self.bias.forward(ws1);
-
-        // for each input batch
         Zip::from(inp_m.rows())
             .and(out_m.rows_mut())
-            .par_for_each(|inp_r, out_b| {
+            .par_for_each(|inp_r, out_b| { // for each batch
                 let mul_res = ws0.clone().dot(&inp_r);
 
                 // for each neuron
                 Zip::from(out_b)
                     .and(&mul_res)
                     .and(bias_out)
-                    .for_each(|out_el, in_row, bias_el| {
+                    .for_each(|out_el, in_row, bias_el| { // for each "neuron"
                         *out_el = (self.activation.func)(*in_row + bias_el);
                     });
             });
@@ -108,7 +103,7 @@ where
 
                 let mut avg = 0.0;
                 Zip::from(self_err_vals.column(neu_idx)).for_each(|err_val| {
-                    avg += self.bias.val * err_val;
+                    avg += err_val;
                 });
 
                 avg = avg / self_err_vals.column(prev_idx).len() as f32;
@@ -165,7 +160,7 @@ where
         if size > 0 && prev_size > 0 {
             self.size = size;
             self.prev_size = prev_size;
-            self.lr_params = LearnParams::new(self.size, self.prev_size);
+            self.lr_params = LearnParams::new_with_const_bias(self.size, self.prev_size);
         }
 
         if let Variant::Float(l1_regul) = cfg.get("l1_regul").unwrap() {
@@ -202,7 +197,6 @@ where
             size,
             prev_size,
             lr_params: LearnParams::new_with_const_bias(size, prev_size),
-            bias: ConstBias::new(size, 1.0),
             activation,
             l1_regul: 0.0,
             l2_regul: 0.0,

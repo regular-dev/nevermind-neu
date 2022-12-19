@@ -8,11 +8,9 @@ use log::{debug, error, info};
 use rand::{thread_rng, Rng};
 
 use crate::learn_params::{LearnParams, ParamsBlob};
-
 use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerError, LayerForwardResult};
 use crate::activation::{sign, Activation};
 
-use crate::bias::{Bias, ConstBias};
 use crate::util::Variant;
 
 #[derive(Clone)]
@@ -21,7 +19,6 @@ pub struct HiddenLayer<T: Fn(f32) -> f32 + Clone, TD: Fn(f32) -> f32 + Clone> {
     pub size: usize,
     pub prev_size: usize,
     pub dropout: f32,
-    pub bias: ConstBias,
     pub l2_regul: f32,
     pub l1_regul: f32,
     pub activation: Activation<T, TD>,
@@ -37,31 +34,33 @@ where
         let mut out_m = self.lr_params.output.borrow_mut();
         let ws = self.lr_params.ws.borrow();
         let ws0 = &ws[0];
+        let bias_out = ws[1].row(0);
 
-        // Check output sizes
-        if out_m.nrows() != inp_m.nrows() {
-            error!(
-                "Invalid batch size. Income {}, self : {}",
-                inp_m.nrows(),
-                out_m.nrows()
-            );
-            return Err(LayerError::InvalidSize);
-        }
-
-        let bias_out = self.bias.forward(&ws[1]);
+        let mut rng = thread_rng();
+        let dropout_len = (self.size as f32 * self.dropout) as usize;
+        let dropout_n = rng.gen_range(0, self.size - dropout_len as usize);
+        let dropout_y = dropout_n + dropout_len;
 
         // for each input batch
         Zip::from(inp_m.rows())
             .and(out_m.rows_mut())
-            .par_for_each(|inp_b, out_b| {
+            .par_for_each(|inp_b, out_b| { // for each batch
                 let mul_res = ws0.clone().dot(&inp_b);
 
+                let mut counter_neu = 0;
                 // for each neuron
                 Zip::from(out_b)
                     .and(&mul_res)
                     .and(bias_out)
-                    .for_each(|out_el, in_row, bias_el| {
-                        *out_el = (self.activation.func)(in_row + bias_el);
+                    .for_each(|out_el, in_row, bias_el| { // for each "neuron"
+                        if counter_neu >= dropout_n && counter_neu < dropout_y {
+                            // zero neuron
+                            *out_el = 0.0;
+                            counter_neu += 1;
+                        } else {
+                            *out_el = (self.activation.func)(in_row + bias_el);
+                            counter_neu += 1;
+                        }
                     });
             });
 
@@ -77,28 +76,11 @@ where
         let self_output = self.lr_params.output.borrow();
         let next_ws0 = &next_ws[0];
 
-        // let err_mul = &next_ws[0] * next_err_vals[0];
-        debug!(
-            "[hidden layer] i am here : {} | {} | {}",
-            self_err_vals.nrows(),
-            next_err_vals.nrows(),
-            self_output.nrows()
-        );
-
         Zip::from(self_err_vals.rows_mut())
             .and(next_err_vals.rows())
             .and(self_output.rows())
             .par_for_each(|err_val_r, next_err_val_r, output_r| {
-                debug!("before dot product");
-
                 let mul_res = next_ws0.t().dot(&next_err_val_r);
-
-                debug!(
-                    "[hidden layer zip : {} | {} | {}",
-                    err_val_r.shape()[0],
-                    output_r.shape()[0],
-                    mul_res.len()
-                );
 
                 Zip::from(err_val_r).and(output_r).and(&mul_res).for_each(
                     |err_val, output, col| {
@@ -116,23 +98,10 @@ where
         let mut ws_grad = self.lr_params.ws_grad.borrow_mut();
 
         let ws0_shape = ws[0].shape();
-        let params_len = ws0_shape[0] * ws0_shape[1];
-
-        let mut rng = thread_rng();
-        let dropout_len = (params_len as f32 * self.dropout) as usize;
-        let dropout_n = rng.gen_range(0, params_len - dropout_len as usize);
-        let dropout_y = dropout_n + dropout_len;
-        let mut counter_ws = 0;
 
         for neu_idx in 0..ws0_shape[0] {
             for prev_idx in 0..ws0_shape[1] {
                 let cur_ws_idx = [neu_idx, prev_idx];
-
-                if counter_ws >= dropout_n && counter_ws < dropout_y {
-                    ws_grad[0][cur_ws_idx] = 0.0;
-                    counter_ws += 1;
-                    continue;
-                }
 
                 let mut avg = 0.0;
                 Zip::from(prev_input.column(prev_idx))
@@ -154,7 +123,6 @@ where
                 }
 
                 ws_grad[0][cur_ws_idx] = avg - l2_penalty - l1_penalty;
-                counter_ws += 1;
             }
         }
 
@@ -162,12 +130,11 @@ where
         for neu_idx in 0..ws[1].shape()[0] {
             // self.size
             for prev_idx in 0..ws[1].shape()[1] {
-                // 1
                 let cur_ws_idx = [neu_idx, prev_idx];
 
                 let mut avg = 0.0;
                 Zip::from(self_err_vals.column(neu_idx)).for_each(|err_val| {
-                    avg += self.bias.val * err_val;
+                    avg += err_val;
                 });
 
                 avg = avg / self_err_vals.column(prev_idx).len() as f32;
@@ -224,7 +191,6 @@ where
             self.size = size;
             self.prev_size = prev_size;
             self.lr_params = LearnParams::new_with_const_bias(self.size, self.prev_size);
-            self.bias = ConstBias::new(self.size, 1.0);
         }
 
         if let Variant::Float(dropout) = cfg.get("dropout").unwrap() {
@@ -270,7 +236,6 @@ where
             prev_size,
             dropout: 0.0,
             lr_params: LearnParams::new_with_const_bias(size, prev_size),
-            bias: ConstBias::new(size, 1.0),
             activation,
             l2_regul: 0.0,
             l1_regul: 0.0,
