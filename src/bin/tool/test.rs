@@ -42,8 +42,11 @@ pub fn test_net(
                 break;
             }
         }
-
-        info!("Below label is : {}", label);
+        
+        if label != -1 {
+            info!("Below label is : {}", label);
+        }
+        info!("Below output is : {}", test_batch.output);
         let out = net.eval(test_batch.input);
         let out_b = out.borrow();
         info!("Neural output is : {}", out_b);
