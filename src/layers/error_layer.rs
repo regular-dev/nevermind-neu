@@ -30,7 +30,7 @@ where
         let mut out_m = self.lr_params.output.borrow_mut();
         let ws = self.lr_params.ws.borrow();
         let ws0 = &ws[0]; // for neurons
-        let bias_out = ws[1].row(0); // for bias
+        let bias_out = ws[1].column(0);
 
         Zip::from(inp_m.rows())
             .and(out_m.rows_mut())

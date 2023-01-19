@@ -34,7 +34,7 @@ where
         let mut out_m = self.lr_params.output.borrow_mut();
         let ws = self.lr_params.ws.borrow();
         let ws0 = &ws[0];
-        let bias_out = ws[1].row(0);
+        let bias_out = ws[1].column(0);
 
         let mut rng = thread_rng();
         let dropout_len = (self.size as f32 * self.dropout) as usize;

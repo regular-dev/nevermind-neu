@@ -32,7 +32,7 @@ impl AbstractLayer for SoftmaxLossLayer {
 
         Zip::from(inp_m.rows())
             .and(out_m.rows_mut())
-            .par_for_each(|inp_b, out_b| {
+            .par_for_each(|inp_b, out_b| { // for each batch
                 let mul_res = ws_mat0.clone() * inp_b;
 
                 let mut e_rows = mul_res.map_axis(Axis(1), |row| row.sum());
@@ -41,7 +41,7 @@ impl AbstractLayer for SoftmaxLossLayer {
                 e_rows = e_rows.mapv_into(|v| E.powf(v));
                 let sum_rows = e_rows.sum();
 
-                Zip::from(out_b).and(&e_rows).par_for_each(|out_el, in_e| {
+                Zip::from(out_b).and(&e_rows).for_each(|out_el, in_e| { // for each "neuron"
                     *out_el = in_e / sum_rows;
                 });
             });
