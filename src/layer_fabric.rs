@@ -48,11 +48,15 @@ pub fn create_layer(
                         l = Box::new(layers_macros::sigmoid_hidden_layer!());
                     } else if activation == "tanh" {
                         l = Box::new(layers_macros::tanh_hidden_layer!());
-                    } else {
+                    } else if activation == "relu" {
                         l = Box::new(layers_macros::relu_hidden_layer!());
+                    } else if activation == "leaky_relu" {
+                        l = Box::new(layers_macros::leaky_relu_hidden_layer!());
+                    } else {
+                        l = Box::new(layers_macros::raw_hidden_layer!());
                     }
                 } else {
-                    l = Box::new(layers_macros::relu_hidden_layer!());
+                    l = Box::new(layers_macros::raw_hidden_layer!());
                 }
 
                 l.set_layer_cfg(cfg_val);
@@ -106,6 +110,18 @@ pub mod layers_macros {
         };
     }
 
+    macro_rules! leaky_relu_hidden_layer {
+        () => {
+            HiddenLayer::new(0, 0, activation_macros::leaky_relu_activation!())
+        };
+    }
+
+    macro_rules! raw_hidden_layer {
+        () => {
+            HiddenLayer::new(0, 0, activation_macros::raw_activation!())
+        };
+    }
+
     macro_rules! sigmoid_error_layer {
         () => {
             ErrorLayer::new(0, 0, activation_macros::sigmoid_activation!())
@@ -125,9 +141,11 @@ pub mod layers_macros {
     }
 
     pub(crate) use raw_error_layer;
+    pub(crate) use raw_hidden_layer;
     pub(crate) use relu_hidden_layer;
     pub(crate) use sigmoid_error_layer;
     pub(crate) use sigmoid_hidden_layer;
     pub(crate) use tanh_error_layer;
     pub(crate) use tanh_hidden_layer;
+    pub(crate) use leaky_relu_hidden_layer;
 }

@@ -32,6 +32,30 @@ pub fn relu(val: f32) -> f32 {
     }
 }
 
+pub fn relu_deriv(val: f32) -> f32 {
+    if val > 0.0 {
+        1.0
+    } else {
+        0.0
+    }
+}
+
+pub fn leaky_relu(val: f32) -> f32 {
+    if val > 0.0 {
+        val
+    } else {
+        0.01 * val
+    }
+}
+
+pub fn leaky_relu_deriv(val: f32) -> f32 {
+    if val > 0.0 {
+        1.0
+    } else {
+        0.01
+    }
+}
+
 pub fn sign(val: f32) -> f32 {
     if val < 0.0 {
         return -1.0;
@@ -39,14 +63,6 @@ pub fn sign(val: f32) -> f32 {
         return 1.0;
     }
     0.0
-}
-
-pub fn relu_deriv(val: f32) -> f32 {
-    if val > 0.0 {
-        1.0
-    } else {
-        0.0
-    }
 }
 
 pub fn sigmoid_on_vec(input: &DataVec, output: &mut DataVec) {
@@ -110,6 +126,13 @@ pub mod activation_macros {
     }
 
     #[macro_export]
+    macro_rules! leaky_relu_activation {
+        () => {
+            Activation::new("leaky_relu", leaky_relu, leaky_relu_deriv)
+        };
+    }
+
+    #[macro_export]
     macro_rules! activation_by_name {
         ("sigmoid") => {
             Activation::new("sigmoid", sigmoid, sigmoid_deriv)
@@ -129,5 +152,6 @@ pub mod activation_macros {
     pub use relu_activation;
     pub use sigmoid_activation; // pub(crate) use sigmoid_activation
     pub use tanh_activation;
+    pub use leaky_relu_activation;
     pub use activation_by_name;
 }
