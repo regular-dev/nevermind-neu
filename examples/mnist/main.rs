@@ -16,16 +16,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mnist = Mnist::new("mnist_data/");
 
-    let mut c = 0;
+    // let mut c = 0;
 
     for (x, y) in mnist.train_data.iter().zip(mnist.train_labels) {
-        if c < 20 {
-            println!("Test first out : {}, label is {}", c, y);
-            print_sample_image(x, y);
-            c += 1;
-        } else {
-            return Ok(()); // TODO : refactor test code
-        }
+        // if c < 20 {
+        //     println!("Test first out : {}, label is {}", c, y);
+        //     print_sample_image(x, y);
+        //     c += 1;
+        // } else {
+        //     return Ok(()); // TODO : refactor test code
+        // }
 
         let mut inp: Vec<f32> = Vec::new();
         inp.reserve(x.len());
