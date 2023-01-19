@@ -1,10 +1,15 @@
 mod optim_sgd;
+mod optim_adagrad;
 mod optim_rms;
+mod optim_adam;
+
 mod optim_creator;
 
 use std::collections::HashMap;
 
 pub use optim_rms::*;
+pub use optim_adagrad::*;
+pub use optim_adam::*;
 pub use optim_sgd::*;
 pub use optim_creator::*;
 
@@ -26,7 +31,13 @@ pub fn optimizer_from_type(opt_type: &str) -> Result<Box<dyn Optimizer>, CustomE
         },
         "sgd" => {
             return Ok(Box::new(OptimizerSGD::default()));
-        }
+        },
+        "adagrad" => {
+            return Ok(Box::new(OptimizerAdaGrad::default()));
+        },
+        "adam" => {
+            return Ok(Box::new(OptimizerAdam::default()));
+        },
         _ => {
             return Err(CustomError::WrongArg);
         }

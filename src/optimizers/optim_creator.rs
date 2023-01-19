@@ -30,6 +30,16 @@ pub fn optimizer_from_file(filepath: &str) -> Result<Box<dyn Optimizer>, Box<dyn
             sgd.set_cfg(&optim_params.0);
 
             return Ok(sgd);
+        } else if optim_type == "adagrad" {
+            let mut adagrad = Box::new(OptimizerAdaGrad::default());
+            adagrad.set_cfg(&optim_params.0);
+
+            return Ok(adagrad);
+        } else if optim_type == "adam" {
+            let mut adam = Box::new(OptimizerAdam::default());
+            adam.set_cfg(&optim_params.0);
+
+            return Ok(adam);
         } else {
             return Err(Box::new(CustomError::InvalidFormat));
         }

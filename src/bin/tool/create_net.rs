@@ -54,7 +54,7 @@ fn handle_optimizer(stdin: &io::Stdin, filepath: &str) -> Result<(), Box<dyn Err
         return Ok(());
     }
 
-    println!("Tell me optimizer type : [sgd, rmsprop]");
+    println!("Tell me optimizer type : [sgd, rmsprop, adagrad, adam]");
     let opt_type: String = read_from_stdin(&stdin)?;
 
     if opt_type == "sgd" {
@@ -81,6 +81,24 @@ fn handle_optimizer(stdin: &io::Stdin, filepath: &str) -> Result<(), Box<dyn Err
 
         optimizer.learn_rate = lr;
         optimizer.alpha = alpha;
+
+        optimizer_to_file(optimizer, filepath)?;
+    } else if opt_type == "adagrad" {
+        let mut optimizer = OptimizerAdaGrad::default();
+
+        println!("Tell me learning rate [0.01 foramt]");
+        let lr: f32 = read_from_stdin(&stdin)?;
+
+        optimizer.learn_rate = lr;
+
+        optimizer_to_file(optimizer, filepath)?;
+    } else if opt_type == "adam" {
+        let mut optimizer = OptimizerAdam::default();
+
+        println!("Tell me learning rate [0.01 foramt]");
+        let lr: f32 = read_from_stdin(&stdin)?;
+
+        optimizer.learn_rate = lr;
 
         optimizer_to_file(optimizer, filepath)?;
     }
