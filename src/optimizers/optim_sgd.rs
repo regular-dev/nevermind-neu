@@ -34,7 +34,7 @@ impl OptimizerSGD {
                 let cur_ws_idx = [neu_idx, prev_idx];
 
                 // grad is 0.0 when weights is in dropout selection
-                if ws[cur_ws_idx] == 0.0 {
+                if ws_grad[cur_ws_idx] == 0.0 {
                     continue;
                 }
 
