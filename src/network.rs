@@ -38,6 +38,11 @@ use crate::models::Model;
 
 const BENCH_ITER: usize = 500;
 
+pub enum CallbackReturnAction {
+    None,
+    Stop,
+    StopAndSave,
+}
 
 /// Neural-Network
 pub struct Network<T>
@@ -58,7 +63,8 @@ where
     decay_step: usize,
     show_accuracy: bool,
     is_bench_time: bool,
-    name: String,
+    pub name: String,
+    callbacks: Vec< Box<dyn FnMut(usize, f32) -> CallbackReturnAction>>,
 }
 
 impl<T> Network<T>
@@ -71,7 +77,7 @@ where
         Network {
             train_dl: None,
             test_dl: None,
-            optim: Box::new(OptimizerSGD::new(1e-1, 0.8)),
+            optim: Box::new(OptimizerRMS::new(1e-2, 0.9)),
             test_err: 0.0,
             test_batch_size: 10,
             is_write_test_err: true,
@@ -84,6 +90,7 @@ where
             is_bench_time: true,
             show_accuracy: true,
             name: "network".to_owned(),
+            callbacks: Vec::new(),
         }
     }
 
@@ -104,6 +111,7 @@ where
             is_bench_time: true,
             show_accuracy: true,
             name: "network".to_owned(),
+            callbacks: Vec::new(),
         }
     }
 
@@ -122,6 +130,14 @@ where
         self.test_dl = Some(test_dl);
         let s = self.test_batch_num(1);
         s
+    }
+
+    // pub fn add_callback(&mut self, c: Rc<RefCell<dyn FnMut(&'a mut Self)>>) {
+    //     self.callbacks.push(c);
+    // }
+
+    pub fn add_callback(&mut self, c: Box<dyn FnMut(usize, f32)->CallbackReturnAction>) {
+        self.callbacks.push(c);
     }
 
     pub fn create_test_solver(&mut self) {
@@ -348,6 +364,9 @@ where
         let mut bench_time = Instant::now();
         let mut test_err = 0.0;
 
+        let mut flag_stop = false;
+        let mut flag_save = false;
+
         loop {
             if self.test_dl.is_none() {
                 if iter_num % self.test_batch_size == 0 && iter_num != 0 {
@@ -402,9 +421,43 @@ where
                 self.append_error(&mut err_file, test_err)?;
             }
 
+            for it_cb in self.callbacks.iter_mut() {
+                let out = it_cb(iter_num, test_err);
+
+                match out {
+                    CallbackReturnAction::None => (),
+                    CallbackReturnAction::Stop => {
+                        info!("Stopping training loop on {} iteration...", iter_num);
+                        info!("Last test error : {}", test_err);
+                        flag_stop = true;
+                    },
+                    CallbackReturnAction::StopAndSave => {
+                        info!("Stopping training loop on {} iteration...", iter_num);
+                        info!("Last test error : {}", test_err);
+                        flag_save = true;
+                        flag_stop = true;
+                    }
+                }
+            }
+
+            if flag_stop {
+                break;
+            }
+
             iter_num += 1;
         }
 
+        if flag_save {
+            let filename = format!("{}_{}_int.state", self.name, iter_num);
+            info!("Saving net to file {}", filename);
+            self.save_model_state(&filename)?;
+        }
+
+        if flag_stop {
+            return Ok(());
+        }
+
+        info!("Training finished !");
         info!("Trained for error : {}", test_err);
         info!("Iterations : {}", iter_num);
 

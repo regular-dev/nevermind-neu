@@ -1,8 +1,9 @@
-use log::{error, info};
+use log::{error, info, debug};
+use signal_hook::consts::SIGKILL;
 
 use std::time::Instant;
 
-use serde::Serialize;
+use signal_hook::{consts::SIGINT, iterator::Signals};
 
 use clap::ArgMatches;
 
@@ -32,6 +33,23 @@ pub fn train_net(
     info!("Train batch size : {}", model.batch_size());
 
     let mut net = Network::new(model);
+
+    let mut signals = Signals::new(&[SIGINT])?;
+
+    net.add_callback(Box::new(move |_, _|
+    {
+        for sig in signals.pending() {
+            debug!("Received signal {:?}", sig);
+
+            if sig == SIGINT {
+                return CallbackReturnAction::StopAndSave;
+            } else if sig == SIGKILL {
+                return CallbackReturnAction::Stop;
+            }
+        }
+
+        CallbackReturnAction::None
+    }));
 
     net.set_train_dataset(train_ds);
 

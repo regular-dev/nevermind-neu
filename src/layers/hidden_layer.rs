@@ -1,14 +1,13 @@
 use std::collections::HashMap;
-use std::ops::{Deref, DerefMut};
 
 use ndarray::Zip;
 
-use log::{debug, error, info};
+use log::debug;
 
 use rand::{thread_rng, Rng};
 
 use crate::learn_params::{LearnParams, ParamsBlob};
-use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerError, LayerForwardResult};
+use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
 use crate::activation::{sign, Activation};
 
 use crate::util::Variant;
