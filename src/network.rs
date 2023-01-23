@@ -117,7 +117,6 @@ where
 
     pub fn test_batch_num(mut self, batch_size: usize) -> Self {
         if let Some(test_model) = self.test_model.as_mut() {
-            // TODO : set_batch_size change for prepare_for_tests ?
             test_model.set_batch_size_for_tests(batch_size);
         }
 

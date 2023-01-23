@@ -106,9 +106,7 @@ fn handle_optimizer(stdin: &io::Stdin, filepath: &str) -> Result<(), Box<dyn Err
     Ok(())
 }
 
-fn create_layers(
-    stdin: &io::Stdin,
-) -> Result<Sequential, Box<dyn Error>> {
+fn create_layers(stdin: &io::Stdin) -> Result<Sequential, Box<dyn Error>> {
     let mut ls = SequentialLayersStorage::empty();
 
     // Input layer
@@ -127,7 +125,7 @@ fn create_layers(
             println!("Tell me the size of hidden layer");
             let l_size: usize = read_from_stdin(stdin)?;
 
-            println!("Tell me the activation function for hidden layer [sigmoid/tanh/relu/raw]");
+            println!("Tell me the activation function for hidden layer [sigmoid/tanh/relu/leaky_relu/raw]");
             let mut answ: String = read_from_stdin(stdin)?;
             answ.make_ascii_lowercase();
 
@@ -153,6 +151,11 @@ fn create_layers(
                         activation_macros::relu_activation!(),
                     )));
                 }
+                "leaky_relu" => ls.add_layer(Box::new(HiddenLayer::new(
+                    l_size,
+                    prev_s,
+                    activation_macros::leaky_relu_activation!(),
+                ))),
                 "raw" => {
                     ls.add_layer(Box::new(HiddenLayer::new(
                         l_size,
@@ -170,7 +173,7 @@ fn create_layers(
         }
     }
 
-    println!("Tell me output layer type [raw, softmax_loss]");
+    println!("Tell me output layer activation function [raw, sigmoid, tanh, softmax_loss]");
     let out_l_type: String = read_from_stdin(stdin)?;
 
     println!("Tell me output layer size");
@@ -183,7 +186,19 @@ fn create_layers(
             activation_macros::raw_activation!(),
         )));
     } else if out_l_type == "softmax_loss" {
-       ls.add_layer(Box::new(SoftmaxLossLayer::new(out_l_size, prev_s)));
+        ls.add_layer(Box::new(SoftmaxLossLayer::new(out_l_size, prev_s)));
+    } else if out_l_type == "sigmoid" {
+        ls.add_layer(Box::new(ErrorLayer::new(
+            out_l_size,
+            prev_s,
+            activation_macros::sigmoid_activation!(),
+        )));
+    } else if out_l_type == "tanh" {
+        ls.add_layer(Box::new(ErrorLayer::new(
+            out_l_size,
+            prev_s,
+            activation_macros::tanh_activation!(),
+        )));
     }
 
     println!("Finally network : {}", ls);
