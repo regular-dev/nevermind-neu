@@ -5,15 +5,15 @@ pub fn sigmoid(val: f32) -> f32 {
 }
 
 pub fn sigmoid_deriv(val: f32) -> f32 {
-    return (1.0 - val) * val;
+    return (1.0 - sigmoid(val)) * sigmoid(val);
 }
 
 pub fn tanh(val: f32) -> f32 {
     return val.tanh();
 }
-
+ 
 pub fn tanh_deriv(val: f32) -> f32 {
-    return 1.0 - tanh(val) * tanh(val);
+    return 1.0 - tanh(val).powf(2.0);
 }
 
 pub fn raw(val: f32) -> f32 {
