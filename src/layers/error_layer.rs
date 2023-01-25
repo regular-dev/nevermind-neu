@@ -35,7 +35,7 @@ where
         Zip::from(inp_m.rows())
             .and(out_m.rows_mut())
             .par_for_each(|inp_r, out_b| { // for each batch
-                let mul_res = ws0.clone().dot(&inp_r);
+                let mul_res = ws0.dot(&inp_r);
 
                 // for each neuron
                 Zip::from(out_b)

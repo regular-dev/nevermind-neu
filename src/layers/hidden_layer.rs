@@ -44,7 +44,7 @@ where
         Zip::from(inp_m.rows())
             .and(out_m.rows_mut())
             .par_for_each(|inp_b, out_b| { // for each batch
-                let mul_res = ws0.clone().dot(&inp_b);
+                let mul_res = ws0.dot(&inp_b);
 
                 let mut counter_neu = 0;
                 // for each neuron
