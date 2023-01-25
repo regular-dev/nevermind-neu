@@ -15,10 +15,10 @@ use std::rc::Rc;
 
 use std::error::*;
 use std::fs::File;
-use std::io::{BufRead, BufReader, Error, ErrorKind, Write};
+use std::io::{ErrorKind, Write};
 use std::time::Instant;
 
-use ndarray::{Zip, Data};
+use ndarray::Zip;
 
 use ndarray_stats::QuantileExt;
 
@@ -26,12 +26,8 @@ use std::fs::OpenOptions;
 
 use super::dataloader::DataLoader;
 use super::learn_params::LearnParams;
+use crate::err::CustomError;
 use crate::util::*;
-
-use super::{
-    dataloader::{DataBatch, SimpleDataLoader},
-    layers::InputDataLayer,
-};
 
 use super::optimizers::*;
 use crate::models::Model;
@@ -64,7 +60,7 @@ where
     show_accuracy: bool,
     is_bench_time: bool,
     pub name: String,
-    callbacks: Vec< Box<dyn FnMut(usize, f32) -> CallbackReturnAction>>,
+    callbacks: Vec<Box<dyn FnMut(usize, f32) -> CallbackReturnAction>>,
 }
 
 impl<T> Network<T>
@@ -81,7 +77,7 @@ where
             test_err: 0.0,
             test_batch_size: 10,
             is_write_test_err: true,
-            train_model: Some(model), 
+            train_model: Some(model),
             test_model,
             snap_iter: 0,
             test_iter: 0,
@@ -95,14 +91,15 @@ where
     }
 
     pub fn new_for_eval(model: T) -> Self {
-        Network {
+        let tbs = model.batch_size();
+        let test_net = Network {
             train_dl: None,
             test_dl: None,
-            optim: Box::new(OptimizerSGD::new(1e-1, 0.8)),
+            optim: Box::new(OptimizerSGD::new(1e-2, 0.8)),
             test_err: 0.0,
-            test_batch_size: 10,
+            test_batch_size: 1,
             is_write_test_err: true,
-            train_model: None, 
+            train_model: None,
             test_model: Some(model),
             snap_iter: 0,
             test_iter: 0,
@@ -112,7 +109,8 @@ where
             show_accuracy: true,
             name: "network".to_owned(),
             callbacks: Vec::new(),
-        }
+        };
+        test_net.test_batch_num(tbs)
     }
 
     pub fn test_batch_num(mut self, batch_size: usize) -> Self {
@@ -131,11 +129,7 @@ where
         s
     }
 
-    // pub fn add_callback(&mut self, c: Rc<RefCell<dyn FnMut(&'a mut Self)>>) {
-    //     self.callbacks.push(c);
-    // }
-
-    pub fn add_callback(&mut self, c: Box<dyn FnMut(usize, f32)->CallbackReturnAction>) {
+    pub fn add_callback(&mut self, c: Box<dyn FnMut(usize, f32) -> CallbackReturnAction>) {
         self.callbacks.push(c);
     }
 
@@ -206,7 +200,10 @@ where
         let mut err = 0.0;
 
         let test_batch = test_dl.next_batch(self.test_batch_size);
-        self.test_model.as_mut().unwrap().feedforward(test_batch.input);
+        self.test_model
+            .as_mut()
+            .unwrap()
+            .feedforward(test_batch.input);
 
         let len_layers = self.test_model.as_ref().unwrap().layers_count(); // TODO : maybe somehow refactor ?
         let last_layer = self.test_model.as_ref().unwrap().layer(len_layers - 1);
@@ -241,16 +238,38 @@ where
         err / self.test_batch_size as f32
     }
 
-    pub fn eval(&mut self, train_data: Batch) -> Rc<RefCell<Batch>> {
+    pub fn eval_one(
+        &mut self,
+        data: DataVec,
+    ) -> Result<Rc<RefCell<Batch>>, Box<dyn std::error::Error>> {
+        if self.test_batch_size != 1 {
+            error!("Invalid batch size {} for test model", self.test_batch_size);
+            return Err(Box::new(CustomError::Other));
+        }
+
+        if let Some(test_model) = self.test_model.as_mut() {
+            let data_len = data.len();
+            let cvt = data.into_shape((1, data_len)).unwrap();
+            test_model.feedforward(cvt);
+
+            let last_lp = test_model.last_layer().learn_params().unwrap();
+
+            return Ok(last_lp.output.clone());
+        }
+
+        return Err(Box::new(CustomError::Other));
+    }
+
+    pub fn eval(
+        &mut self,
+        train_data: Batch,
+    ) -> Result<Rc<RefCell<Batch>>, Box<dyn std::error::Error>> {
         if let Some(test_model) = self.test_model.as_mut() {
             test_model.feedforward(train_data);
 
-            let last_lp = test_model
-                .last_layer()
-                .learn_params()
-                .unwrap();
-    
-            return last_lp.output.clone();
+            let last_lp = test_model.last_layer().learn_params().unwrap();
+
+            return Ok(last_lp.output.clone());
         }
 
         if let Some(train_model) = self.train_model.as_mut() {
@@ -258,12 +277,12 @@ where
 
             let last_lp = train_model.last_layer().learn_params().unwrap();
 
-            return last_lp.output.clone();
+            return Ok(last_lp.output.clone());
         }
 
         error!("Error evaluation !!!");
 
-        return Rc::new(RefCell::new(Batch::zeros((1,1)))); // TODO : return some error
+        return Err(Box::new(CustomError::Other));
     }
 
     fn calc_avg_err(last_layer_lr: &LearnParams) -> f32 {
@@ -285,7 +304,10 @@ where
             if let Variant::Float(lr) = lr {
                 let decayed_lr = lr * self.learn_rate_decay;
 
-                info!("Perfoming learning rate decay : from {}, to {}", lr, decayed_lr);
+                info!(
+                    "Perfoming learning rate decay : from {}, to {}",
+                    lr, decayed_lr
+                );
 
                 let mut m = HashMap::new();
                 m.insert("learn_rate".to_owned(), Variant::Float(decayed_lr));
@@ -301,16 +323,18 @@ where
         }
 
         if let Some(train_model) = self.train_model.as_mut() {
-            let data = self.train_dl.as_ref().unwrap().next_batch(train_model.batch_size());
+            let data = self
+                .train_dl
+                .as_ref()
+                .unwrap()
+                .next_batch(train_model.batch_size());
             train_model.feedforward(data.input);
             train_model.backpropagate(data.output);
 
             Network::optimize_model(train_model, &mut self.optim);
-            
+
             if self.test_dl.is_none() {
-                let lr = train_model.last_layer()
-                    .learn_params()
-                    .unwrap();
+                let lr = train_model.last_layer().learn_params().unwrap();
                 self.test_err += Self::calc_avg_err(&lr);
             }
         }
@@ -396,7 +420,11 @@ where
 
             if iter_num != 0 && iter_num % BENCH_ITER == 0 && self.is_bench_time {
                 let elapsed = bench_time.elapsed();
-                info!("Do {} Iteration for {} millisecs", BENCH_ITER, elapsed.as_millis());
+                info!(
+                    "Do {} Iteration for {} millisecs",
+                    BENCH_ITER,
+                    elapsed.as_millis()
+                );
                 bench_time = Instant::now();
             }
 
@@ -405,7 +433,7 @@ where
             if iter_num != 0 && self.decay_step != 0 && iter_num % self.decay_step == 0 {
                 self.perform_learn_rate_decay();
             }
-            
+
             if self.snap_iter != 0 && iter_num % self.snap_iter == 0 && iter_num != 0 {
                 let filename = format!("{}_{}.state", self.name, iter_num);
                 self.save_model_state(&filename)?;
@@ -429,7 +457,7 @@ where
                         info!("Stopping training loop on {} iteration...", iter_num);
                         info!("Last test error : {}", test_err);
                         flag_stop = true;
-                    },
+                    }
                     CallbackReturnAction::StopAndSave => {
                         info!("Stopping training loop on {} iteration...", iter_num);
                         info!("Last test error : {}", test_err);
