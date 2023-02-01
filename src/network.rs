@@ -1,19 +1,15 @@
 use std::collections::HashMap;
-use std::hash::Hash;
 use std::vec::Vec;
 
-use serde::ser::{SerializeSeq, SerializeStruct};
 use serde::{Deserialize, Serialize, Serializer};
 use serde_json;
 use serde_yaml;
 
 use log::{debug, error, info, warn};
-use uuid::fmt::Simple;
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use std::error::*;
 use std::fs::File;
 use std::io::{ErrorKind, Write};
 use std::time::Instant;
@@ -31,8 +27,6 @@ use crate::util::*;
 
 use super::optimizers::*;
 use crate::models::Model;
-
-const BENCH_ITER: usize = 500;
 
 pub enum CallbackReturnAction {
     None,
@@ -58,7 +52,6 @@ where
     learn_rate_decay: f32,
     decay_step: usize,
     show_accuracy: bool,
-    is_bench_time: bool,
     pub name: String,
     callbacks: Vec<Box<dyn FnMut(usize, f32) -> CallbackReturnAction>>,
 }
@@ -83,7 +76,6 @@ where
             test_iter: 0,
             learn_rate_decay: 1.0,
             decay_step: 0,
-            is_bench_time: true,
             show_accuracy: true,
             name: "network".to_owned(),
             callbacks: Vec::new(),
@@ -105,7 +97,6 @@ where
             test_iter: 0,
             learn_rate_decay: 1.0,
             decay_step: 0,
-            is_bench_time: true,
             show_accuracy: true,
             name: "network".to_owned(),
             callbacks: Vec::new(),
@@ -156,16 +147,11 @@ where
         self
     }
 
-    pub fn is_bench_time(mut self, state: bool) -> Self {
-        self.is_bench_time = state;
-        self
-    }
-
     pub fn save_model_state(&self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(train_model) = self.train_model.as_ref() {
-            train_model.save_state(path)?
+            return train_model.save_state(path);
         }
-        Ok(()) // TODO : Return error if there is no train_model
+        Err(Box::new(CustomError::Other))
     }
 
     pub fn set_train_dataset(&mut self, data: Box<dyn DataLoader>) {
@@ -406,6 +392,16 @@ where
                 if iter_num % self.test_iter == 0 && iter_num != 0 {
                     test_err = self.test_net();
 
+                    let elapsed = bench_time.elapsed();
+
+                    info!(
+                        "Did {} iterations for {} milliseconds",
+                        self.test_iter,
+                        elapsed.as_millis()
+                    );
+
+                    bench_time = Instant::now();
+
                     if test_err < err {
                         info!("Reached satisfying error value");
                         break;
@@ -416,16 +412,6 @@ where
             if max_iter != 0 && iter_num >= max_iter {
                 info!("Reached max iteration");
                 break;
-            }
-
-            if iter_num != 0 && iter_num % BENCH_ITER == 0 && self.is_bench_time {
-                let elapsed = bench_time.elapsed();
-                info!(
-                    "Do {} Iteration for {} millisecs",
-                    BENCH_ITER,
-                    elapsed.as_millis()
-                );
-                bench_time = Instant::now();
             }
 
             self.perform_step();

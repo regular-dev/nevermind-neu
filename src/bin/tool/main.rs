@@ -9,6 +9,7 @@ pub mod create_net;
 pub mod dataset_info;
 pub mod train;
 pub mod test;
+pub mod train_tui;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
@@ -69,6 +70,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .help("Train till the net error will be less than this value")
                 .action(ArgAction::Set).value_parser(clap::value_parser!(f32))
                 .require_equals(true)
+        )
+        .arg(
+            Arg::new("Tui")
+                .long("tui")
+                .help("Use interactive terminal user interface")
+                .action(ArgAction::Set)
+                .value_parser(clap::value_parser!(bool))
+                .require_equals(true)
+                .default_value("false")
         )
         .arg(
             Arg::new("LrDecay")
@@ -194,7 +204,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     if cmd.0 == "train" {
         let (_subcmd, args) = matches.subcommand().unwrap();
-         train::train_net(&args)?;
+
+        let is_tui = args.get_one::<bool>("Tui").unwrap();
+
+        if *is_tui {
+            train_tui::train_tui(&args)?;
+        } else {
+            train::train_net(&args)?;
+        }
     }
     if cmd.0 == "test" {
         let (_subcmd, args) = matches.subcommand().unwrap();
