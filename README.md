@@ -1,3 +1,3 @@
 # Regular Mind
 
-All kinds of data science algorithms.
+Machine learning library written in rust
