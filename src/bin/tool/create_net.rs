@@ -6,12 +6,12 @@ use clap::ArgMatches;
 
 use log::info;
 
-use regular_mind::activation::*;
-use regular_mind::err::*;
-use regular_mind::layers::*;
-use regular_mind::layers_storage::*;
-use regular_mind::models::*;
-use regular_mind::optimizers::*;
+use nevermind_neu::activation::*;
+use nevermind_neu::err::*;
+use nevermind_neu::layers::*;
+use nevermind_neu::layers_storage::*;
+use nevermind_neu::models::*;
+use nevermind_neu::optimizers::*;
 
 
 fn read_from_stdin<T: FromStr>(stdin: &io::Stdin) -> Result<T, Box<dyn Error>> {

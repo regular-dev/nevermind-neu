@@ -1,9 +1,6 @@
 use std::fs::File;
 
 use log::{info, LevelFilter, SetLoggerError};
-use log4rs::append::console::ConsoleAppender;
-use log4rs::append::file::FileAppender;
-use log4rs::encode::pattern::PatternEncoder;
 
 use std::time::Instant;
 
@@ -13,10 +10,10 @@ use ndarray::array;
 
 use env_logger::Env;
 
-use regular_mind::dataloader::*;
-use regular_mind::network::*;
-use regular_mind::models::*;
-use regular_mind::optimizers::*;
+use nevermind_neu::dataloader::*;
+use nevermind_neu::network::*;
+use nevermind_neu::models::*;
+use nevermind_neu::optimizers::*;
 
 #[cfg(feature = "log_log4rs")]
 fn init_logger() {

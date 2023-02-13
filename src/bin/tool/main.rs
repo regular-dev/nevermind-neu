@@ -1,4 +1,4 @@
-extern crate regular_mind;
+extern crate nevermind_neu;
 
 use clap;
 use clap::{App, Arg, ArgAction, Command};

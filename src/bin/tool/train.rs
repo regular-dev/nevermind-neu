@@ -7,12 +7,12 @@ use signal_hook::{consts::SIGINT, iterator::Signals};
 
 use clap::ArgMatches;
 
-// regular_mind
-use regular_mind::dataloader::*;
-use regular_mind::network::*;
-use regular_mind::err::*;
-use regular_mind::models::*;
-use regular_mind::optimizers::*;
+// nevermind_neu
+use nevermind_neu::dataloader::*;
+use nevermind_neu::network::*;
+use nevermind_neu::err::*;
+use nevermind_neu::models::*;
+use nevermind_neu::optimizers::*;
 
 
 /// Starts train a network with required net configuration

@@ -1,6 +1,6 @@
-use regular_mind::dataloader::*;
-use regular_mind::util::*;
-use regular_mind::err::*;
+use nevermind_neu::dataloader::*;
+use nevermind_neu::util::*;
+use nevermind_neu::err::*;
 
 use log::error;
 

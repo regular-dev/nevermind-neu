@@ -1,14 +1,14 @@
 use log::{error, info};
-use regular_mind::models::Model;
-use regular_mind::models::Sequential;
+use nevermind_neu::models::Model;
+use nevermind_neu::models::Sequential;
 
 use std::time::Instant;
 
 use clap::ArgMatches;
 
 // regular_mind
-use regular_mind::dataloader::*;
-use regular_mind::network::*;
+use nevermind_neu::dataloader::*;
+use nevermind_neu::network::*;
 
 pub fn test_net(
     args: &ArgMatches,

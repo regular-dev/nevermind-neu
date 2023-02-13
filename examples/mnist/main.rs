@@ -5,8 +5,8 @@ use std::vec::Vec;
 
 use std::ops::DerefMut;
 
-use regular_mind::dataloader::*;
-use regular_mind::util::*;
+use nevermind_neu::dataloader::*;
+use nevermind_neu::util::*;
 
 use rust_mnist::{print_sample_image, Mnist};
 
