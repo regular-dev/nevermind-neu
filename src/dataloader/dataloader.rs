@@ -5,4 +5,5 @@ pub trait DataLoader {
     fn next_batch(&self, size: usize) -> MiniBatch;
 
     fn reset(&mut self) { }
+    fn len(&self) -> Option< usize > { None }
 }

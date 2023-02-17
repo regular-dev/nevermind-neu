@@ -1,9 +1,9 @@
-use std::ops::{Deref, DerefMut};
+use std::{rc::Rc, cell::RefCell, sync::atomic::{AtomicU32, Ordering}};
 
 use std::collections::HashMap;
 use std::f32::consts::E;
 
-use ndarray::{Array1, Axis, Zip};
+use ndarray::{Array1, Zip, Axis};
 
 use log::{debug, info, warn};
 
@@ -16,11 +16,6 @@ pub struct SoftmaxLossLayer {
     pub size: usize,
     pub prev_size: usize,
     pub lr_params: LearnParams,
-
-    // test
-    pub batch_id: usize,
-    pub batch_size: usize,
-    pub arr_accuracy: Array1<f32>,
 }
 
 impl AbstractLayer for SoftmaxLossLayer {
@@ -58,52 +53,44 @@ impl AbstractLayer for SoftmaxLossLayer {
     ) -> LayerBackwardResult {
         let prev_input = &prev_input[0].output.borrow();
         let mut self_err_vals = self.lr_params.err_vals.borrow_mut();
-        let self_output = self.lr_params.output.borrow();
+        let mut self_output = self.lr_params.output.borrow_mut();
 
-        // TEST
-        let mut v_max = -999999.0;
-        let mut v_idx = 0;
-        let mut expected_idx = -1;
-
-        for (idx, it) in self_output.iter().enumerate() {
-            if *it > v_max {
-                v_max = *it;
-                v_idx = idx;
-            }
-        }
-
-        for (idx, it) in expected_vec.iter().enumerate() {
-            if *it == 1.0 {
-                expected_idx = idx as i32;
-                break;
-            }
-        }
-
-        if v_idx == expected_idx as usize {
-            *self.arr_accuracy.get_mut(self.batch_id).unwrap() = 1.0;
-        }
-
-        self.batch_id += 1;
-
-        if self.batch_id % self.batch_size == 0 && self.batch_id != 0 {
-            self.arr_accuracy = Array1::zeros(self.batch_size);
-            self.batch_id = 0;
-        }
+        let match_cnt = AtomicU32::new(0);
+        let batch_len = self_output.len_of(Axis(0)) as f32;
 
         Zip::from(self_err_vals.rows_mut())
             .and(self_output.rows())
             .and(expected_vec.rows())
-            .par_for_each(|err_val_b, out_b, expected_b| {
+            .par_for_each(|err_val_b, out_b, expected_b| { // for each batch
+                let (mut out_idx, mut out_max_val) = (-1, 0.0);
+                let mut idx = 0;
+                let mut b_expected_idx = -1;
+
                 Zip::from(err_val_b).and(out_b).and(expected_b).for_each(
                     |err_val, output, expected| {
+                        if *output > out_max_val {
+                            out_max_val = *output;
+                            out_idx = idx;
+                        }
+
                         if *expected == 1.0 {
+                            b_expected_idx = idx;
                             *err_val = 1.0 - *output;
                         } else {
                             *err_val = (-1.0) * *output;
                         }
+
+                        idx += 1;
                     },
                 );
+
+                if b_expected_idx == out_idx {
+                    match_cnt.fetch_add(1, Ordering::Relaxed);
+                } 
             });
+
+        let accuracy = match_cnt.load(Ordering::SeqCst) as f32 / batch_len;
+        self_output[[1, 0]] = accuracy;
 
         // calc per-weight gradient, TODO : refactor code below
         // for prev_layer :
@@ -164,19 +151,11 @@ impl AbstractLayer for SoftmaxLossLayer {
             prev_size = *var_prev_size as usize;
         }
 
-        debug!("Error size : {}", size);
-        debug!("Prev size : {}", prev_size);
-
         if size > 0 && prev_size > 0 {
             self.size = size;
             self.prev_size = prev_size;
             self.lr_params = LearnParams::new(self.size, self.prev_size);
         }
-
-        // test
-        self.batch_id = 0;
-        self.batch_size = 1000;
-        self.arr_accuracy = Array1::zeros(self.batch_size);
     }
 
     fn size(&self) -> usize {
@@ -196,13 +175,13 @@ impl AbstractLayer for SoftmaxLossLayer {
 
 impl SoftmaxLossLayer {
     pub fn new(size: usize, prev_size: usize) -> Self {
+        let mut lr_params = LearnParams::new(size, prev_size);
+        lr_params.output = Rc::new(RefCell::new(Batch::zeros((2, size))));
+
         Self {
             size,
             prev_size,
-            lr_params: LearnParams::new(size, prev_size),
-            batch_size: 1000,
-            arr_accuracy: Array1::zeros(1000),
-            batch_id: 0,
+            lr_params,
         }
     }
 }

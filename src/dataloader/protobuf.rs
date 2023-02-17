@@ -96,11 +96,15 @@ impl DataLoader for ProtobufDataLoader {
     fn next_batch(&self, size: usize) -> MiniBatch {
         let mut mb = Vec::with_capacity(size);
 
-        for i in 0..size {
+        for _ in 0..size {
             mb.push(self.next());
         }
 
         MiniBatch::new(mb)
+    }
+
+    fn len(&self) -> Option< usize > {
+        Some(self.data.len())
     }
 
     fn reset(&mut self) {

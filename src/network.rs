@@ -14,7 +14,7 @@ use std::fs::File;
 use std::io::{ErrorKind, Write};
 use std::time::Instant;
 
-use ndarray::Zip;
+use ndarray::{Zip, Axis};
 
 use ndarray_stats::QuantileExt;
 
@@ -39,21 +39,24 @@ pub struct Network<T>
 where
     T: Model + Serialize + Clone,
 {
-    train_dl: Option<Box<dyn DataLoader>>,
-    test_dl: Option<Box<dyn DataLoader>>,
+    pub train_dl: Option<Box<dyn DataLoader>>,
+    pub test_dl: Option<Box<dyn DataLoader>>,
     optim: Box<dyn Optimizer>,
-    test_err: f32,
+    test_err_non_dl: f32,
     test_batch_size: usize,
     is_write_test_err: bool,
     train_model: Option<T>,
     test_model: Option<T>,
     snap_iter: usize,
     test_iter: usize,
+    cur_iter_err: f32,
+    cur_iter_acc: f32,
     learn_rate_decay: f32,
     decay_step: usize,
     show_accuracy: bool,
     pub name: String,
-    callbacks: Vec<Box<dyn FnMut(usize, f32) -> CallbackReturnAction>>,
+    // callback fn args : (iteration_number, current iteration loss, accuracy)
+    callbacks: Vec<Box<dyn FnMut(usize, f32, f32) -> CallbackReturnAction>>,
 }
 
 impl<T> Network<T>
@@ -67,13 +70,15 @@ where
             train_dl: None,
             test_dl: None,
             optim: Box::new(OptimizerRMS::new(1e-2, 0.9)),
-            test_err: 0.0,
+            test_err_non_dl: 0.0,
             test_batch_size: 10,
             is_write_test_err: true,
             train_model: Some(model),
             test_model,
             snap_iter: 0,
             test_iter: 0,
+            cur_iter_acc: -1.0,
+            cur_iter_err: 0.0,
             learn_rate_decay: 1.0,
             decay_step: 0,
             show_accuracy: true,
@@ -88,13 +93,15 @@ where
             train_dl: None,
             test_dl: None,
             optim: Box::new(OptimizerSGD::new(1e-2, 0.8)),
-            test_err: 0.0,
+            test_err_non_dl: 0.0,
             test_batch_size: 1,
             is_write_test_err: true,
             train_model: None,
             test_model: Some(model),
             snap_iter: 0,
             test_iter: 0,
+            cur_iter_err: 0.0,
+            cur_iter_acc: -1.0,
             learn_rate_decay: 1.0,
             decay_step: 0,
             show_accuracy: true,
@@ -120,7 +127,7 @@ where
         s
     }
 
-    pub fn add_callback(&mut self, c: Box<dyn FnMut(usize, f32) -> CallbackReturnAction>) {
+    pub fn add_callback(&mut self, c: Box<dyn FnMut(usize, f32, f32) -> CallbackReturnAction>) {
         self.callbacks.push(c);
     }
 
@@ -131,6 +138,14 @@ where
     pub fn write_test_err_to_file(mut self, state: bool) -> Self {
         self.is_write_test_err = state;
         self
+    }
+
+    pub fn train_batch_size(&self) -> Option<usize> {
+        if let Some(train_model) = &self.train_model {
+            return Some(train_model.batch_size());
+        } else {
+            return None;
+        }
     }
 
     pub fn save_network_cfg(&mut self, path: &str) -> std::io::Result<()> {
@@ -177,8 +192,8 @@ where
     /// Test net and returns and average error
     fn test_net(&mut self) -> f32 {
         if self.test_dl.is_none() {
-            let err = self.test_err / self.test_batch_size as f32; // error average
-            self.test_err = 0.0;
+            let err = self.test_err_non_dl / self.test_batch_size as f32; // error average
+            self.test_err_non_dl = 0.0;
             return err;
         }
 
@@ -283,6 +298,16 @@ where
         return test_err;
     }
 
+    fn calc_accuracy(last_layer_lr: &LearnParams) -> Option<f32> {
+        let lr_output = last_layer_lr.output.borrow();
+
+        if lr_output.len_of(Axis(0)) > 1 {
+            return Some(lr_output[[1, 0]]);
+        }
+
+        return None;
+    }
+
     fn perform_learn_rate_decay(&mut self) {
         let opt_params = self.optim.cfg();
 
@@ -319,9 +344,14 @@ where
 
             Network::optimize_model(train_model, &mut self.optim);
 
+            // store current iteration loss and accuracy
+            let lr = train_model.last_layer().learn_params().unwrap();
+
+            self.cur_iter_err = Self::calc_avg_err(&lr);
+            self.cur_iter_acc = Self::calc_accuracy(&lr).unwrap();
+
             if self.test_dl.is_none() {
-                let lr = train_model.last_layer().learn_params().unwrap();
-                self.test_err += Self::calc_avg_err(&lr);
+                self.test_err_non_dl += self.cur_iter_err;
             }
         }
     }
@@ -435,7 +465,7 @@ where
             }
 
             for it_cb in self.callbacks.iter_mut() {
-                let out = it_cb(iter_num, test_err);
+                let out = it_cb(iter_num, self.cur_iter_err, self.cur_iter_acc);
 
                 match out {
                     CallbackReturnAction::None => (),

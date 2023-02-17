@@ -1,7 +1,7 @@
-use log::{error, info, debug};
+use log::{debug, error, info};
 use signal_hook::consts::SIGKILL;
 
-use std::time::Instant;
+use std::{error::Error, time::Instant};
 
 use signal_hook::{consts::SIGINT, iterator::Signals};
 
@@ -9,35 +9,95 @@ use clap::ArgMatches;
 
 // nevermind_neu
 use nevermind_neu::dataloader::*;
-use nevermind_neu::network::*;
 use nevermind_neu::err::*;
 use nevermind_neu::models::*;
+use nevermind_neu::network::*;
 use nevermind_neu::optimizers::*;
-
 
 /// Starts train a network with required net configuration
 /// and train dataset
-pub fn train_net(
-    args: &ArgMatches
-) -> Result<(), Box<dyn std::error::Error>> {
-    let model_cfg = args.get_one::<String>("ModelCfg").unwrap();
-    let mut model = Sequential::from_file(&model_cfg)?;
+pub fn train_net(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
+    let mut net = create_net_from_cmd_args(args)?;
+    set_train_dataset_to_net(&mut net, args)?;
 
+    let mut opt_err = None;
+    let mut opt_max_iter = None;
+
+    if let Some(err) = args.get_one::<f32>("Err") {
+        info!("Satisfying error : {}", err);
+        opt_err = Some(err);
+    }
+
+    if let Some(max_iter) = args.get_one::<usize>("MaxIter") {
+        info!("Iteration limit : {}", max_iter);
+        opt_max_iter = Some(max_iter);
+    }
+
+    let now_time = Instant::now();
+
+    if opt_err.is_some() && opt_max_iter.is_some() {
+        let err = opt_err.unwrap();
+        let max_iter = opt_max_iter.unwrap();
+
+        info!(
+            "Start train till the err {} or max iteration {}",
+            *err, *max_iter
+        );
+        net.train_for_error_or_iter(*err, *max_iter)?;
+    } else if opt_err.is_some() {
+        let err = opt_err.unwrap();
+
+        info!("Start train till the err {}", *err);
+        net.train_for_error(*err)?;
+    } else if opt_max_iter.is_some() {
+        let max_iter = opt_max_iter.unwrap();
+
+        info!("Start train max iteration {}", *max_iter);
+        net.train_for_n_times(*max_iter)?;
+    } else {
+        error!("Error and max iteration for training wasn't set (--max_iter , -err)");
+        return Err(Box::new(CustomError::WrongArg));
+    }
+
+    let elapsed_bench = now_time.elapsed();
+
+    info!("Elapsed for training : {} ms", elapsed_bench.as_millis());
+
+    Ok(())
+}
+
+pub fn set_train_dataset_to_net(
+    net: &mut Network<Sequential>,
+    args: &ArgMatches,
+) -> Result<(), Box<dyn Error>> {
     let train_ds = args.get_one::<String>("TrainData").unwrap();
     let train_ds = Box::new(ProtobufDataLoader::from_file(train_ds)?);
+
+    net.set_train_dataset(train_ds);
+
+    Ok(())
+}
+
+pub fn create_net_from_cmd_args(args: &ArgMatches) -> Result<Network<Sequential>, Box<dyn Error>> {
+    let model_cfg = args.get_one::<String>("ModelCfg").unwrap();
+    let mut model = Sequential::from_file(&model_cfg)?;
 
     if let Some(model_state) = args.get_one::<String>("ModelState") {
         model.load_state(&model_state)?;
     }
 
+    let train_ds = args.get_one::<String>("TrainData").unwrap();
+    let train_ds = Box::new(ProtobufDataLoader::from_file(train_ds)?);
+
     info!("Train batch size : {}", model.batch_size());
 
     let mut net = Network::new(model);
 
+    net.set_train_dataset(train_ds);
+
     let mut signals = Signals::new(&[SIGINT])?;
 
-    net.add_callback(Box::new(move |_, _|
-    {
+    net.add_callback(Box::new(move |_, _, _| {
         for sig in signals.pending() {
             debug!("Received signal {:?}", sig);
 
@@ -50,8 +110,6 @@ pub fn train_net(
 
         CallbackReturnAction::None
     }));
-
-    net.set_train_dataset(train_ds);
 
     if let Some(optimizer_cfg) = args.get_one::<String>("OptCfg") {
         info!("Setting up optimizer : {}", optimizer_cfg);
@@ -103,56 +161,19 @@ pub fn train_net(
         net = net.write_test_err_to_file(is_true);
     }
 
-    let mut opt_err = None;
-    let mut opt_max_iter = None;
-    
-    if let Some(err) = args.get_one::<f32>("Err") {
-        info!("Satisfying error : {}", err);
-        opt_err = Some(err);
-    }
-
-    if let Some(max_iter) = args.get_one::<usize>("MaxIter") {
-        info!("Iteration limit : {}", max_iter);
-        opt_max_iter = Some(max_iter);
-    }
-
-    let now_time = Instant::now();
-
-    if opt_err.is_some() && opt_max_iter.is_some() {
-        let err = opt_err.unwrap();
-        let max_iter = opt_max_iter.unwrap();
-
-        info!("Start train till the err {} or max iteration {}", *err, *max_iter);
-        net.train_for_error_or_iter(*err, *max_iter)?;
-    } else if opt_err.is_some() {
-        let err = opt_err.unwrap();
-
-        info!("Start train till the err {}", *err);
-        net.train_for_error(*err)?;
-    } else if opt_max_iter.is_some() {
-        let max_iter = opt_max_iter.unwrap();
-
-        info!("Start train max iteration {}", *max_iter);
-        net.train_for_n_times(*max_iter)?;
-    } else {
-        error!("Error and max iteration for training wasn't set (--max_iter , -err)");
-        return Err(Box::new(CustomError::WrongArg));
-    }
-
-    let elapsed_bench = now_time.elapsed();
-    
-    info!("Elapsed for training : {} ms", elapsed_bench.as_millis());
-
-    Ok(())
+    Ok(net)
 }
 
-pub fn gen_init_state(args: &ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
+pub fn gen_init_state(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
     let model_cfg = args.get_one::<String>("ModelCfg").unwrap();
     let out_file = args.get_one::<String>("OutFile").unwrap();
     let model = Sequential::from_file(&model_cfg)?;
     model.save_state(out_file)?;
 
-    info!("Saved initialized state for model {} to file {}", model_cfg, out_file);
+    info!(
+        "Saved initialized state for model {} to file {}",
+        model_cfg, out_file
+    );
 
     Ok(())
 }

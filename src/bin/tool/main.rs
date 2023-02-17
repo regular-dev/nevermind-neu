@@ -12,8 +12,6 @@ pub mod test;
 pub mod train_tui;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
-
     let matches = App::new("regular_mind tool")
         .version("0.1.0")
         .author("Regular-dev")
@@ -198,6 +196,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let cmd = matches.subcommand().unwrap();
 
+    // check if tui or not to disable log messages
+    let mut is_tui: bool = false;
+    if cmd.0 == "train" {
+        let (_, args) = matches.subcommand().unwrap();
+        
+        is_tui = *args.get_one::<bool>("Tui").unwrap();
+    }
+
+    if is_tui {
+        env_logger::Builder::from_env(Env::default().default_filter_or("error")).init();
+    } else {
+        env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+    }
+
+    // command section
     if cmd.0 == "dataset_info" {
         let (_subcmd, args) = matches.subcommand().unwrap();
         dataset_info::dataset_info(&args)?;
