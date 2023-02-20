@@ -1,10 +1,7 @@
 use clap::{Arg, ArgMatches};
-use ndarray::Data;
-use nevermind_neu::dataloader::*;
 use nevermind_neu::err::*;
-use nevermind_neu::network::*;
 use nevermind_neu::{
-    dataloader::ProtobufDataLoader, models::Sequential, network::CallbackReturnAction,
+    network::CallbackReturnAction,
 };
 
 use log::{error, info};
@@ -19,7 +16,7 @@ use std::{
 };
 
 // use std::unistd::Pid;
-use nix::{sys::signal::{self, Signal, kill}, unistd::getpid};
+use nix::{sys::signal::{Signal, kill}, unistd::getpid};
 
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
@@ -37,10 +34,7 @@ use tui::{
     Frame, Terminal,
 };
 
-use crate::train;
 use crate::train::create_net_from_cmd_args;
-
-const DATA: [(f64, f64); 5] = [(0.0, 0.0), (1.0, 1.0), (2.0, 2.0), (3.0, 3.0), (4.0, 4.0)];
 
 pub enum NetMsg {
     InitInfo(usize, usize),    // epoch_size, batch_size

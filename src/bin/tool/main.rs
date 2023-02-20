@@ -73,10 +73,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Arg::new("Tui")
                 .long("tui")
                 .help("Use interactive terminal user interface")
-                .action(ArgAction::Set)
-                .value_parser(clap::value_parser!(bool))
-                .require_equals(true)
-                .default_value("false")
         )
         .arg(
             Arg::new("LrDecay")
@@ -201,7 +197,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if cmd.0 == "train" {
         let (_, args) = matches.subcommand().unwrap();
         
-        is_tui = *args.get_one::<bool>("Tui").unwrap();
+        is_tui = args.contains_id("Tui");
     }
 
     if is_tui {
@@ -218,9 +214,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if cmd.0 == "train" {
         let (_subcmd, args) = matches.subcommand().unwrap();
 
-        let is_tui = args.get_one::<bool>("Tui").unwrap();
+        let is_tui = args.contains_id("Tui");
 
-        if *is_tui {
+        if is_tui {
             train_tui::train_tui(&args)?;
         } else {
             train::train_net(&args)?;
