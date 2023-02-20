@@ -18,6 +18,9 @@ use std::{
     time::{Duration, Instant},
 };
 
+// use std::unistd::Pid;
+use nix::{sys::signal::{self, Signal, kill}, unistd::getpid};
+
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
@@ -285,7 +288,7 @@ impl Tui {
             if crossterm::event::poll(timeout)? {
                 if let Event::Key(key) = event::read()? {
                     match key.code {
-                        KeyCode::Char('q') => return Ok(()),
+                        KeyCode::Char('q') => break,
                         // KeyCode::Left => app.items.unselect(),
                         // KeyCode::Down => app.items.next(),
                         // KeyCode::Up => app.items.previous(),
@@ -299,6 +302,8 @@ impl Tui {
                 last_tick = Instant::now();
             }
         }
+
+        kill(getpid(), Signal::SIGINT)?;
 
         Ok(())
     }
