@@ -3,6 +3,12 @@ name = "nevermind-neu"
 version = "0.1.0"
 edition = "2021"
 autoexamples = true
+description = "Machine learning library with terminal user interface"
+license = "Apache-2.0"
+keywords = ["neural-network", "machine-learning"]
+categories = ["command-line-utilities"]
+repository = "https://github.com/regular-dev/nevermind-neu"
+homepage = "https://regular-dev.org/nevermind-neu"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
