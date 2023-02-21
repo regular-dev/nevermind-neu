@@ -18,3 +18,6 @@ Machine learning library and tool with terminal user interface written in rust.
   - RNN + LSTM
   - Residual block
   - OpenCL computation
+
+## License
+Apache License Version 2.0
