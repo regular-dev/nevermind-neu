@@ -1,5 +1,6 @@
 # nevermind-neu
 [![crates.io](https://img.shields.io/crates/v/nevermind-neu.svg)](https://crates.io/crates/nevermind-neu)
+
 Machine learning library and tool with terminal user interface written in rust.
 
 ## Features
