@@ -62,7 +62,7 @@ fn init_logger() {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_logger();
-    log::info!("Regular-mind 0.1 test app starting...");
+    log::info!("nevermind-neu xor example starting...");
 
     // prepare data set
     let mut dataset_train: Vec<DataBatch> = Vec::new();
