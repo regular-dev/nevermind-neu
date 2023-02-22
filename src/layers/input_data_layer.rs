@@ -60,6 +60,8 @@ impl AbstractLayer for InputDataLayer {
         }
     }
 
+    fn set_input_shape(&mut self, sh: &[usize]) { }
+
     fn size(&self) -> usize {
         self.input_size
     }

@@ -39,6 +39,16 @@ impl LearnParams {
         }
     }
 
+    pub fn empty() -> Self {
+        Self {
+            ws: Rc::new(RefCell::new(vec![WsMat::zeros((0, 0))])),
+            ws_grad: Rc::new(RefCell::new(vec![WsMat::zeros((0, 0))])),
+            err_vals: Rc::new(RefCell::new(Batch::zeros((0, 0)))),
+            output: Rc::new(RefCell::new(Batch::zeros((0, 0)))),
+            uuid: Uuid::new_v4(),
+        }
+    }
+
     pub fn new_with_const_bias(size: usize, prev_size: usize) -> Self {
         let ws = WsMat::random((size, prev_size), Uniform::new(-0.9, 0.9));
         // let ws_bias = WsMat::random((size, 1), Uniform::new(-0.5, 0.5));

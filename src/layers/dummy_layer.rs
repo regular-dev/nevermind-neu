@@ -32,6 +32,9 @@ impl AbstractLayer for DummyLayer {
         return "DummyLayer";
     }
 
+    fn set_input_shape(&mut self, sh: &[usize]) {
+    }
+
     fn size(&self) -> usize {
         0
     }

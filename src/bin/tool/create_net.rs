@@ -133,33 +133,28 @@ fn create_layers(stdin: &io::Stdin) -> Result<Sequential, Box<dyn Error>> {
                 "sigmoid" => {
                     ls.add_layer(Box::new(HiddenLayer::new(
                         l_size,
-                        prev_s,
                         activation_macros::sigmoid_activation!(),
                     )));
                 }
                 "tanh" => {
                     ls.add_layer(Box::new(HiddenLayer::new(
                         l_size,
-                        prev_s,
                         activation_macros::tanh_activation!(),
                     )));
                 }
                 "relu" => {
                     ls.add_layer(Box::new(HiddenLayer::new(
                         l_size,
-                        prev_s,
                         activation_macros::relu_activation!(),
                     )));
                 }
                 "leaky_relu" => ls.add_layer(Box::new(HiddenLayer::new(
                     l_size,
-                    prev_s,
                     activation_macros::leaky_relu_activation!(),
                 ))),
                 "raw" => {
                     ls.add_layer(Box::new(HiddenLayer::new(
                         l_size,
-                        prev_s,
                         activation_macros::raw_activation!(),
                     )));
                 }
@@ -182,7 +177,6 @@ fn create_layers(stdin: &io::Stdin) -> Result<Sequential, Box<dyn Error>> {
     if out_l_type == "raw" {
         ls.add_layer(Box::new(ErrorLayer::new(
             out_l_size,
-            prev_s,
             activation_macros::raw_activation!(),
         )));
     } else if out_l_type == "softmax_loss" {
@@ -190,20 +184,19 @@ fn create_layers(stdin: &io::Stdin) -> Result<Sequential, Box<dyn Error>> {
     } else if out_l_type == "sigmoid" {
         ls.add_layer(Box::new(ErrorLayer::new(
             out_l_size,
-            prev_s,
             activation_macros::sigmoid_activation!(),
         )));
     } else if out_l_type == "tanh" {
         ls.add_layer(Box::new(ErrorLayer::new(
             out_l_size,
-            prev_s,
             activation_macros::tanh_activation!(),
         )));
     }
 
     println!("Finally network : {}", ls);
 
-    let seq_mdl = Sequential::new_with_layers(ls);
+    let mut seq_mdl = Sequential::new_with_layers(ls);
+    seq_mdl.compile_shapes();
 
     Ok(seq_mdl)
 }

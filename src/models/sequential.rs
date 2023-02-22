@@ -35,10 +35,13 @@ impl Sequential {
     }
 
     pub fn new_simple(net_cfg: &Vec<usize>) -> Self {
-        Self {
+        let mut seq = Self {
             ls: SequentialLayersStorage::new_simple_network(net_cfg),
             batch_size: 1,
-        }
+        };
+        seq.compile_shapes();
+
+        return seq;
     }
 
     pub fn new_with_layers(ls: SequentialLayersStorage) -> Self {
@@ -48,6 +51,7 @@ impl Sequential {
     pub fn from_file(filepath: &str) -> Result<Self, Box<dyn Error>> {
         let cfg_file = File::open(filepath)?;
         let mut mdl: Sequential = serde_yaml::from_reader(cfg_file)?;
+        mdl.compile_shapes();
         mdl.set_batch_size(mdl.batch_size);
 
         Ok(mdl)
@@ -69,6 +73,19 @@ impl Sequential {
         }
 
         Ok(())
+    }
+
+    pub fn compile_shapes(&mut self) { // TODO : may return some result in further
+        let mut prev_size = 0;
+
+        for (idx, l) in self.ls.iter_mut().enumerate() {
+            if idx == 0 {
+                prev_size = l.size();
+            }
+
+            l.set_input_shape(&[prev_size]);
+            prev_size = l.size();
+        }
     }
 }
 

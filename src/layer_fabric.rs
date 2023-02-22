@@ -94,49 +94,49 @@ pub fn create_layer(
 pub mod layers_macros {
     macro_rules! sigmoid_hidden_layer {
         (  ) => {{
-            HiddenLayer::new(0, 0, activation_macros::sigmoid_activation!())
+            HiddenLayer::new(0, activation_macros::sigmoid_activation!())
         }};
     }
 
     macro_rules! tanh_hidden_layer {
         (  ) => {{
-            HiddenLayer::new(0, 0, activation_macros::tanh_activation!())
+            HiddenLayer::new(0, activation_macros::tanh_activation!())
         }};
     }
 
     macro_rules! relu_hidden_layer {
         () => {
-            HiddenLayer::new(0, 0, activation_macros::relu_activation!())
+            HiddenLayer::new(0, activation_macros::relu_activation!())
         };
     }
 
     macro_rules! leaky_relu_hidden_layer {
         () => {
-            HiddenLayer::new(0, 0, activation_macros::leaky_relu_activation!())
+            HiddenLayer::new(0, activation_macros::leaky_relu_activation!())
         };
     }
 
     macro_rules! raw_hidden_layer {
         () => {
-            HiddenLayer::new(0, 0, activation_macros::raw_activation!())
+            HiddenLayer::new(0, activation_macros::raw_activation!())
         };
     }
 
     macro_rules! sigmoid_error_layer {
         () => {
-            ErrorLayer::new(0, 0, activation_macros::sigmoid_activation!())
+            ErrorLayer::new(0, activation_macros::sigmoid_activation!())
         };
     }
 
     macro_rules! tanh_error_layer {
         () => {
-            ErrorLayer::new(0, 0, activation_macros::tanh_activation!())
+            ErrorLayer::new(0, activation_macros::tanh_activation!())
         };
     }
 
     macro_rules! raw_error_layer {
         () => {
-            ErrorLayer::new(0, 0, activation_macros::raw_activation!())
+            ErrorLayer::new(0, activation_macros::raw_activation!())
         };
     }
 

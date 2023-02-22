@@ -171,6 +171,12 @@ impl AbstractLayer for SoftmaxLossLayer {
     fn clone_layer(&self) -> Box<dyn AbstractLayer> {
         Box::new(self.clone())
     }
+
+    fn set_input_shape(&mut self, sh: &[usize]) {
+        let mut lr_params = LearnParams::new(self.size, sh[0]);
+        lr_params.output = Rc::new(RefCell::new(Batch::zeros((2, self.size))));
+        self.lr_params = lr_params;
+    }
 }
 
 impl SoftmaxLossLayer {
