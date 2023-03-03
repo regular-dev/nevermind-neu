@@ -99,13 +99,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     //net.save_solver_state("solver_state.proto")?;
 
-    // test dataset
-    let mut dataset_test: Vec<DataBatch> = Vec::new();
-    dataset_test.push(DataBatch::new(vec![0.0, 0.0], vec![0.0]));
-    dataset_test.push(DataBatch::new(vec![0.0, 1.0], vec![1.0]));
-    dataset_test.push(DataBatch::new(vec![1.0, 0.0], vec![1.0]));
-    dataset_test.push(DataBatch::new(vec![1.0, 1.0], vec![0.0]));
-
     info!("Now testing net !!!");
 
     let out = net.eval(array![[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]]).unwrap();
