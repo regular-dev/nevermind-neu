@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use super::abstract_layer::{AbstractLayer, LayerError, LayerForwardResult};
 
-use crate::dataloader::DataBatch;
 use crate::learn_params::LearnParams;
 use crate::util::{Batch, Blob, DataVecPtr, Variant};
 
@@ -56,7 +55,7 @@ impl AbstractLayer for InputDataLayer {
 
         if size > 0 {
             self.input_size = size;
-            self.lr_params = LearnParams::new_only_output(size);
+            self.lr_params = LearnParams::empty();
         }
     }
 
@@ -81,7 +80,7 @@ impl InputDataLayer {
     pub fn new(input_size: usize) -> Self {
         Self {
             input_size,
-            lr_params: LearnParams::new_only_output(input_size),
+            lr_params: LearnParams::empty(),
         }
     }
 }

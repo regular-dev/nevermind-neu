@@ -66,16 +66,6 @@ impl LearnParams {
         }
     }
 
-    pub fn new_only_output(size: usize) -> Self {
-        Self {
-            ws: Rc::new(RefCell::new(vec![WsMat::zeros((0, 0))])),
-            ws_grad: Rc::new(RefCell::new(vec![WsMat::zeros((0, 0))])),
-            err_vals: Rc::new(RefCell::new(Batch::zeros((0, 0)))),
-            output: Rc::new(RefCell::new(Batch::zeros((0, 0)))),
-            uuid: Uuid::new_v4(),
-        }
-    }
-
     pub fn fit_to_batch_size(&mut self, new_batch_size: usize) {
         let mut out_m = self.output.borrow_mut();
         let mut err_m = self.err_vals.borrow_mut();
@@ -95,7 +85,7 @@ impl LearnParams {
     }
 
     /// Copies learn_params memory of (weights, gradients, output...)
-    /// This function do copy memory
+    /// This function DO copy memory
     /// To clone only Rc<...> use .clone() function
     pub fn copy(&self) -> Self {
         let mut lp = LearnParams::default();

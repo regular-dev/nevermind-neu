@@ -65,16 +65,6 @@ pub fn sign(val: f32) -> f32 {
     0.0
 }
 
-pub fn sigmoid_on_vec(input: &DataVec, output: &mut DataVec) {
-    if input.len() != output.len() {
-        panic!("ERROR: input length vector != output length vector!!!");
-    }
-
-    for (idx, val) in input.indexed_iter() {
-        output[idx] = sigmoid(*val);
-    }
-}
-
 #[derive(Clone)]
 pub struct Activation<T: Fn(f32) -> f32 + Clone, TD: Fn(f32) -> f32 + Clone> {
     pub func: T,
