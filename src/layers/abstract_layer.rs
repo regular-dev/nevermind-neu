@@ -14,6 +14,7 @@ pub enum LayerError {
 pub type LayerForwardResult = Result<ParamsBlob, LayerError>;
 pub type LayerBackwardResult = Result<ParamsBlob, LayerError>;
 
+
 pub trait AbstractLayer {
     // for signature for input layers
     fn forward_input(&mut self, input_data: Batch) -> LayerForwardResult {

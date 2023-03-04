@@ -12,8 +12,9 @@ use crate::activation::{sign, Activation};
 
 use crate::util::Variant;
 
+// Fully-connected layer
 #[derive(Clone)]
-pub struct HiddenLayer<T: Fn(f32) -> f32 + Clone, TD: Fn(f32) -> f32 + Clone> {
+pub struct FcLayer<T: Fn(f32) -> f32 + Clone, TD: Fn(f32) -> f32 + Clone> {
     pub lr_params: LearnParams,
     pub size: usize,
     pub dropout: f32,
@@ -22,7 +23,7 @@ pub struct HiddenLayer<T: Fn(f32) -> f32 + Clone, TD: Fn(f32) -> f32 + Clone> {
     pub activation: Activation<T, TD>,
 }
 
-impl<T, TD> AbstractLayer for HiddenLayer<T, TD>
+impl<T, TD> AbstractLayer for FcLayer<T, TD>
 where
     T: Fn(f32) -> f32 + Sync + Clone + 'static,
     TD: Fn(f32) -> f32 + Sync + Clone + 'static,
@@ -214,7 +215,7 @@ where
     }
 
     fn copy_layer(&self) -> Box<dyn AbstractLayer> {
-        let mut copy_l = Box::new(HiddenLayer::new(
+        let mut copy_l = Box::new(FcLayer::new(
             self.size,
             self.activation.clone(),
         ));
@@ -227,7 +228,7 @@ where
     }
 }
 
-impl<T, TD> HiddenLayer<T, TD>
+impl<T, TD> FcLayer<T, TD>
 where
     T: Fn(f32) -> f32 + Clone,
     TD: Fn(f32) -> f32 + Clone,

@@ -45,25 +45,25 @@ pub fn create_layer(
 
                 if let Variant::String(activation) = activation {
                     if activation == "sigmoid" {
-                        l = Box::new(layers_macros::sigmoid_hidden_layer!());
+                        l = Box::new(layers_macros::sigmoid_fc_layer!());
                     } else if activation == "tanh" {
-                        l = Box::new(layers_macros::tanh_hidden_layer!());
+                        l = Box::new(layers_macros::tanh_fc_layer!());
                     } else if activation == "relu" {
-                        l = Box::new(layers_macros::relu_hidden_layer!());
+                        l = Box::new(layers_macros::relu_fc_layer!());
                     } else if activation == "leaky_relu" {
-                        l = Box::new(layers_macros::leaky_relu_hidden_layer!());
+                        l = Box::new(layers_macros::leaky_relu_fc_layer!());
                     } else {
-                        l = Box::new(layers_macros::raw_hidden_layer!());
+                        l = Box::new(layers_macros::raw_rc_layer!());
                     }
                 } else {
-                    l = Box::new(layers_macros::raw_hidden_layer!());
+                    l = Box::new(layers_macros::raw_rc_layer!());
                 }
 
                 l.set_layer_cfg(cfg_val);
                 return Some(l);
             }
 
-            let l = Box::new(layers_macros::sigmoid_hidden_layer!());
+            let l = Box::new(layers_macros::sigmoid_fc_layer!());
             return Some(l);
         }
         "InputDataLayer" => {
@@ -92,33 +92,33 @@ pub fn create_layer(
 }
 
 pub mod layers_macros {
-    macro_rules! sigmoid_hidden_layer {
+    macro_rules! sigmoid_fc_layer {
         (  ) => {{
-            HiddenLayer::new(0, activation_macros::sigmoid_activation!())
+            FcLayer::new(0, activation_macros::sigmoid_activation!())
         }};
     }
 
-    macro_rules! tanh_hidden_layer {
+    macro_rules! tanh_fc_layer {
         (  ) => {{
-            HiddenLayer::new(0, activation_macros::tanh_activation!())
+            FcLayer::new(0, activation_macros::tanh_activation!())
         }};
     }
 
-    macro_rules! relu_hidden_layer {
+    macro_rules! relu_fc_layer {
         () => {
-            HiddenLayer::new(0, activation_macros::relu_activation!())
+            FcLayer::new(0, activation_macros::relu_activation!())
         };
     }
 
-    macro_rules! leaky_relu_hidden_layer {
+    macro_rules! leaky_relu_fc_layer {
         () => {
-            HiddenLayer::new(0, activation_macros::leaky_relu_activation!())
+            FcLayer::new(0, activation_macros::leaky_relu_activation!())
         };
     }
 
-    macro_rules! raw_hidden_layer {
+    macro_rules! raw_rc_layer {
         () => {
-            HiddenLayer::new(0, activation_macros::raw_activation!())
+            FcLayer::new(0, activation_macros::raw_activation!())
         };
     }
 
@@ -141,11 +141,11 @@ pub mod layers_macros {
     }
 
     pub(crate) use raw_error_layer;
-    pub(crate) use raw_hidden_layer;
-    pub(crate) use relu_hidden_layer;
+    pub(crate) use raw_rc_layer;
+    pub(crate) use relu_fc_layer;
     pub(crate) use sigmoid_error_layer;
-    pub(crate) use sigmoid_hidden_layer;
+    pub(crate) use sigmoid_fc_layer;
     pub(crate) use tanh_error_layer;
-    pub(crate) use tanh_hidden_layer;
-    pub(crate) use leaky_relu_hidden_layer;
+    pub(crate) use tanh_fc_layer;
+    pub(crate) use leaky_relu_fc_layer;
 }

@@ -44,7 +44,8 @@ tui = { version = "0.19.0" }
 #termion = "2.0.1" # tui backend
 crossterm = "0.25.0"
 
-rust-mnist = "0.1" # TODO : must be an optional build feature
+rust-mnist = { version = "0.1", optional = true } 
+ocl = { version = "0.19.4", optional = true }
 
 [dependencies.uuid]
 version = "1.1.2"
@@ -57,7 +58,9 @@ features = [
 [features]
 log_log4rs = []
 log_env_logger = []
-default = ["log_env_logger"]
+mnist = ["dep:rust-mnist"]
+opencl = ["dep:ocl"]
+default = ["log_env_logger", "mnist", "opencl"]
 
 [build-dependencies]
 prost-build = "0.11"

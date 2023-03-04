@@ -131,29 +131,29 @@ fn create_layers(stdin: &io::Stdin) -> Result<Sequential, Box<dyn Error>> {
 
             match answ.as_str() {
                 "sigmoid" => {
-                    ls.add_layer(Box::new(HiddenLayer::new(
+                    ls.add_layer(Box::new(FcLayer::new(
                         l_size,
                         activation_macros::sigmoid_activation!(),
                     )));
                 }
                 "tanh" => {
-                    ls.add_layer(Box::new(HiddenLayer::new(
+                    ls.add_layer(Box::new(FcLayer::new(
                         l_size,
                         activation_macros::tanh_activation!(),
                     )));
                 }
                 "relu" => {
-                    ls.add_layer(Box::new(HiddenLayer::new(
+                    ls.add_layer(Box::new(FcLayer::new(
                         l_size,
                         activation_macros::relu_activation!(),
                     )));
                 }
-                "leaky_relu" => ls.add_layer(Box::new(HiddenLayer::new(
+                "leaky_relu" => ls.add_layer(Box::new(FcLayer::new(
                     l_size,
                     activation_macros::leaky_relu_activation!(),
                 ))),
                 "raw" => {
-                    ls.add_layer(Box::new(HiddenLayer::new(
+                    ls.add_layer(Box::new(FcLayer::new(
                         l_size,
                         activation_macros::raw_activation!(),
                     )));

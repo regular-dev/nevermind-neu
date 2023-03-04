@@ -11,7 +11,7 @@ use std::slice::IterMut;
 use super::layer_fabric::*;
 use super::layers::AbstractLayer;
 use super::layers::ErrorLayer;
-use super::layers::HiddenLayer;
+use super::layers::FcLayer;
 use super::layers::InputDataLayer;
 use super::util::Variant;
 
@@ -59,7 +59,7 @@ impl SequentialLayersStorage {
                 continue;
             }
 
-            let l: Box<dyn AbstractLayer> = Box::new(HiddenLayer::new(
+            let l: Box<dyn AbstractLayer> = Box::new(FcLayer::new(
                 *val,
                 activation_macros::tanh_activation!(),
             ));
