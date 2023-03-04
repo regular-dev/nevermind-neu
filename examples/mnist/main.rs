@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         expected.resize(10, 0.0);
         expected[y as usize] = 1.0;
 
-        let mut b = DataBatch::new(inp, expected);
+        let mut b = LabeledEntry::new(inp, expected);
 
         // normalizing
         minmax_normalize_params(&mut b.input, 0.0, 255.0);
@@ -58,7 +58,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         expected.resize(10, 0.0);
         expected[y as usize] = 1.0;
 
-        let mut b = DataBatch::new(inp, expected);
+        let mut b = LabeledEntry::new(inp, expected);
 
         // normalizing
         minmax_normalize_params(&mut b.input, 0.0, 255.0);

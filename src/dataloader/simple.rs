@@ -1,14 +1,14 @@
 use std::cell::RefCell;
 
-use crate::dataloader::{DataBatch, MiniBatch, DataLoader};
+use crate::dataloader::{LabeledEntry, MiniBatch, DataLoader};
 
 pub struct SimpleDataLoader {
     pub id: RefCell<usize>,
-    pub data: Vec<DataBatch>,
+    pub data: Vec<LabeledEntry>,
 }
 
 impl DataLoader for SimpleDataLoader {
-    fn next(&self) -> &DataBatch {
+    fn next(&self) -> &LabeledEntry {
         assert!(self.data.len() > 0);
 
         let mut self_id = self.id.borrow_mut();
@@ -41,7 +41,7 @@ impl DataLoader for SimpleDataLoader {
 }
 
 impl SimpleDataLoader {
-    pub fn new(data: Vec<DataBatch>) -> Self {
+    pub fn new(data: Vec<LabeledEntry>) -> Self {
         Self {
             id: RefCell::new(1),
             data,

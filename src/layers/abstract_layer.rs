@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::dataloader::DataBatch;
+use crate::dataloader::LabeledEntry;
 use crate::learn_params::{LearnParams, ParamsBlob};
 use crate::util::{Batch, DataVec, DataVecPtr, Variant};
 

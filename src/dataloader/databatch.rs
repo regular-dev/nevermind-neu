@@ -4,12 +4,12 @@ use crate::util::{DataVec, Batch};
 
 
 #[derive(Clone, Default)]
-pub struct DataBatch {
+pub struct LabeledEntry {
     pub input: DataVec,
     pub expected: DataVec,
 }
 
-impl DataBatch {
+impl LabeledEntry {
     pub fn new(input: Vec<f32>, expected: Vec<f32>) -> Self {
         Self {
             input: Array::from_vec(input),
@@ -25,7 +25,7 @@ pub struct MiniBatch {
 }
 
 impl MiniBatch {
-    pub fn new(b: Vec<&DataBatch>) -> Self {
+    pub fn new(b: Vec<&LabeledEntry>) -> Self {
         assert!( !b.is_empty() );
 
         let mut inp_arr = Batch::zeros( (b.len(), b.first().unwrap().input.shape()[0]) );

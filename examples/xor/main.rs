@@ -65,11 +65,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     log::info!("nevermind-neu xor example starting...");
 
     // prepare data set
-    let mut dataset_train: Vec<DataBatch> = Vec::new();
-    dataset_train.push(DataBatch::new(vec![0.0, 0.0], vec![0.0]));
-    dataset_train.push(DataBatch::new(vec![0.0, 1.0], vec![1.0]));
-    dataset_train.push(DataBatch::new(vec![1.0, 0.0], vec![1.0]));
-    dataset_train.push(DataBatch::new(vec![1.0, 1.0], vec![0.0]));
+    let mut dataset_train: Vec<LabeledEntry> = Vec::new();
+    dataset_train.push(LabeledEntry::new(vec![0.0, 0.0], vec![0.0]));
+    dataset_train.push(LabeledEntry::new(vec![0.0, 1.0], vec![1.0]));
+    dataset_train.push(LabeledEntry::new(vec![1.0, 0.0], vec![1.0]));
+    dataset_train.push(LabeledEntry::new(vec![1.0, 1.0], vec![0.0]));
 
     let dataloader = Box::new(SimpleDataLoader::new(dataset_train));
 

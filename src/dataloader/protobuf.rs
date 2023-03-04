@@ -16,7 +16,7 @@ use crate::util::DataVecPtr;
 
 #[derive(Default)]
 pub struct ProtobufDataLoader {
-    pub data: Vec<DataBatch>,
+    pub data: Vec<LabeledEntry>,
     pub id: RefCell<usize>,
 }
 
@@ -43,7 +43,7 @@ impl ProtobufDataLoader {
             let input = Array::from_shape_vec(inp_vec.len(), inp_vec)?;
             let expected = Array::from_shape_vec(expected_vec.len(), expected_vec)?;
 
-            dl.data.push(DataBatch{ 
+            dl.data.push(LabeledEntry{ 
                 input: input,
                 expected: expected
             });
@@ -76,7 +76,7 @@ impl ProtobufDataLoader {
 }
 
 impl DataLoader for ProtobufDataLoader {
-    fn next(&self) -> &DataBatch {
+    fn next(&self) -> &LabeledEntry {
         assert!(self.data.len() > 0);
 
         let mut self_id = self.id.borrow_mut();
