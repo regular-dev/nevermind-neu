@@ -1,10 +1,16 @@
 mod sequential;
 mod model_helper;
+#[cfg(feature = "opencl")]
+mod sequential_ocl;
 
 use std::error::Error;
 use crate::{util::Batch, layers::AbstractLayer};
 
 pub use sequential::*;
+#[cfg(feature = "opencl")]
+pub use sequential_ocl::*;
+
+
 
 pub trait Model {
     fn feedforward(&mut self, train_data: Batch);

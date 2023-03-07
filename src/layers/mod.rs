@@ -16,3 +16,5 @@ pub use error_layer::*;
 pub use fc_layer::*;
 pub use input_data_layer::*;
 pub use softmax_loss_layer::*;
+#[cfg(feature = "opencl")]
+pub use abstract_layer_ocl::*;
