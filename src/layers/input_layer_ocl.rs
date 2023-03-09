@@ -8,7 +8,7 @@ use std::{collections::HashMap, error::Error};
 
 #[derive(Clone)]
 pub struct InputLayerOcl {
-    gpu_params: OclParams,
+    ocl_params: Option<OclParams>,
     size: usize,
     ocl_queue: Option<Queue>,
 }
@@ -16,7 +16,7 @@ pub struct InputLayerOcl {
 impl InputLayerOcl {
     pub fn new(size: usize) -> Self {
         Self {
-            gpu_params: OclParams::empty(),
+            ocl_params: None,
             size,
             ocl_queue: None,
         }
@@ -80,26 +80,28 @@ impl AbstractLayerOcl for InputLayerOcl {
             .build()
             .unwrap(); // TODO : handle unwrap
 
-        let mut inp_buf = self.gpu_params.output.borrow_mut();
+        let mut inp_buf = self.ocl_params.as_mut().unwrap().output.borrow_mut();
         *inp_buf = ocl_buf;
+        
+        drop(inp_buf);
 
-        Ok(vec![self.gpu_params.clone()])
+        Ok(vec![self.ocl_params.as_ref().unwrap().clone()])
     }
 
-    fn forward_ocl(&mut self, params: OclParams) -> LayerForwardResult {
+    fn forward_ocl(&mut self, params: OclParams) -> LayerOclResult {
         Err(LayerError::NotImpl)
     }
 
     fn backward_ocl(
         &mut self,
-        prev_input: OclParams,
-        next_input: OclParams,
-    ) -> LayerBackwardResult {
+        _prev_input: OclParams,
+        _next_input: OclParams,
+    ) -> LayerOclResult {
         Err(LayerError::NotImpl)
     }
 
     fn ocl_params(&self) -> Option<OclParams> {
-        Some(self.gpu_params.clone())
+        Some(self.ocl_params.as_ref().unwrap().clone())
     }
 
     fn copy_layer_ocl(&self) -> Box<dyn AbstractLayerOcl> {
@@ -114,7 +116,7 @@ impl AbstractLayerOcl for InputLayerOcl {
 impl Default for InputLayerOcl {
     fn default() -> Self {
         Self {
-            gpu_params: OclParams::empty(),
+            ocl_params: None,
             size: 0,
             ocl_queue: None
         }

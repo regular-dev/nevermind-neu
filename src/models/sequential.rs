@@ -81,6 +81,7 @@ impl Sequential {
         for (idx, l) in self.ls.iter_mut().enumerate() {
             if idx == 0 {
                 prev_size = l.size();
+                continue;
             }
 
             l.set_input_shape(&[prev_size]);

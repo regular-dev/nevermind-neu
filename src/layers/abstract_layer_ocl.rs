@@ -17,14 +17,14 @@ pub struct OclParams {
 }
 
 impl OclParams {
-    pub fn empty() -> Self {
-        Self {
-            output: Rc::new(RefCell::new(Buffer::builder().build().unwrap())),
-            ws: Rc::new(RefCell::new(Buffer::builder().build().unwrap())),
-            neu_grad: Rc::new(RefCell::new(Buffer::builder().build().unwrap())),
-            ws_grad: Rc::new(RefCell::new(Buffer::builder().build().unwrap())),
-        }
-    }
+    // pub fn empty() -> Self {
+    //     Self {
+    //         output: Rc::new(RefCell::new(Buffer::builder().build().unwrap())),
+    //         ws: Rc::new(RefCell::new(Buffer::builder().build().unwrap())),
+    //         neu_grad: Rc::new(RefCell::new(Buffer::builder().build().unwrap())),
+    //         ws_grad: Rc::new(RefCell::new(Buffer::builder().build().unwrap())),
+    //     }
+    // }
 }
 
 pub trait AbstractLayerOcl: AbstractLayer {
@@ -41,14 +41,14 @@ pub trait AbstractLayerOcl: AbstractLayer {
         Err(LayerError::NotImpl)
     }
 
-    fn forward_ocl(&mut self, params: OclParams) -> LayerForwardResult {
+    fn forward_ocl(&mut self, params: OclParams) -> LayerOclResult {
         Err(LayerError::NotImpl)
     }
     fn backward_ocl(
         &mut self,
         prev_input: OclParams,
         next_input: OclParams,
-    ) -> LayerBackwardResult {
+    ) -> LayerOclResult {
         Err(LayerError::NotImpl)
     }
 
@@ -62,11 +62,10 @@ pub trait AbstractLayerOcl: AbstractLayer {
 }
 
 pub fn init_ocl_params(
-    params: &mut OclParams,
     queue: Queue,
     self_size: usize,
     prev_shape: &[usize],
-) -> Result<(), Box<dyn Error>> {
+) -> Result<OclParams, Box<dyn Error>> {
     let output = Buffer::builder()
             .queue(queue.clone())
             .flags(MemFlags::new().read_write())
@@ -92,15 +91,12 @@ pub fn init_ocl_params(
             .copy_host_slice(ws_cpu_vals.as_slice().unwrap())
             .build()?;
 
-        let mut output_b = params.output.borrow_mut();
-        let mut neu_grad_b = params.neu_grad.borrow_mut();
-        let mut ws_b = params.ws.borrow_mut();
-        let mut ws_grad_b = params.ws_grad.borrow_mut();
+        let params = OclParams {
+            output: Rc::new(RefCell::new(output)),
+            ws: Rc::new(RefCell::new(ws)),
+            neu_grad: Rc::new(RefCell::new(neu_grad)),
+            ws_grad: Rc::new(RefCell::new(ws_grad))
+        };
 
-        *output_b = output;
-        *neu_grad_b = neu_grad;
-        *ws_b = ws;
-        *ws_grad_b = ws_grad;
-
-        Ok(())
+        Ok(params)
 }

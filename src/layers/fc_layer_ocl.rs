@@ -36,10 +36,10 @@ static FC_LAYER_KERNEL: &'static str = r#"
 //#[derive(Clone)]
 pub struct FcLayerOcl {
     cpu_params: LearnParams,
-    gpu_params: OclParams,
+    ocl_params: Option<OclParams>,
     size: usize,
 
-    ocl_kernel: Option<ocl::Kernel>,
+    ocl_kernel: Option<Kernel>,
     ocl_queue: Option<Queue>,
 }
 
@@ -47,7 +47,7 @@ impl FcLayerOcl {
     pub fn new(size: usize) -> Self {
         Self {
             cpu_params: LearnParams::empty(),
-            gpu_params: OclParams::empty(),
+            ocl_params: None,
             size,
             ocl_kernel: None,
             ocl_queue: None,
@@ -73,8 +73,8 @@ impl AbstractLayer for FcLayerOcl {
     fn set_input_shape(&mut self, sh: &[usize]) {
         let queue = self.ocl_queue.as_ref().unwrap();
         // buffer routine
-        init_ocl_params(&mut self.gpu_params, queue.clone(), self.size, sh)
-            .expect("Buffer create failure");
+        self.ocl_params = Some(init_ocl_params(queue.clone(), self.size, sh)
+            .expect("Buffer create failure"));
     }
 
     fn layer_cfg(&self) -> HashMap<String, Variant> {
@@ -112,6 +112,9 @@ impl AbstractLayerOcl for FcLayerOcl {
             .program(&program)
             .queue(queue.clone())
             .global_work_size(self.size)
+            .arg(None::<&Buffer<f32>>)
+            .arg(None::<&Buffer<f32>>)
+            .arg(None::<&Buffer<f32>>)
             .build()?;
 
         self.ocl_kernel = Some(kern);
@@ -120,7 +123,7 @@ impl AbstractLayerOcl for FcLayerOcl {
         Ok(())
     }
 
-    fn forward_ocl(&mut self, params: OclParams) -> LayerForwardResult {
+    fn forward_ocl(&mut self, params: OclParams) -> LayerOclResult {
         Err(LayerError::NotImpl)
     }
 
@@ -128,12 +131,12 @@ impl AbstractLayerOcl for FcLayerOcl {
         &mut self,
         prev_input: OclParams,
         next_input: OclParams,
-    ) -> LayerBackwardResult {
+    ) -> LayerOclResult {
         Err(LayerError::NotImpl)
     }
 
     fn ocl_params(&self) -> Option<OclParams> {
-        Some(self.gpu_params.clone())
+        Some(self.ocl_params.as_ref().unwrap().clone())
     }
 
     fn copy_layer_ocl(&self) -> Box<dyn AbstractLayerOcl> {
@@ -149,7 +152,7 @@ impl Default for FcLayerOcl {
     fn default() -> Self {
         Self {
             cpu_params: LearnParams::empty(),
-            gpu_params: OclParams::empty(),
+            ocl_params: None,
             size: 0,
             ocl_kernel: None,
             ocl_queue: None,
@@ -163,7 +166,7 @@ impl Clone for FcLayerOcl {
 
         Self {
             cpu_params: self.cpu_params.clone(),
-            gpu_params: self.gpu_params.clone(),
+            ocl_params: self.ocl_params.clone(),
             size: self.size,
             ocl_kernel: None,
             ocl_queue: Some(queue.clone()),

@@ -34,11 +34,6 @@ impl SequentialOcl {
 
         let kern_queue = Queue::new(&context, device, None)?;
 
-        // let program = Program::builder()
-        //     .devices(device)
-        //     .src(KERN_SRC)
-        //     .build(&context)?;
-
         Ok(Self {
             layers: Vec::new(),
             batch_size: 1,
@@ -64,6 +59,8 @@ impl SequentialOcl {
             mdl.add_layer(Box::new(FcLayerOcl::new(*i)));
         }
 
+        mdl.init_layers();
+
         mdl
     }
 
@@ -72,8 +69,24 @@ impl SequentialOcl {
         self.layers.push(l);
     }
 
-    pub fn init_ocl_kernels(&mut self) {
-        
+    pub fn init_layers(&mut self) {
+        let mut prev_size = 0;
+
+        for (idx, l) in self.layers.iter_mut().enumerate() {
+            if idx == 0 {
+                prev_size = l.size();
+                continue;
+            }
+
+            l.init_ocl(
+                &self.ocl_ctx,
+                self.ocl_ctx.devices().first().unwrap().clone(),
+                self.ocl_queue.clone(),
+            )
+            .expect("Init ocl failure");
+
+            l.set_input_shape(&[prev_size]);
+        }
     }
 }
 
