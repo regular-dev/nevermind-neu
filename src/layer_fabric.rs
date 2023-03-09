@@ -13,7 +13,7 @@ pub fn create_layer(
     cfg: Option<&HashMap<String, Variant>>,
 ) -> Option<Box<dyn AbstractLayer>> {
     match layer_type {
-        "ErrorLayer" => {
+        "EuclideanLossLayer" => {
             if let Some(cfg_val) = cfg {
                 let mut l: Box<dyn AbstractLayer>;
                 let activation = cfg_val.get("activation").unwrap();
@@ -23,11 +23,11 @@ pub fn create_layer(
                         l = Box::new(layers_macros::sigmoid_error_layer!());
                     } else if activation == "tanh" {
                         l = Box::new(layers_macros::tanh_error_layer!());
-                    } else { 
+                    } else {
                         l = Box::new(layers_macros::raw_error_layer!());
                     }
                 } else {
-                    l = Box::new(layers_macros::raw_error_layer!()); 
+                    l = Box::new(layers_macros::raw_error_layer!());
                 }
 
                 l.set_layer_cfg(cfg_val);
@@ -38,7 +38,7 @@ pub fn create_layer(
                 return Some(l);
             }
         }
-        "HiddenLayer" => {
+        "FcLayer" => {
             if let Some(cfg_val) = cfg {
                 let mut l: Box<dyn AbstractLayer>;
                 let activation = cfg_val.get("activation").unwrap(); // TODO : handle unwrap()
@@ -91,6 +91,38 @@ pub fn create_layer(
     }
 }
 
+#[cfg(feature = "opencl")]
+pub fn create_layer_ocl(
+    layer_type: &str,
+    cfg: Option<&HashMap<String, Variant>>,
+) -> Option<Box<dyn AbstractLayerOcl>> {
+    match layer_type {
+        "InputLayerOcl" => {
+            let mut l = Box::new(InputLayerOcl::default());
+            if let Some(cfg_val) = cfg {
+                l.set_layer_cfg(cfg_val);
+            }
+            return Some(l);
+        },
+        "FcLayerOcl" => {
+            let mut l = Box::new(FcLayerOcl::default());
+            if let Some(cfg_val) = cfg {
+                l.set_layer_cfg(cfg_val);
+            }
+            return Some(l);
+        },
+        "EuclideanLossLayerOcl" => {
+            let mut l = Box::new(EuclideanLossLayerOcl::default());
+            if let Some(cfg_val) = cfg {
+                l.set_layer_cfg(cfg_val);
+            }
+            return Some(l);
+        }
+
+        _ => {return None;}
+    }
+}
+
 pub mod layers_macros {
     macro_rules! sigmoid_fc_layer {
         (  ) => {{
@@ -124,22 +156,23 @@ pub mod layers_macros {
 
     macro_rules! sigmoid_error_layer {
         () => {
-            ErrorLayer::new(0, activation_macros::sigmoid_activation!())
+            EuclideanLossLayer::new(0, activation_macros::sigmoid_activation!())
         };
     }
 
     macro_rules! tanh_error_layer {
         () => {
-            ErrorLayer::new(0, activation_macros::tanh_activation!())
+            EuclideanLossLayer::new(0, activation_macros::tanh_activation!())
         };
     }
 
     macro_rules! raw_error_layer {
         () => {
-            ErrorLayer::new(0, activation_macros::raw_activation!())
+            EuclideanLossLayer::new(0, activation_macros::raw_activation!())
         };
     }
 
+    pub(crate) use leaky_relu_fc_layer;
     pub(crate) use raw_error_layer;
     pub(crate) use raw_rc_layer;
     pub(crate) use relu_fc_layer;
@@ -147,5 +180,4 @@ pub mod layers_macros {
     pub(crate) use sigmoid_fc_layer;
     pub(crate) use tanh_error_layer;
     pub(crate) use tanh_fc_layer;
-    pub(crate) use leaky_relu_fc_layer;
 }

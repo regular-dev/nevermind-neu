@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use std::fmt;
 
-use log::{debug, warn};
+use log::{debug, error};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -10,7 +10,7 @@ use std::slice::IterMut;
 
 use super::layer_fabric::*;
 use super::layers::AbstractLayer;
-use super::layers::ErrorLayer;
+use super::layers::EuclideanLossLayer;
 use super::layers::FcLayer;
 use super::layers::InputDataLayer;
 use super::util::Variant;
@@ -40,7 +40,7 @@ impl SequentialLayersStorage {
         let mut ls = SequentialLayersStorage::empty();
 
         if layers.len() < 3 {
-            eprintln!("Invalid layers length !!!");
+            error!("Invalid layers length !");
             return SequentialLayersStorage::empty();
         }
 
@@ -51,7 +51,7 @@ impl SequentialLayersStorage {
                 continue;
             }
             if idx == layers.len() - 1 {
-                let l = Box::new(ErrorLayer::new(
+                let l = Box::new(EuclideanLossLayer::new(
                     *val,
                     activation_macros::raw_activation!(),
                 ));
@@ -146,14 +146,14 @@ impl fmt::Display for SequentialLayersStorage {
 /// Helper class to easy ser/deserialize
 #[derive(Serialize, Deserialize)]
 pub struct SerdeLayerParam {
-    name: String,
-    params: HashMap<String, Variant>,
+    pub name: String,
+    pub params: HashMap<String, Variant>,
 }
 
 /// Helper class to easy ser/deserialize
 #[derive(Serialize, Deserialize, Default)]
 pub struct SerdeLayersStorage {
-    layers_cfg: Vec<SerdeLayerParam>,
+    pub layers_cfg: Vec<SerdeLayerParam>,
 }
 
 impl Serialize for SequentialLayersStorage {

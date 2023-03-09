@@ -175,19 +175,19 @@ fn create_layers(stdin: &io::Stdin) -> Result<Sequential, Box<dyn Error>> {
     let out_l_size: usize = read_from_stdin(stdin)?;
 
     if out_l_type == "raw" {
-        ls.add_layer(Box::new(ErrorLayer::new(
+        ls.add_layer(Box::new(EuclideanLossLayer::new(
             out_l_size,
             activation_macros::raw_activation!(),
         )));
     } else if out_l_type == "softmax_loss" {
         ls.add_layer(Box::new(SoftmaxLossLayer::new(out_l_size, prev_s)));
     } else if out_l_type == "sigmoid" {
-        ls.add_layer(Box::new(ErrorLayer::new(
+        ls.add_layer(Box::new(EuclideanLossLayer::new(
             out_l_size,
             activation_macros::sigmoid_activation!(),
         )));
     } else if out_l_type == "tanh" {
-        ls.add_layer(Box::new(ErrorLayer::new(
+        ls.add_layer(Box::new(EuclideanLossLayer::new(
             out_l_size,
             activation_macros::tanh_activation!(),
         )));

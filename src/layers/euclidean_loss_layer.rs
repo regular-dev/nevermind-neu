@@ -11,7 +11,7 @@ use crate::learn_params::{LearnParams, ParamsBlob};
 use crate::util::{Batch, DataVec, Variant};
 
 #[derive(Clone)]
-pub struct ErrorLayer<T: Fn(f32) -> f32 + Clone, TD: Fn(f32) -> f32 + Clone> {
+pub struct EuclideanLossLayer<T: Fn(f32) -> f32 + Clone, TD: Fn(f32) -> f32 + Clone> {
     pub size: usize,
     pub lr_params: LearnParams,
     pub l2_regul: f32,
@@ -19,7 +19,7 @@ pub struct ErrorLayer<T: Fn(f32) -> f32 + Clone, TD: Fn(f32) -> f32 + Clone> {
     pub activation: Activation<T, TD>,
 }
 
-impl<T, TD> AbstractLayer for ErrorLayer<T, TD>
+impl<T, TD> AbstractLayer for EuclideanLossLayer<T, TD>
 where
     T: Fn(f32) -> f32 + Sync + Clone + 'static,
     TD: Fn(f32) -> f32 + Sync + Clone + 'static,
@@ -117,7 +117,7 @@ where
     }
 
     fn layer_type(&self) -> &str {
-        "ErrorLayer"
+        "EuclideanLossLayer"
     }
 
     fn learn_params(&self) -> Option<LearnParams> {
@@ -181,7 +181,7 @@ where
     }
 
     fn copy_layer(&self) -> Box<dyn AbstractLayer> {
-        let mut copy_l = ErrorLayer::new(self.size, self.activation.clone());
+        let mut copy_l = EuclideanLossLayer::new(self.size, self.activation.clone());
         copy_l.set_learn_params(self.lr_params.copy());
         Box::new(copy_l)
     }
@@ -191,7 +191,7 @@ where
     }
 }
 
-impl<T, TD> ErrorLayer<T, TD>
+impl<T, TD> EuclideanLossLayer<T, TD>
 where
     T: Fn(f32) -> f32 + Clone,
     TD: Fn(f32) -> f32 + Clone,

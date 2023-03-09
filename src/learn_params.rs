@@ -30,7 +30,7 @@ impl LearnParams {
         Self {
             ws: Rc::new(RefCell::new(vec![WsMat::random(
                 (size, prev_size),
-                Uniform::new(-0.5, 0.5),
+                Uniform::new(-0.9, 0.9),
             )])),
             ws_grad: Rc::new(RefCell::new(vec![WsMat::zeros((size, prev_size))])),
             err_vals: Rc::new(RefCell::new(Batch::zeros((1, size)))),

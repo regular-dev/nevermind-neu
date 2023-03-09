@@ -2,19 +2,17 @@ use crate::layers::*;
 use crate::learn_params::LearnParams;
 use crate::util::*;
 
-use ndarray_rand::{rand_distr::Uniform, RandomExt};
+use ocl::{Context, Device, Kernel, Program, Queue};
 
-use ocl::{Buffer, Context, Device, Kernel, MemFlags, Program, Queue};
+use std::collections::HashMap;
 
-use std::{collections::HashMap, error::Error};
-
-static FC_LAYER_KERNEL: &'static str = r#"
+static EUCLIDEAN_LOSS_KERNEL: &'static str = r#"
     float sigmoid(float v) 
     {
         return 1.0 / (1.0 + exp(-v)); 
     }
 
-    __kernel void fc_layer_product(
+    __kernel void euclidean_loss(
                 __global const float *x,
                 __global const float *ws,
                 __global float *y)
@@ -33,31 +31,29 @@ static FC_LAYER_KERNEL: &'static str = r#"
     }
 "#;
 
-//#[derive(Clone)]
-pub struct FcLayerOcl {
+pub struct EuclideanLossLayerOcl {
     cpu_params: LearnParams,
     gpu_params: OclParams,
     size: usize,
-
-    ocl_kernel: Option<ocl::Kernel>,
     ocl_queue: Option<Queue>,
+    ocl_kernel: Option<Kernel>,
 }
 
-impl FcLayerOcl {
+impl EuclideanLossLayerOcl {
     pub fn new(size: usize) -> Self {
         Self {
             cpu_params: LearnParams::empty(),
             gpu_params: OclParams::empty(),
             size,
-            ocl_kernel: None,
             ocl_queue: None,
+            ocl_kernel: None,
         }
     }
 }
 
-impl AbstractLayer for FcLayerOcl {
+impl AbstractLayer for EuclideanLossLayerOcl {
     fn layer_type(&self) -> &str {
-        "FcLayerOcl"
+        "EuclideanLossLayerOcl"
     }
 
     fn size(&self) -> usize {
@@ -95,27 +91,27 @@ impl AbstractLayer for FcLayerOcl {
     }
 }
 
-impl AbstractLayerOcl for FcLayerOcl {
+impl AbstractLayerOcl for EuclideanLossLayerOcl {
     fn init_ocl(
         &mut self,
         ocl_ctx: &Context,
         device: Device,
         queue: Queue,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let program = Program::builder()
             .devices(device)
-            .src(FC_LAYER_KERNEL)
+            .src(EUCLIDEAN_LOSS_KERNEL)
             .build(&ocl_ctx)?;
 
         let kern = Kernel::builder()
-            .name("fc_layer_product")
+            .name("euclidean_loss")
             .program(&program)
             .queue(queue.clone())
             .global_work_size(self.size)
             .build()?;
 
-        self.ocl_kernel = Some(kern);
         self.ocl_queue = Some(queue);
+        self.ocl_kernel = Some(kern);
 
         Ok(())
     }
@@ -145,19 +141,19 @@ impl AbstractLayerOcl for FcLayerOcl {
     }
 }
 
-impl Default for FcLayerOcl {
+impl Default for EuclideanLossLayerOcl {
     fn default() -> Self {
         Self {
             cpu_params: LearnParams::empty(),
             gpu_params: OclParams::empty(),
             size: 0,
-            ocl_kernel: None,
             ocl_queue: None,
+            ocl_kernel: None,
         }
     }
 }
 
-impl Clone for FcLayerOcl {
+impl Clone for EuclideanLossLayerOcl {
     fn clone(&self) -> Self {
         let queue = self.ocl_queue.as_ref().unwrap();
 
