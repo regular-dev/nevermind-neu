@@ -75,6 +75,11 @@ impl SequentialOcl {
         for (idx, l) in self.layers.iter_mut().enumerate() {
             if idx == 0 {
                 prev_size = l.size();
+                l.init_ocl(
+                    &self.ocl_ctx,
+                    self.ocl_ctx.devices().first().unwrap().clone(),
+                    self.ocl_queue.clone(),
+                ).expect("Input layer init ocl failure");
                 continue;
             }
 
@@ -91,7 +96,37 @@ impl SequentialOcl {
 }
 
 impl Model for SequentialOcl {
-    fn feedforward(&mut self, train_data: Batch) {}
+    fn feedforward(&mut self, train_data: Batch) {
+        let mut out = None;
+
+        // for the first(input) layer
+        {
+            let l_first = self.layers.first_mut().unwrap();
+            let result_out = l_first.forward_input_ocl(train_data);
+
+            match result_out {
+                Err(_reason) => {
+                    return;
+                }
+                Ok(val) => {
+                    out = Some(val);
+                }
+            }
+        }
+
+        for l in self.layers.iter_mut().skip(1) {
+            let result_out = l.forward_ocl(out.unwrap());
+
+            match result_out {
+                Err(_reason) => {
+                    return;
+                }
+                Ok(val) => {
+                    out = Some(val);
+                }
+            };
+        }
+    }
 
     fn backpropagate(&mut self, expected: Batch) {}
 
@@ -101,6 +136,10 @@ impl Model for SequentialOcl {
 
     fn set_batch_size(&mut self, batch_size: usize) {
         self.batch_size = batch_size;
+
+        for l in self.layers.iter_mut() {
+            l.set_batch_size(self.batch_size);
+        }
     }
 
     fn set_batch_size_for_tests(&mut self, batch_size: usize) {}

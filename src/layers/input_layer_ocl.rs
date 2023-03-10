@@ -1,5 +1,7 @@
 use ocl::{Buffer, Context, Device, MemFlags, Queue};
 
+use log::debug;
+
 use crate::layers::*;
 use crate::learn_params::LearnParams;
 use crate::util::*;
@@ -10,6 +12,7 @@ use std::{collections::HashMap, error::Error};
 pub struct InputLayerOcl {
     ocl_params: Option<OclParams>,
     size: usize,
+    batch_size: usize,
     ocl_queue: Option<Queue>,
 }
 
@@ -18,6 +21,7 @@ impl InputLayerOcl {
         Self {
             ocl_params: None,
             size,
+            batch_size: 1,
             ocl_queue: None,
         }
     }
@@ -30,6 +34,10 @@ impl AbstractLayer for InputLayerOcl {
 
     fn size(&self) -> usize {
         self.size
+    }
+
+    fn set_batch_size(&mut self, batch_size: usize) {
+        self.batch_size = batch_size;
     }
 
     fn learn_params(&self) -> Option<LearnParams> {
@@ -72,23 +80,25 @@ impl AbstractLayerOcl for InputLayerOcl {
     fn forward_input_ocl(&mut self, input_data: Batch) -> LayerOclResult {
         let ocl_queue = self.ocl_queue.as_ref().unwrap();
 
+        debug!("len : {} , input_Data : {}", self.size * self.batch_size, input_data.len());
+
         let ocl_buf = Buffer::builder()
             .queue(ocl_queue.clone())
             .flags(MemFlags::new().read_write())
-            .len(self.size)
+            .len(self.size * self.batch_size)
             .copy_host_slice(input_data.as_slice().unwrap())
             .build()
             .unwrap(); // TODO : handle unwrap
 
-        let mut inp_buf = self.ocl_params.as_mut().unwrap().output.borrow_mut();
-        *inp_buf = ocl_buf;
-        
-        drop(inp_buf);
+        // let mut inp_buf = self.ocl_params.as_mut().unwrap().output.borrow_mut();
+        // *inp_buf = ocl_buf;
+
+        self.ocl_params = Some(OclParams::only_output(ocl_buf, ocl_queue.clone()));
 
         Ok(vec![self.ocl_params.as_ref().unwrap().clone()])
     }
 
-    fn forward_ocl(&mut self, params: OclParams) -> LayerOclResult {
+    fn forward_ocl(&mut self, params: OclParamsBlob) -> LayerOclResult {
         Err(LayerError::NotImpl)
     }
 
@@ -118,6 +128,7 @@ impl Default for InputLayerOcl {
         Self {
             ocl_params: None,
             size: 0,
+            batch_size: 1,
             ocl_queue: None
         }
     }

@@ -70,9 +70,8 @@ impl SequentialLayersStorage {
     }
 
     pub fn fit_to_batch_size(&mut self, batch_size: usize) {
-        for i in &self.layers {
-            let mut lr = i.learn_params().unwrap();
-            lr.fit_to_batch_size(batch_size);
+        for i in self.layers.iter_mut() {
+            i.set_batch_size(batch_size);
         }
     }
 

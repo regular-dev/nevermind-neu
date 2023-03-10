@@ -38,6 +38,11 @@ pub trait AbstractLayer {
 
     fn size(&self) -> usize;
 
+    fn set_batch_size(&mut self, batch_size: usize) {
+        let mut lr = self.learn_params().unwrap();
+        lr.fit_to_batch_size(batch_size);
+    }
+
     fn learn_params(&self) -> Option<LearnParams>;
     fn set_learn_params(&mut self, lp: LearnParams);
 
