@@ -74,6 +74,22 @@ static FC_LAYER_KERNEL_BWD: &'static str = r#"
        
         neu_grad[idx] = sigmoid_deriv(self_out[idx]) * sum;
 
+        if (idx >= self_shape) {
+            return;
+        }
+
+        for (int i = 0; i < self_shape; ++i) {
+            for (int j = 0; j < prev_shape; ++j) {
+                __private float grad_avg = 0.0;
+
+                for (int g = 0; g < global_work_size(); ++g) {
+                    if (g % )
+                }
+
+                ws_grad[i * prev_shape + j] = 
+            }
+        }
+
         // TODO ...
     }
 "#;
@@ -209,7 +225,7 @@ impl AbstractLayerOcl for FcLayerOcl {
         let self_ws = self.ocl_params.as_ref().unwrap().ws.borrow();
         let self_output = self.ocl_params.as_ref().unwrap().output.borrow();
 
-        let self_kern = self.ocl_kernel.as_mut().unwrap();
+        let self_kern = self.ocl_kernel.as_ref().unwrap();
 
         self_kern
             .set_arg("in", &*prev_output)
@@ -222,7 +238,7 @@ impl AbstractLayerOcl for FcLayerOcl {
             .expect("[fc_ocl] Setting param OUT failure");
 
         unsafe {
-            self_kern.enq().expect("[fc_ocl] Enqueue failure");
+            self_kern.enq().expect("[fc_ocl] Enqueue kernel failure");
         }
 
         let mut out_vec = vec![0.0; self.size * self.batch_size];
@@ -247,7 +263,7 @@ impl AbstractLayerOcl for FcLayerOcl {
         Ok(vec![self.ocl_params.as_ref().unwrap().clone()])
     }
 
-    fn backward_ocl(&mut self, prev_input: OclParams, next_input: OclParams) -> LayerOclResult {
+    fn backward_ocl(&mut self, prev_input: OclParamsBlob, next_input: OclParams) -> LayerOclResult {
         Err(LayerError::NotImpl)
     }
 

@@ -51,11 +51,13 @@ pub trait AbstractLayerOcl: AbstractLayer {
     fn forward_input_ocl(&mut self, input_data: Batch) -> LayerOclResult {
         Err(LayerError::NotImpl)
     }
-
     fn forward_ocl(&mut self, params: OclParamsBlob) -> LayerOclResult {
         Err(LayerError::NotImpl)
     }
-    fn backward_ocl(&mut self, prev_input: OclParams, next_input: OclParams) -> LayerOclResult {
+    fn backward_ocl(&mut self, prev_input: OclParamsBlob, next_input: OclParams) -> LayerOclResult {
+        Err(LayerError::NotImpl)
+    }
+    fn backward_output_ocl(&mut self, prev_input: OclParamsBlob, expected: Batch) -> LayerOclResult {
         Err(LayerError::NotImpl)
     }
 
@@ -119,20 +121,12 @@ pub fn fit_to_batch_size_ocl(
         .flags(MemFlags::new().read_write())
         .len(self_size * batch_size)
         .build()?;
-    let neu_grad = Buffer::builder()
-        .queue(queue.clone())
-        .flags(MemFlags::new().read_write())
-        .len(self_size * batch_size)
-        .build()?;
 
     let mut output_b = params.output.borrow_mut();
-    let mut neu_grad_b = params.neu_grad.borrow_mut();
 
     *output_b = output;
-    *neu_grad_b = neu_grad;
 
     drop(output_b);
-    drop(neu_grad_b);
 
     Ok(params)
 }

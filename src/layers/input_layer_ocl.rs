@@ -88,7 +88,7 @@ impl AbstractLayerOcl for InputLayerOcl {
             .len(self.size * self.batch_size)
             .copy_host_slice(input_data.as_slice().unwrap())
             .build()
-            .unwrap(); // TODO : handle unwrap
+            .expect("[inp_ocl] Couldn't create "); // TODO : handle unwrap
 
         // let mut inp_buf = self.ocl_params.as_mut().unwrap().output.borrow_mut();
         // *inp_buf = ocl_buf;
@@ -99,14 +99,6 @@ impl AbstractLayerOcl for InputLayerOcl {
     }
 
     fn forward_ocl(&mut self, params: OclParamsBlob) -> LayerOclResult {
-        Err(LayerError::NotImpl)
-    }
-
-    fn backward_ocl(
-        &mut self,
-        _prev_input: OclParams,
-        _next_input: OclParams,
-    ) -> LayerOclResult {
         Err(LayerError::NotImpl)
     }
 
