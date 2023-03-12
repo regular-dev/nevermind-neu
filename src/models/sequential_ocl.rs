@@ -79,7 +79,8 @@ impl SequentialOcl {
                     &self.ocl_ctx,
                     self.ocl_ctx.devices().first().unwrap().clone(),
                     self.ocl_queue.clone(),
-                ).expect("Input layer init ocl failure");
+                )
+                .expect("Input layer init ocl failure");
                 continue;
             }
 
@@ -91,6 +92,8 @@ impl SequentialOcl {
             .expect("Init ocl failure");
 
             l.set_input_shape(&[prev_size]);
+
+            prev_size = l.size();
         }
     }
 }
@@ -128,7 +131,51 @@ impl Model for SequentialOcl {
         }
     }
 
-    fn backpropagate(&mut self, expected: Batch) {}
+    fn backpropagate(&mut self, expected: Batch) {
+        let mut out = None;
+
+        // for the last layer
+        {
+            let prev_out = self.layers[self.layers.len() - 2].ocl_params();
+
+            let last_layer_idx = self.layers.len() - 1;
+
+            let result_out =
+                self.layers[last_layer_idx].backward_output_ocl(vec![prev_out.unwrap()], expected);
+
+            match result_out {
+                Err(_reason) => {
+                    return;
+                }
+                Ok(val) => {
+                    out = Some(val);
+                }
+            }
+        }
+
+        for idx in 1..self.layers.len() {
+            if idx == self.layers.len() - 1 {
+                continue;
+            }
+
+            let prev_out = self.layers[self.layers.len() - 2 - idx].ocl_params();
+            let next_out = self.layers[self.layers.len() - idx].ocl_params();
+
+            let layer_idx = self.layers.len() - 1 - idx;
+
+            let result_out = self.layers[layer_idx]
+                .backward_ocl(vec![prev_out.unwrap()], vec![next_out.unwrap()]);
+
+            match result_out {
+                Err(_reason) => {
+                    return;
+                }
+                Ok(val) => {
+                    out = Some(val);
+                }
+            }
+        }
+    }
 
     fn batch_size(&self) -> usize {
         self.batch_size

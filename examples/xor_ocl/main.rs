@@ -50,6 +50,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //  net.save_network_cfg("network.cfg")?;
     let t_data = dataloader.next_batch(4);
     seq_mdl.feedforward(t_data.input);
+    seq_mdl.backpropagate(t_data.output);
 
     return Ok(());
 

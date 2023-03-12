@@ -54,7 +54,7 @@ pub trait AbstractLayerOcl: AbstractLayer {
     fn forward_ocl(&mut self, params: OclParamsBlob) -> LayerOclResult {
         Err(LayerError::NotImpl)
     }
-    fn backward_ocl(&mut self, prev_input: OclParamsBlob, next_input: OclParams) -> LayerOclResult {
+    fn backward_ocl(&mut self, prev_input: OclParamsBlob, next_input: OclParamsBlob) -> LayerOclResult {
         Err(LayerError::NotImpl)
     }
     fn backward_output_ocl(&mut self, prev_input: OclParamsBlob, expected: Batch) -> LayerOclResult {

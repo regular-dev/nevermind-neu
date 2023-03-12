@@ -64,9 +64,7 @@ static EUCLIDEAN_LOSS_KERNEL_BWD: &'static str = r#"
             avg_err += labels[inner_idx] - self_out[inner_idx];
         }
 
-        avg_err = avg_err / batch_size;
-
-        neu_grad[idx] = avg_err;
+        neu_grad[idx] = avg_err / batch_size;
             
         for (int i = 0; i < prev_shape; ++i) {
             ws_grad[idx * prev_shape + i] = neu_grad[idx] * prev_out[i];
@@ -120,6 +118,11 @@ impl AbstractLayer for EuclideanLossLayerOcl {
             .unwrap()
             .set_arg("batch_size", batch_size as i32)
             .expect("[euc_ocl] Failed to set batch_size arg");
+        self.ocl_kernel_grad
+            .as_mut()
+            .unwrap()
+            .set_arg("batch_size", batch_size as i32)
+            .expect("[euc_ocl] Failed to set batch_size arg");
 
         self.ocl_params = Some(
             fit_to_batch_size_ocl(
@@ -141,7 +144,11 @@ impl AbstractLayer for EuclideanLossLayerOcl {
     fn set_input_shape(&mut self, sh: &[usize]) {
         let kern = self.ocl_kernel.as_mut().unwrap();
         kern.set_arg("prev_shape", sh[0] as i32)
-            .expect("[euc_loss] Failed to set prev_shape arg");
+            .expect("[euc_ocl] Failed to set prev_shape arg");
+
+        let kern_grad = self.ocl_kernel_grad.as_mut().unwrap();
+        kern_grad.set_arg("prev_shape", sh[0] as i32)
+            .expect("[euc_ocl] Failed to set prev_shape arg");
 
         let queue = self.ocl_queue.as_ref().unwrap();
         // buffer routine
@@ -201,7 +208,7 @@ impl AbstractLayerOcl for EuclideanLossLayerOcl {
             .program(&program_grad)
             .queue(queue.clone())
             .global_work_size(self.size())
-            .arg_named("batch_size", 0 as i32)
+            .arg_named("batch_size", self.batch_size as i32)
             .arg_named("prev_shape", 0 as i32)
             .arg_named("self_shape", self.size as i32)
             .arg_named("self_out", None::<&Buffer<f32>>)
@@ -237,7 +244,9 @@ impl AbstractLayerOcl for EuclideanLossLayerOcl {
             .expect("[euc_ocl] Setting param OUT failure");
 
         unsafe {
-            self_kern.enq().expect("[fc_ocl] Enqueue failure");
+            self_kern
+                .enq()
+                .expect("[euc_ocl] Enqueue forward kernel failure");
         }
 
         debug!("[euc_ocl] forward");
@@ -295,8 +304,19 @@ impl AbstractLayerOcl for EuclideanLossLayerOcl {
             .expect("[euc_ocl] Setting param WS_GRAD failure");
 
         unsafe {
-            self_kern.enq().expect("[euc_ocl] Enqueue kernel failure");
+            self_kern
+                .enq()
+                .expect("[euc_ocl] Enqueue backward kernel failure");
         }
+
+        let mut neu_grad_vec = vec![0.0; self.size];
+        self_neu_grad.read(&mut neu_grad_vec).enq().unwrap();
+
+        println!("==EUC_OCL_GRAD====");
+        for i in neu_grad_vec.iter() {
+            print!("{:.2} ", i);
+        }
+        println!("======");
 
         Ok(vec![self.ocl_params.as_ref().unwrap().clone()])
     }
