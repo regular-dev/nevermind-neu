@@ -1,5 +1,7 @@
 use std::{cell::RefCell, error::Error, rc::Rc};
 
+use uuid::Uuid;
+
 use ndarray_rand::{rand_distr::Uniform, RandomExt};
 use ocl::{Buffer, Context, Device, MemFlags, ProQue, Queue};
 
@@ -14,6 +16,7 @@ pub struct OclParams {
     pub ws: Rc<RefCell<Buffer<Num>>>,
     pub neu_grad: Rc<RefCell<Buffer<Num>>>,
     pub ws_grad: Rc<RefCell<Buffer<Num>>>,
+    pub uuid: Uuid,
 }
 
 impl OclParams {
@@ -31,7 +34,8 @@ impl OclParams {
             output: Rc::new(RefCell::new(buf)),
             ws: Rc::new(RefCell::new(Buffer::builder().queue(queue.clone()).len(1).build().unwrap())),
             neu_grad: Rc::new(RefCell::new(Buffer::builder().queue(queue.clone()).len(1).build().unwrap())),
-            ws_grad: Rc::new(RefCell::new(Buffer::builder().queue(queue).len(1).build().unwrap()))           
+            ws_grad: Rc::new(RefCell::new(Buffer::builder().queue(queue).len(1).build().unwrap())),
+            uuid: Uuid::new_v4(),
         }
     }
 }
@@ -105,6 +109,7 @@ pub fn init_ocl_params(
         ws: Rc::new(RefCell::new(ws)),
         neu_grad: Rc::new(RefCell::new(neu_grad)),
         ws_grad: Rc::new(RefCell::new(ws_grad)),
+        uuid: Uuid::new_v4(),
     };
 
     Ok(params)

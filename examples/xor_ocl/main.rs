@@ -36,11 +36,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //let mut solver_rms = SolverRMS::from_file("network.cfg")?;
     // solver_rms.load_state("solver_state.proto")?;
 
-    let net_cfg = vec![2, 5, 1];
+    let net_cfg = vec![2, 10, 1];
     let mut seq_mdl = SequentialOcl::new_simple(&net_cfg);
-    seq_mdl.set_batch_size(4);
+    seq_mdl.set_batch_size(1);
 
-    let opt = Box::new(OptimizerRMS::new(1e-2, 0.8));
+    let mut opt = Box::new(OptimizerOclSgd::new(seq_mdl.queue()));
 
     //let mut net = Network::new(seq_mdl).test_batch_num(4);
 
@@ -48,9 +48,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //net.set_train_dataset(dataloader);
 
     //  net.save_network_cfg("network.cfg")?;
-    let t_data = dataloader.next_batch(4);
-    seq_mdl.feedforward(t_data.input);
-    seq_mdl.backpropagate(t_data.output);
+    for _ in 0..120000 {
+      let t_data = dataloader.next_batch(1);
+      seq_mdl.feedforward(t_data.input);
+      seq_mdl.backpropagate(t_data.output);
+      seq_mdl.optimize(&mut opt);
+    }
 
     return Ok(());
 

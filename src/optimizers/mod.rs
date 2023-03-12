@@ -3,6 +3,9 @@ mod optim_adagrad;
 mod optim_rms;
 mod optim_adam;
 
+#[cfg(feature = "opencl")]
+mod optim_ocl_sgd;
+
 mod optim_creator;
 
 use std::collections::HashMap;
@@ -12,6 +15,7 @@ pub use optim_adagrad::*;
 pub use optim_adam::*;
 pub use optim_sgd::*;
 pub use optim_creator::*;
+pub use optim_ocl_sgd::*;
 
 use crate::learn_params::LearnParams;
 use crate::util::*;

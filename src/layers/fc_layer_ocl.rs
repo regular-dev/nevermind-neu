@@ -4,9 +4,6 @@ use crate::util::*;
 
 use log::debug;
 
-use ndarray_rand::{rand_distr::Uniform, RandomExt};
-
-use ocl::core::Int;
 use ocl::{Buffer, Context, Device, Kernel, MemFlags, Program, Queue};
 
 use std::{collections::HashMap, error::Error};

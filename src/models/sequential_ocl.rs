@@ -1,5 +1,6 @@
 use crate::layers::*;
 use crate::models::*;
+use crate::optimizers::*;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -95,6 +96,16 @@ impl SequentialOcl {
 
             prev_size = l.size();
         }
+    }
+
+    pub fn optimize(&mut self, opt: &mut OptimizerOclSgd) {
+        for l in self.layers.iter_mut() {
+            opt.optimize(l.ocl_params().unwrap());
+        }
+    }
+
+    pub fn queue(&self) -> Queue {
+        self.ocl_queue.clone()
     }
 }
 
