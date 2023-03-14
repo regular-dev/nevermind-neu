@@ -5,6 +5,8 @@ mod optim_adam;
 
 #[cfg(feature = "opencl")]
 mod optim_ocl_sgd;
+#[cfg(feature = "opencl")]
+mod optim_ocl_rms;
 
 mod optim_creator;
 
@@ -15,7 +17,10 @@ pub use optim_adagrad::*;
 pub use optim_adam::*;
 pub use optim_sgd::*;
 pub use optim_creator::*;
+#[cfg(feature = "opencl")]
 pub use optim_ocl_sgd::*;
+#[cfg(feature = "opencl")]
+pub use optim_ocl_rms::*;
 
 use crate::learn_params::LearnParams;
 use crate::util::*;
