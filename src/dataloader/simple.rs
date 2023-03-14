@@ -43,7 +43,7 @@ impl DataLoader for SimpleDataLoader {
 impl SimpleDataLoader {
     pub fn new(data: Vec<LabeledEntry>) -> Self {
         Self {
-            id: RefCell::new(1),
+            id: RefCell::new(0),
             data,
         }
     }
