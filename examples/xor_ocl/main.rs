@@ -1,14 +1,10 @@
-use std::fs::File;
-
-use log::{info, LevelFilter, SetLoggerError};
+use log::info;
 
 use std::time::Instant;
 
-use log4rs::config::{Appender, Config, Root};
-
-use ndarray::array;
-
 use env_logger::Env;
+
+use ndarray_rand::rand::thread_rng;
 
 use nevermind_neu::dataloader::*;
 use nevermind_neu::network::*;
@@ -31,16 +27,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     dataset_train.push(LabeledEntry::new(vec![1.0, 0.0], vec![1.0]));
     dataset_train.push(LabeledEntry::new(vec![1.0, 1.0], vec![0.0]));
 
-    let dataloader = Box::new(SimpleDataLoader::new(dataset_train));
+    let mut dataloader = Box::new(SimpleDataLoader::new(dataset_train));
 
     //let mut solver_rms = SolverRMS::from_file("network.cfg")?;
     // solver_rms.load_state("solver_state.proto")?;
 
     let net_cfg = vec![2, 10, 1];
     let mut seq_mdl = SequentialOcl::new_simple(&net_cfg);
-    seq_mdl.set_batch_size(1);
+    seq_mdl.set_batch_size(4);
 
-    let mut opt = Box::new(OptimizerOclSgd::new(seq_mdl.queue()));
+    let mut opt = Box::new(OptimizerOclRms::new(seq_mdl.queue()));
 
     //let mut net = Network::new(seq_mdl).test_batch_num(4);
 
@@ -48,8 +44,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //net.set_train_dataset(dataloader);
 
     //  net.save_network_cfg("network.cfg")?;
-    for _ in 0..120000 {
-      let t_data = dataloader.next_batch(1);
+    for _ in 0..1500 {
+      let t_data = dataloader.next_batch(4);
       seq_mdl.feedforward(t_data.input);
       seq_mdl.backpropagate(t_data.output);
       seq_mdl.optimize(&mut opt);
