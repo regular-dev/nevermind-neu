@@ -29,7 +29,7 @@ static EUCLIDEAN_LOSS_KERNEL_FWD: &'static str = r#"
 
         __private float sum = 0.0;
 
-        for (__private int j = 0; j < prev_shape; ++j) {
+        for (int j = 0; j < prev_shape; ++j) {
             sum += ws[real_idx * prev_shape + j] * in[j + prev_shape * batch_idx];
         }
             
@@ -54,20 +54,22 @@ static EUCLIDEAN_LOSS_KERNEL_BWD: &'static str = r#"
                 __global float *ws_grad)
     {
         uint const idx = get_global_id(0);
-        __private uint const real_idx = idx % self_shape;
-        __private uint const batch_idx = idx / self_shape;
-
-        __private float avg_err = 0.0;
 
         for (int i = 0; i < batch_size; ++i) {
-            int inner_idx = i * self_shape + real_idx;
-            avg_err += labels[inner_idx] - self_out[inner_idx];
+            __private int inner_idx = i * self_shape + idx;
+            neu_grad[inner_idx] = labels[inner_idx] - self_out[inner_idx];
         }
-
-        neu_grad[idx] = avg_err / batch_size;
             
         for (int i = 0; i < prev_shape; ++i) {
-            ws_grad[idx * prev_shape + i] = neu_grad[idx] * prev_out[i];
+            __private float avg_grad = 0.0;
+
+            for (int j = 0; j < batch_size; ++j) {
+                avg_grad += neu_grad[j * self_shape + idx] * prev_out[j * prev_shape + i];
+            }
+
+            avg_grad = avg_grad / batch_size;
+
+            ws_grad[idx * prev_shape + i] = avg_grad;
         }
     }
 "#;
@@ -207,7 +209,7 @@ impl AbstractLayerOcl for EuclideanLossLayerOcl {
             .name("euclidean_loss_grad")
             .program(&program_grad)
             .queue(queue.clone())
-            .global_work_size(self.size())
+            .global_work_size(self.size)
             .arg_named("batch_size", self.batch_size as i32)
             .arg_named("prev_shape", 0 as i32)
             .arg_named("self_shape", self.size as i32)
@@ -275,7 +277,7 @@ impl AbstractLayerOcl for EuclideanLossLayerOcl {
         let lbl_buf = Buffer::builder()
             .queue(ocl_queue.clone())
             .flags(MemFlags::new().read_only())
-            .len(self.size * self.batch_size)
+            .len(expected.len())
             .copy_host_slice(expected.as_slice().unwrap())
             .build()
             .expect("[euc_ocl] Couldn't create label buffer");
@@ -308,15 +310,6 @@ impl AbstractLayerOcl for EuclideanLossLayerOcl {
                 .enq()
                 .expect("[euc_ocl] Enqueue backward kernel failure");
         }
-
-        let mut neu_grad_vec = vec![0.0; self.size];
-        self_neu_grad.read(&mut neu_grad_vec).enq().unwrap();
-
-        println!("==EUC_OCL_GRAD====");
-        for i in neu_grad_vec.iter() {
-            print!("{:.2} ", i);
-        }
-        println!("======");
 
         Ok(vec![self.ocl_params.as_ref().unwrap().clone()])
     }

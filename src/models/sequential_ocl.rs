@@ -98,8 +98,8 @@ impl SequentialOcl {
         }
     }
 
-    pub fn optimize(&mut self, opt: &mut OptimizerOclSgd) {
-        for l in self.layers.iter_mut() {
+    pub fn optimize(&mut self, opt: &mut OptimizerOclRms) {
+        for l in self.layers.iter_mut().skip(1) {
             opt.optimize(l.ocl_params().unwrap());
         }
     }
@@ -145,11 +145,13 @@ impl Model for SequentialOcl {
     fn backpropagate(&mut self, expected: Batch) {
         let mut out = None;
 
+        let layers_len = self.layers.len();
+
         // for the last layer
         {
-            let prev_out = self.layers[self.layers.len() - 2].ocl_params();
+            let prev_out = self.layers[layers_len - 2].ocl_params();
 
-            let last_layer_idx = self.layers.len() - 1;
+            let last_layer_idx = layers_len - 1;
 
             let result_out =
                 self.layers[last_layer_idx].backward_output_ocl(vec![prev_out.unwrap()], expected);
@@ -164,15 +166,15 @@ impl Model for SequentialOcl {
             }
         }
 
-        for idx in 1..self.layers.len() {
-            if idx == self.layers.len() - 1 {
+        for idx in 1..layers_len {
+            if idx == layers_len - 1 {
                 continue;
             }
 
-            let prev_out = self.layers[self.layers.len() - 2 - idx].ocl_params();
-            let next_out = self.layers[self.layers.len() - idx].ocl_params();
+            let prev_out = self.layers[layers_len - 2 - idx].ocl_params();
+            let next_out = self.layers[layers_len - idx].ocl_params();
 
-            let layer_idx = self.layers.len() - 1 - idx;
+            let layer_idx = layers_len - 1 - idx;
 
             let result_out = self.layers[layer_idx]
                 .backward_ocl(vec![prev_out.unwrap()], vec![next_out.unwrap()]);

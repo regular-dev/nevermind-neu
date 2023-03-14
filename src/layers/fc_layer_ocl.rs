@@ -28,7 +28,7 @@ static FC_LAYER_KERNEL_FWD: &'static str = r#"
 
         __private float sum = 0.0;
 
-        for (__private int j = 0; j < prev_shape; ++j) {
+        for (int j = 0; j < prev_shape; ++j) {
             sum += ws[real_idx * prev_shape + j] * in[j + prev_shape * batch_idx];
         }
             
@@ -61,24 +61,26 @@ static FC_LAYER_KERNEL_BWD: &'static str = r#"
     {
         uint const idx = get_global_id(0);
 
-        __private float sum_err = 0.0;
-
-        for (int i = 0; i < next_shape; ++i) {
-            sum_err += next_ws[self_shape * i + idx] * next_grad[i];
-        }
-
-        __private float avg_out = 0.0;
-
         for (int i = 0; i < batch_size; ++i) {
-            avg_out += self_out[i * self_shape + idx];
+            __private float sum_err = 0.0;
+
+            for (int j = 0; j < next_shape; ++j) {
+                sum_err += next_grad[i * next_shape + j] * next_ws[self_shape * j + idx];
+            }
+
+            neu_grad[i * self_shape + idx] = sum_err * sigmoid_deriv(self_out[i * self_shape + idx]);
         }
-
-        avg_out = avg_out / batch_size;
-
-        neu_grad[idx] = sum_err * sigmoid_deriv(avg_out);
 
         for (int i = 0; i < prev_shape; ++i) {
-            ws_grad[prev_shape * idx + i] = neu_grad[idx] * prev_out[i];
+            __private float avg_grad = 0.0;
+
+            for (int j = 0; j < batch_size; ++j) {
+                avg_grad += neu_grad[j * self_shape + idx] * prev_out[j * prev_shape + i];
+            }
+
+            avg_grad = avg_grad / batch_size;
+
+            ws_grad[idx * prev_shape + i] = avg_grad;
         }
     }
 "#;
@@ -274,14 +276,6 @@ impl AbstractLayerOcl for FcLayerOcl {
             .expect("Failed to read test data");
         prev_output.read(&mut in_vec).enq().unwrap();
 
-        for i in out_vec.iter() {
-            print!("{:.2} ", i);
-        }
-        println!("===");
-        for i in in_vec.iter() {
-            print!("{:.2} ", i);
-        }
-
         debug!("[fc_ocl] forward");
 
         Ok(vec![self.ocl_params.as_ref().unwrap().clone()])
@@ -298,7 +292,7 @@ impl AbstractLayerOcl for FcLayerOcl {
         let prev_out = prev_input.first().unwrap().output.borrow();
         let next_ws = next_input.first().unwrap().ws.borrow();
         let next_grad = next_input.first().unwrap().neu_grad.borrow();
-        let next_shape = next_grad.len();
+        let next_shape = next_grad.len() / self.batch_size;
 
         let self_kern = self.ocl_kernel_grad.as_ref().unwrap();
 
@@ -331,15 +325,6 @@ impl AbstractLayerOcl for FcLayerOcl {
                 .enq()
                 .expect("[fc_ocl] Enqueue backward kernel failure");
         }
-
-        let mut neu_grad_vec = vec![9.0; self.size];
-        self_neu_grad.read(&mut neu_grad_vec).enq().unwrap();
-
-        println!("===FC_OCL_GRAD===");
-        for i in neu_grad_vec.iter() {
-            print!("{:.2} ", i);
-        }
-        println!("======");
 
         debug!("[fc_ocl] backward done");
 

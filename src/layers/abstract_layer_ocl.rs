@@ -32,9 +32,23 @@ impl OclParams {
     pub fn only_output(buf: Buffer<f32>, queue: Queue) -> Self {
         Self {
             output: Rc::new(RefCell::new(buf)),
-            ws: Rc::new(RefCell::new(Buffer::builder().queue(queue.clone()).len(1).build().unwrap())),
-            neu_grad: Rc::new(RefCell::new(Buffer::builder().queue(queue.clone()).len(1).build().unwrap())),
-            ws_grad: Rc::new(RefCell::new(Buffer::builder().queue(queue).len(1).build().unwrap())),
+            ws: Rc::new(RefCell::new(
+                Buffer::builder()
+                    .queue(queue.clone())
+                    .len(1)
+                    .build()
+                    .unwrap(),
+            )),
+            neu_grad: Rc::new(RefCell::new(
+                Buffer::builder()
+                    .queue(queue.clone())
+                    .len(1)
+                    .build()
+                    .unwrap(),
+            )),
+            ws_grad: Rc::new(RefCell::new(
+                Buffer::builder().queue(queue).len(1).build().unwrap(),
+            )),
             uuid: Uuid::new_v4(),
         }
     }
@@ -58,10 +72,18 @@ pub trait AbstractLayerOcl: AbstractLayer {
     fn forward_ocl(&mut self, params: OclParamsBlob) -> LayerOclResult {
         Err(LayerError::NotImpl)
     }
-    fn backward_ocl(&mut self, prev_input: OclParamsBlob, next_input: OclParamsBlob) -> LayerOclResult {
+    fn backward_ocl(
+        &mut self,
+        prev_input: OclParamsBlob,
+        next_input: OclParamsBlob,
+    ) -> LayerOclResult {
         Err(LayerError::NotImpl)
     }
-    fn backward_output_ocl(&mut self, prev_input: OclParamsBlob, expected: Batch) -> LayerOclResult {
+    fn backward_output_ocl(
+        &mut self,
+        prev_input: OclParamsBlob,
+        expected: Batch,
+    ) -> LayerOclResult {
         Err(LayerError::NotImpl)
     }
 
@@ -126,12 +148,20 @@ pub fn fit_to_batch_size_ocl(
         .flags(MemFlags::new().read_write())
         .len(self_size * batch_size)
         .build()?;
+    let neu_grad = Buffer::builder()
+        .queue(queue.clone())
+        .flags(MemFlags::new().read_write())
+        .len(self_size * batch_size)
+        .build()?;
 
     let mut output_b = params.output.borrow_mut();
+    let mut neu_grad_b = params.neu_grad.borrow_mut();
 
     *output_b = output;
+    *neu_grad_b = neu_grad;
 
     drop(output_b);
+    drop(neu_grad_b);
 
     Ok(params)
 }
