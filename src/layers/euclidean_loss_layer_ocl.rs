@@ -1,5 +1,6 @@
 use crate::layers::*;
 use crate::learn_params::*;
+use crate::ocl::*;
 use crate::util::*;
 
 use log::debug;
@@ -135,13 +136,17 @@ impl AbstractLayer for EuclideanLossLayerOcl {
             )
             .expect("Fit to batch size ocl failed"),
         );
+
+        self.cpu_params.fit_to_batch_size(batch_size);
     }
 
     fn learn_params(&self) -> Option<LearnParams> {
-        None
+        Some(self.cpu_params.clone())
     }
 
-    fn set_learn_params(&mut self, lp: LearnParams) {}
+    fn set_learn_params(&mut self, lp: LearnParams) {
+        self.cpu_params = lp;
+    }
 
     fn set_input_shape(&mut self, sh: &[usize]) {
         let kern = self.ocl_kernel.as_mut().unwrap();
@@ -149,21 +154,17 @@ impl AbstractLayer for EuclideanLossLayerOcl {
             .expect("[euc_ocl] Failed to set prev_shape arg");
 
         let kern_grad = self.ocl_kernel_grad.as_mut().unwrap();
-        kern_grad.set_arg("prev_shape", sh[0] as i32)
+        kern_grad
+            .set_arg("prev_shape", sh[0] as i32)
             .expect("[euc_ocl] Failed to set prev_shape arg");
 
         let queue = self.ocl_queue.as_ref().unwrap();
         // buffer routine
         self.ocl_params =
             Some(init_ocl_params(queue.clone(), self.size, sh).expect("Buffer create failure"));
-    }
 
-    fn layer_cfg(&self) -> HashMap<String, Variant> {
-        let cfg: HashMap<String, Variant> = HashMap::new();
-        cfg
+        self.cpu_params = LearnParams::new(self.size, sh[0]);
     }
-
-    fn set_layer_cfg(&mut self, _cfg: &HashMap<String, Variant>) {}
 
     // Do copy layer memory(ws, output, ...)
     fn copy_layer(&self) -> Box<dyn AbstractLayer> {
@@ -253,17 +254,6 @@ impl AbstractLayerOcl for EuclideanLossLayerOcl {
 
         debug!("[euc_ocl] forward");
 
-        let mut out_vec = vec![0.0; self.size * self.batch_size];
-
-        self_output
-            .read(&mut out_vec)
-            .enq()
-            .expect("Failed to read test data");
-
-        for i in out_vec.iter() {
-            println!("output : {}", i);
-        }
-
         Ok(vec![self.ocl_params.as_ref().unwrap().clone()])
     }
 
@@ -318,6 +308,10 @@ impl AbstractLayerOcl for EuclideanLossLayerOcl {
         Some(self.ocl_params.as_ref().unwrap().clone())
     }
 
+    fn set_ocl_params(&mut self, params: OclParams) {
+        self.ocl_params = Some(params);
+    }
+
     fn copy_layer_ocl(&self) -> Box<dyn AbstractLayerOcl> {
         todo!()
     }
@@ -358,5 +352,23 @@ impl Clone for EuclideanLossLayerOcl {
 
     fn clone_from(&mut self, _source: &Self) {
         todo!()
+    }
+}
+
+impl WithParams for EuclideanLossLayerOcl {
+    fn cfg(&self) -> HashMap<String, Variant> {
+        let mut out = HashMap::new();
+
+        out.insert("size".to_string(), Variant::Int(self.size as i32));
+
+        out
+    }
+
+    fn set_cfg(&mut self, args: &HashMap<String, Variant>) {
+        if let Some(size) = args.get("size") {
+            if let Variant::Int(size) = size {
+                self.size = *size as usize;
+            }
+        }
     }
 }

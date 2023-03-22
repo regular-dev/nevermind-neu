@@ -4,8 +4,8 @@ use uuid::Uuid;
 
 use std::ops::Deref;
 
-use std::collections::HashMap;
 use crate::util::*;
+use std::collections::HashMap;
 
 pub struct OptimizerSGD {
     pub learn_rate: f32,
@@ -18,7 +18,7 @@ impl OptimizerSGD {
         Self {
             learn_rate,
             momentum,
-            ws_delta: HashMap::new()
+            ws_delta: HashMap::new(),
         }
     }
 
@@ -51,13 +51,13 @@ impl Default for OptimizerSGD {
         Self {
             learn_rate: 1e-2,
             momentum: 0.8,
-            ws_delta: HashMap::new()
+            ws_delta: HashMap::new(),
         }
     }
 }
 
 impl Optimizer for OptimizerSGD {
-    fn optimize_network(&mut self, lp: &mut LearnParams) {
+    fn optimize_params(&mut self, lp: &mut LearnParams) {
         let mut lr_ws = lp.ws.borrow_mut();
         let lr_grad = lp.ws_grad.borrow();
 
@@ -82,7 +82,9 @@ impl Optimizer for OptimizerSGD {
             );
         }
     }
-    
+}
+
+impl WithParams for OptimizerSGD {
     fn cfg(&self) -> HashMap<String, Variant> {
         let mut cfg_params = HashMap::new();
 

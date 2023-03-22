@@ -1,14 +1,11 @@
 use log::{debug, error, info};
 use signal_hook::consts::SIGKILL;
 
-use std::{error::Error, time::Instant, fs::File};
+use std::{error::Error, time::Instant};
 
 use signal_hook::{consts::SIGINT, iterator::Signals};
 
 use clap::ArgMatches;
-
-#[cfg(feature = "opencl")]
-use crate::train_ocl::*;
 
 // nevermind_neu
 use nevermind_neu::dataloader::*;
@@ -17,21 +14,11 @@ use nevermind_neu::models::*;
 use nevermind_neu::orchestra::*;
 use nevermind_neu::optimizers::*;
 
-/// Starts train a network with required net configuration
-/// and train dataset
-#[allow(unreachable_code)]
-pub fn train_net(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
-    let mdl_type = check_model_type(args.get_one::<String>("ModelCfg").unwrap())?;
-    if mdl_type.as_str() == "mdl_sequential_ocl" {
-        // handle as OpenCL model
-        #[cfg(feature = "opencl")]
-        return train_net_ocl(args);
-        panic!("Compiled without opencl support");
-    }
 
-    let mut net = create_net_from_cmd_args(args)?;
+pub fn train_net_ocl(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
+    let mut net = create_net_ocl_from_cmd_args(args)?;
 
-    set_train_dataset_to_net(&mut net, args)?;
+    //set_train_dataset_to_net(&mut net, args)?;
 
     let mut opt_err = None;
     let mut opt_max_iter = None;
@@ -79,21 +66,9 @@ pub fn train_net(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn set_train_dataset_to_net(
-    net: &mut Orchestra<Sequential>,
-    args: &ArgMatches,
-) -> Result<(), Box<dyn Error>> {
-    let train_ds = args.get_one::<String>("TrainData").unwrap();
-    let train_ds = Box::new(ProtobufDataLoader::from_file(train_ds)?);
-
-    net.set_train_dataset(train_ds);
-
-    Ok(())
-}
-
-pub fn create_net_from_cmd_args(args: &ArgMatches) -> Result<Orchestra<Sequential>, Box<dyn Error>> {
+pub fn create_net_ocl_from_cmd_args(args: &ArgMatches) -> Result<Orchestra<SequentialOcl>, Box<dyn Error>> {
     let model_cfg = args.get_one::<String>("ModelCfg").unwrap();
-    let mut model = Sequential::from_file(&model_cfg)?;
+    let mut model = SequentialOcl::from_file(&model_cfg)?;
 
     if let Some(model_state) = args.get_one::<String>("ModelState") {
         model.load_state(&model_state)?;
@@ -101,7 +76,7 @@ pub fn create_net_from_cmd_args(args: &ArgMatches) -> Result<Orchestra<Sequentia
 
     if let Some(optimizer_cfg) = args.get_one::<String>("OptCfg") {
         info!("Setting up optimizer : {}", optimizer_cfg);
-        let opt = optimizer_from_file(optimizer_cfg)?;
+        let opt = optimizer_ocl_from_file(optimizer_cfg, model.queue())?;
         model.set_optim(opt);
     }
 
@@ -175,24 +150,4 @@ pub fn create_net_from_cmd_args(args: &ArgMatches) -> Result<Orchestra<Sequentia
     }
 
     Ok(net)
-}
-
-fn check_model_type(mdl_cfg: &str) -> Result<String, Box<dyn Error>> {
-    let mdl_file = File::open(mdl_cfg)?;
-    let mdl: SerdeSequentialModel = serde_yaml::from_reader(mdl_file)?;
-    return Ok(mdl.mdl_type)
-}
-
-pub fn gen_init_state(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
-    let model_cfg = args.get_one::<String>("ModelCfg").unwrap();
-    let out_file = args.get_one::<String>("OutFile").unwrap();
-    let model = Sequential::from_file(&model_cfg)?;
-    model.save_state(out_file)?;
-
-    info!(
-        "Saved initialized state for model {} to file {}",
-        model_cfg, out_file
-    );
-
-    Ok(())
 }

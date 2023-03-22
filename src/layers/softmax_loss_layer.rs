@@ -1,9 +1,13 @@
-use std::{rc::Rc, cell::RefCell, sync::atomic::{AtomicU32, Ordering}};
+use std::{
+    cell::RefCell,
+    rc::Rc,
+    sync::atomic::{AtomicU32, Ordering},
+};
 
 use std::collections::HashMap;
 use std::f32::consts::E;
 
-use ndarray::{Array1, Zip, Axis};
+use ndarray::{Array1, Axis, Zip};
 
 use log::{debug, info, warn};
 
@@ -27,8 +31,9 @@ impl AbstractLayer for SoftmaxLossLayer {
 
         Zip::from(inp_m.rows())
             .and(out_m.rows_mut())
-            .par_for_each(|inp_b, out_b| { // for each batch
-                let mut mul_res = ws_mat0.dot( &inp_b );
+            .par_for_each(|inp_b, out_b| {
+                // for each batch
+                let mut mul_res = ws_mat0.dot(&inp_b);
 
                 // let mut e_rows = mul_res.map_axis(Axis(1), |row| row.sum());
                 let e_rows_max = array_helpers::max(&mul_res);
@@ -36,7 +41,8 @@ impl AbstractLayer for SoftmaxLossLayer {
                 mul_res = mul_res.mapv_into(|v| E.powf(v));
                 let sum_rows = mul_res.sum();
 
-                Zip::from(out_b).and(&mul_res).for_each(|out_el, in_e| { // for each "neuron"
+                Zip::from(out_b).and(&mul_res).for_each(|out_el, in_e| {
+                    // for each "neuron"
                     *out_el = in_e / sum_rows;
                 });
             });
@@ -61,7 +67,8 @@ impl AbstractLayer for SoftmaxLossLayer {
         Zip::from(self_err_vals.rows_mut())
             .and(self_output.rows())
             .and(expected_vec.rows())
-            .par_for_each(|err_val_b, out_b, expected_b| { // for each batch
+            .par_for_each(|err_val_b, out_b, expected_b| {
+                // for each batch
                 let (mut out_idx, mut out_max_val) = (-1, 0.0);
                 let mut idx = 0;
                 let mut b_expected_idx = -1;
@@ -86,7 +93,7 @@ impl AbstractLayer for SoftmaxLossLayer {
 
                 if b_expected_idx == out_idx {
                     match_cnt.fetch_add(1, Ordering::Relaxed);
-                } 
+                }
             });
 
         let accuracy = match_cnt.load(Ordering::SeqCst) as f32 / batch_len;
@@ -131,33 +138,6 @@ impl AbstractLayer for SoftmaxLossLayer {
         self.lr_params = lp;
     }
 
-    fn layer_cfg(&self) -> HashMap<String, Variant> {
-        let mut cfg = HashMap::new();
-
-        cfg.insert("size".to_owned(), Variant::Int(self.size as i32));
-        cfg.insert("prev_size".to_owned(), Variant::Int(self.prev_size as i32));
-
-        cfg
-    }
-
-    fn set_layer_cfg(&mut self, cfg: &HashMap<String, Variant>) {
-        let (mut size, mut prev_size): (usize, usize) = (0, 0);
-
-        if let Variant::Int(var_size) = cfg.get("size").unwrap() {
-            size = *var_size as usize;
-        }
-
-        if let Variant::Int(var_prev_size) = cfg.get("prev_size").unwrap() {
-            prev_size = *var_prev_size as usize;
-        }
-
-        if size > 0 && prev_size > 0 {
-            self.size = size;
-            self.prev_size = prev_size;
-            self.lr_params = LearnParams::new(self.size, self.prev_size);
-        }
-    }
-
     fn size(&self) -> usize {
         self.size
     }
@@ -188,6 +168,35 @@ impl SoftmaxLossLayer {
             size,
             prev_size,
             lr_params,
+        }
+    }
+}
+
+impl WithParams for SoftmaxLossLayer {
+    fn cfg(&self) -> HashMap<String, Variant> {
+        let mut cfg = HashMap::new();
+
+        cfg.insert("size".to_owned(), Variant::Int(self.size as i32));
+        cfg.insert("prev_size".to_owned(), Variant::Int(self.prev_size as i32));
+
+        cfg
+    }
+
+    fn set_cfg(&mut self, cfg: &HashMap<String, Variant>) {
+        let (mut size, mut prev_size): (usize, usize) = (0, 0);
+
+        if let Variant::Int(var_size) = cfg.get("size").unwrap() {
+            size = *var_size as usize;
+        }
+
+        if let Variant::Int(var_prev_size) = cfg.get("prev_size").unwrap() {
+            prev_size = *var_prev_size as usize;
+        }
+
+        if size > 0 && prev_size > 0 {
+            self.size = size;
+            self.prev_size = prev_size;
+            self.lr_params = LearnParams::new(self.size, self.prev_size);
         }
     }
 }

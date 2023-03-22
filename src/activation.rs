@@ -1,5 +1,3 @@
-use super::util::DataVec;
-
 pub fn sigmoid(val: f32) -> f32 {
     return 1.0 / (1.0 + (-val).exp());
 }

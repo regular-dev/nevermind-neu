@@ -6,6 +6,9 @@ use clap::ArgMatches;
 
 use log::info;
 
+#[cfg(feature = "opencl")]
+use crate::create_net_ocl::*;
+
 use nevermind_neu::activation::*;
 use nevermind_neu::err::*;
 use nevermind_neu::layers::*;
@@ -14,7 +17,7 @@ use nevermind_neu::models::*;
 use nevermind_neu::optimizers::*;
 
 
-fn read_from_stdin<T: FromStr>(stdin: &io::Stdin) -> Result<T, Box<dyn Error>> {
+pub fn read_from_stdin<T: FromStr>(stdin: &io::Stdin) -> Result<T, Box<dyn Error>> {
     let mut inp_str = String::new();
     stdin.read_line(&mut inp_str)?;
     inp_str.pop(); // TODO : fint better way to crop \0 ?
@@ -28,7 +31,16 @@ fn read_from_stdin<T: FromStr>(stdin: &io::Stdin) -> Result<T, Box<dyn Error>> {
     return Err(Box::new(CustomError::Other));
 }
 
+#[allow(unreachable_code)]
 pub fn create_net(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
+    let is_ocl = args.get_one::<bool>("Ocl").unwrap();
+    if *is_ocl {
+        info!("Creating OpenCL based model...");
+        #[cfg(feature = "opencl")]
+        return create_net_ocl(args);
+        panic!("Build without OpenCL support");
+    }
+
     let out_file = args.get_one::<String>("OutFile").unwrap();
     let out_optim = args.get_one::<String>("OptimFile").unwrap();
 

@@ -7,30 +7,33 @@ mod optim_adam;
 mod optim_ocl_sgd;
 #[cfg(feature = "opencl")]
 mod optim_ocl_rms;
+#[cfg(feature = "opencl")]
+mod optim_ocl;
+#[cfg(feature = "opencl")]
+mod optim_ocl_fabric;
 
-mod optim_creator;
-
-use std::collections::HashMap;
+mod optim_fabric;
 
 pub use optim_rms::*;
 pub use optim_adagrad::*;
 pub use optim_adam::*;
 pub use optim_sgd::*;
-pub use optim_creator::*;
+pub use optim_fabric::*;
 #[cfg(feature = "opencl")]
 pub use optim_ocl_sgd::*;
 #[cfg(feature = "opencl")]
 pub use optim_ocl_rms::*;
+#[cfg(feature = "opencl")]
+pub use optim_ocl::*;
+#[cfg(feature ="opencl")]
+pub use optim_ocl_fabric::*;
 
-use crate::learn_params::LearnParams;
+use crate::learn_params::*;
 use crate::util::*;
 use crate::err::*;
 
-pub trait Optimizer {
-    fn optimize_network(&mut self, learn_params: &mut LearnParams);
-    
-    fn cfg(&self) -> HashMap<String, Variant>;
-    fn set_cfg(&mut self, args: &HashMap<String, Variant>);
+pub trait Optimizer : WithParams {
+    fn optimize_params(&mut self, learn_params: &mut LearnParams);
 }
 
 pub fn optimizer_from_type(opt_type: &str) -> Result<Box<dyn Optimizer>, CustomError> {

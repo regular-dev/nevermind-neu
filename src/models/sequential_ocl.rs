@@ -1,13 +1,16 @@
+use std::{cell::RefCell, fmt, fs::File, io::prelude::*, io::ErrorKind, rc::Rc};
+
 use crate::layers::*;
+use crate::learn_params::LearnParams;
 use crate::models::*;
 use crate::optimizers::*;
+use crate::util::*;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use log::{debug, info};
+use log::{debug, error, info};
 
 use ocl::flags::{CommandQueueProperties, MapFlags, MemFlags};
-use ocl::prm::Float4;
 use ocl::{Buffer, Context, Device, Event, Kernel, Platform, Program, Queue, Result as OclResult};
 
 use crate::layer_fabric::*;
@@ -18,6 +21,7 @@ pub struct SequentialOcl {
     batch_size: usize,
     ocl_ctx: Context,
     ocl_queue: Queue,
+    optim: Box<dyn OptimizerOcl>,
 }
 
 impl SequentialOcl {
@@ -39,7 +43,8 @@ impl SequentialOcl {
             layers: Vec::new(),
             batch_size: 1,
             ocl_ctx: context,
-            ocl_queue: kern_queue,
+            ocl_queue: kern_queue.clone(),
+            optim: Box::new(OptimizerOclRms::new(kern_queue.clone())),
         })
     }
 
@@ -65,8 +70,31 @@ impl SequentialOcl {
         mdl
     }
 
+    pub fn from_file(filepath: &str) -> Result<Self, Box<dyn Error>> {
+        let cfg_file = File::open(filepath)?;
+        let mut mdl: SequentialOcl = serde_yaml::from_reader(cfg_file)?;        
+        Ok(mdl)
+    }
+
+    pub fn to_file(&self, filepath: &str) -> Result<(), Box<dyn Error>> {
+        let yaml_str_result = serde_yaml::to_string(&self);
+
+        let mut output = File::create(filepath)?;
+
+        match yaml_str_result {
+            Ok(yaml_str) => {
+                output.write_all(yaml_str.as_bytes())?;
+            }
+            Err(x) => {
+                error!("Error (serde-yaml) serializing net layers !!!");
+                return Err(Box::new(std::io::Error::new(ErrorKind::Other, x)));
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn add_layer(&mut self, l: Box<dyn AbstractLayerOcl>) {
-        let mut l = l;
         self.layers.push(l);
     }
 
@@ -98,10 +126,62 @@ impl SequentialOcl {
         }
     }
 
-    pub fn optimize(&mut self, opt: &mut OptimizerOclRms) {
-        for l in self.layers.iter_mut().skip(1) {
-            opt.optimize(l.ocl_params().unwrap());
+    fn init_layers_but_weights(&mut self) {
+        let mut prev_size = 0;
+
+        for (idx, l) in self.layers.iter_mut().enumerate() {
+            if idx == 0 {
+                prev_size = l.size();
+                l.init_ocl(
+                    &self.ocl_ctx,
+                    self.ocl_ctx.devices().first().unwrap().clone(),
+                    self.ocl_queue.clone(),
+                )
+                .expect("Input layer init ocl failure");
+                continue;
+            }
+
+            l.init_ocl(
+                &self.ocl_ctx,
+                self.ocl_ctx.devices().first().unwrap().clone(),
+                self.ocl_queue.clone(),
+            )
+            .expect("Init ocl failure");
+
+            // We need to copy weights buffer cause of
+            // https://registry.khronos.org/OpenCL/sdk/1.2/docs/man/xhtml/clSetKernelArg.html#notes
+            let train_mdl_params = l.ocl_params().unwrap();
+            let train_mdl_ws = train_mdl_params.ws.borrow();
+            let mut vec_ws = vec![0.0; train_mdl_ws.len()];
+
+            train_mdl_ws
+                .read(&mut vec_ws)
+                .enq()
+                .expect("Failed to read train model weights");
+
+            l.set_input_shape(&[prev_size]);
+
+            let mut new_mdl_params = l.ocl_params().unwrap();
+            let new_mdl_ws = Rc::new(RefCell::new(
+                Buffer::builder()
+                    .queue(self.ocl_queue.clone())
+                    .flags(MemFlags::new().read_write())
+                    .len(vec_ws.len())
+                    .copy_host_slice(vec_ws.as_slice())
+                    .build()
+                    .expect("Failed to copy WS buffer"),
+            ));
+
+            new_mdl_params.ws = new_mdl_ws;
+
+            l.set_ocl_params(new_mdl_params);
+
+            prev_size = l.size();
         }
+    }
+
+    pub fn set_optim(&mut self, opt: Box<dyn OptimizerOcl>) {
+        self.optim = opt;
     }
 
     pub fn queue(&self) -> Queue {
@@ -166,6 +246,7 @@ impl Model for SequentialOcl {
             }
         }
 
+        // TODO : refactor below
         for idx in 1..layers_len {
             if idx == layers_len - 1 {
                 continue;
@@ -190,6 +271,49 @@ impl Model for SequentialOcl {
         }
     }
 
+    fn optimize(&mut self) {
+        for l in self.layers.iter_mut().skip(1) {
+            self.optim.optimize_ocl_params(l.ocl_params().unwrap());
+        }
+    }
+
+    fn model_type(&self) -> &str {
+        "mdl_sequential_ocl"
+    }
+
+    fn output_params(&self) -> LearnParams {
+        let ocl_params = self
+            .layers
+            .last()
+            .expect("There are no layers in model ocl !!!")
+            .ocl_params()
+            .unwrap();
+
+        let cpu_lp = self
+            .layers
+            .last()
+            .expect("There are no layers in ocl model")
+            .learn_params()
+            .unwrap();
+        let mut cpu_output = cpu_lp.output.borrow_mut();
+        let mut cpu_neu_grad = cpu_lp.err_vals.borrow_mut();
+
+        // Fetch data from OCL Buffer to cpu memory
+        let ocl_params_output = ocl_params.output.borrow();
+        ocl_params_output
+            .read(cpu_output.as_slice_mut().unwrap())
+            .enq()
+            .expect("Failed to copy OCL buffer to CPU");
+
+        let ocl_params_neu_grad = ocl_params.neu_grad.borrow();
+        ocl_params_neu_grad
+            .read(cpu_neu_grad.as_slice_mut().unwrap())
+            .enq()
+            .expect("Failed top copy OCL buffer to CPU");
+
+        return cpu_lp.clone();
+    }
+
     fn batch_size(&self) -> usize {
         self.batch_size
     }
@@ -202,7 +326,13 @@ impl Model for SequentialOcl {
         }
     }
 
-    fn set_batch_size_for_tests(&mut self, batch_size: usize) {}
+    fn set_batch_size_for_tests(&mut self, batch_size: usize) {
+        self.batch_size = batch_size;
+
+        for l in self.layers.iter_mut() {
+            l.set_batch_size(self.batch_size);
+        }
+    }
 
     // TODO : maybe make return value Option<...>
     fn layer(&self, id: usize) -> &Box<dyn AbstractLayer> {
@@ -227,9 +357,12 @@ impl Clone for SequentialOcl {
     fn clone(&self) -> Self {
         let mut seq_mdl = SequentialOcl::new().unwrap();
 
-        for i in &self.layers {
+        for i in self.layers.iter() {
             seq_mdl.layers.push(i.clone_layer_ocl());
         }
+
+        seq_mdl.init_layers_but_weights();
+        seq_mdl.set_batch_size(self.batch_size);
 
         seq_mdl
     }
@@ -244,17 +377,20 @@ impl Serialize for SequentialOcl {
     where
         S: Serializer,
     {
-        let mut s_layers_storage = SerdeLayersStorage::default();
+        let mut seq_mdl = SerdeSequentialModel::default();
 
         for l in self.layers.iter() {
             let s_layer_param = SerdeLayerParam {
                 name: l.layer_type().to_owned(),
-                params: l.layer_cfg(),
+                params: l.cfg(),
             };
-            s_layers_storage.layers_cfg.push(s_layer_param);
+            seq_mdl.ls.push(s_layer_param);
         }
 
-        s_layers_storage.serialize(serializer)
+        seq_mdl.batch_size = self.batch_size();
+        seq_mdl.mdl_type = self.model_type().to_string();
+
+        seq_mdl.serialize(serializer)
     }
 }
 
@@ -263,22 +399,42 @@ impl<'de> Deserialize<'de> for SequentialOcl {
     where
         D: Deserializer<'de>,
     {
-        let s_layers_storage = SerdeLayersStorage::deserialize(deserializer)?;
+        let serde_mdl = SerdeSequentialModel::deserialize(deserializer)?;
 
-        let mut ls = SequentialOcl::new().unwrap();
+        let mut seq_mdl = SequentialOcl::new().expect("Failed to create SequentialOcl model");
 
-        for i in &s_layers_storage.layers_cfg {
+        if serde_mdl.mdl_type != seq_mdl.model_type() {
+            todo!("Handle invalid model type");
+        }
+
+        for i in &serde_mdl.ls {
             let l_opt = create_layer_ocl(i.name.as_str(), Some(&i.params));
 
             if let Some(l) = l_opt {
                 debug!("Create layer : {}", i.name);
-                ls.layers.push(l);
+                seq_mdl.layers.push(l);
             } else {
                 // TODO : impl return D::Error
                 panic!("Bad deserialization");
             }
         }
 
-        Ok(ls)
+        seq_mdl.init_layers();
+        seq_mdl.set_batch_size(serde_mdl.batch_size);
+
+        Ok(seq_mdl)
+    }
+}
+
+impl fmt::Display for SequentialOcl {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut out = String::new();
+
+        for i in &self.layers {
+            out += i.size().to_string().as_str();
+            out += "-";
+        }
+
+        write!(f, "{}", &out.as_str()[0..out.len() - 1])
     }
 }

@@ -6,6 +6,10 @@ use clap::{App, Arg, ArgAction, Command};
 use env_logger::Env;
 
 pub mod create_net;
+#[cfg(feature = "opencl")]
+pub mod create_net_ocl;
+#[cfg(feature = "opencl")]
+pub mod train_ocl;
 pub mod dataset_info;
 pub mod train;
 pub mod test;
@@ -183,10 +187,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .require_equals(true)
                 .takes_value(true)
                 .action(ArgAction::Set))
-        .arg(Arg::new("OptimFile")
-            .long("optim_out")
-            .help("Specify optimizer configuration output file")
-            .default_value("optim.cfg")))
+            .arg(Arg::new("OptimFile")
+                .long("optim_out")
+                .help("Specify optimizer configuration output file")
+                .default_value("optim.cfg"))
+            .arg(Arg::new("Ocl")
+                .long("opencl")
+                .help("Create OpenCL based net")
+                .action(ArgAction::SetTrue)
+                .default_value("false")
+                .value_parser(clap::value_parser!(bool))
+                .takes_value(false)
+        ))
         .after_help("after help message. TODO : expand with examples")
         .get_matches();
 

@@ -87,6 +87,10 @@ impl SequentialLayersStorage {
         return self.layers.iter_mut();
     }
 
+    pub fn iter(&self) -> std::slice::Iter<Box<dyn AbstractLayer>> {
+        return self.layers.iter();
+    }
+
     pub fn add_layer(&mut self, l: Box<dyn AbstractLayer>) {
         // if !self.layers.is_empty() {
         //     if let Variant::Int(l_prev_size) = l.layer_cfg()["prev_size"] {
@@ -165,7 +169,7 @@ impl Serialize for SequentialLayersStorage {
         for l in self.layers.iter() {
             let s_layer_param = SerdeLayerParam {
                 name: l.layer_type().to_owned(),
-                params: l.layer_cfg(),
+                params: l.cfg(),
             };
             s_layers_storage.layers_cfg.push(s_layer_param);
         }

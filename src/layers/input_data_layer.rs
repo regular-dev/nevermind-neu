@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use super::abstract_layer::{AbstractLayer, LayerError, LayerForwardResult};
 
 use crate::learn_params::LearnParams;
-use crate::util::{Batch, Blob, DataVecPtr, Variant};
+use crate::util::{Batch, Blob, DataVecPtr, Variant, WithParams};
 
 #[derive(Default, Clone)]
 pub struct InputDataLayer {
@@ -38,27 +38,6 @@ impl AbstractLayer for InputDataLayer {
         self.lr_params = lp;
     }
 
-    fn layer_cfg(&self) -> HashMap<String, Variant> {
-        let mut cfg: HashMap<String, Variant> = HashMap::new();
-
-        cfg.insert("size".to_owned(), Variant::Int(self.input_size as i32));
-
-        cfg
-    }
-
-    fn set_layer_cfg(&mut self, cfg: &HashMap<String, Variant>) {
-        let mut size: usize = 0;
-
-        if let Variant::Int(var_size) = cfg.get("size").unwrap() {
-            size = *var_size as usize;
-        }
-
-        if size > 0 {
-            self.input_size = size;
-            self.lr_params = LearnParams::empty();
-        }
-    }
-
     fn set_input_shape(&mut self, sh: &[usize]) { }
 
     fn size(&self) -> usize {
@@ -81,6 +60,29 @@ impl InputDataLayer {
         Self {
             input_size,
             lr_params: LearnParams::empty(),
+        }
+    }
+}
+
+impl WithParams for InputDataLayer {
+    fn cfg(&self) -> HashMap<String, Variant> {
+        let mut cfg: HashMap<String, Variant> = HashMap::new();
+
+        cfg.insert("size".to_owned(), Variant::Int(self.input_size as i32));
+
+        cfg
+    }
+
+    fn set_cfg(&mut self, cfg: &HashMap<String, Variant>) {
+        let mut size: usize = 0;
+
+        if let Variant::Int(var_size) = cfg.get("size").unwrap() {
+            size = *var_size as usize;
+        }
+
+        if size > 0 {
+            self.input_size = size;
+            self.lr_params = LearnParams::empty();
         }
     }
 }

@@ -5,56 +5,9 @@ use uuid::Uuid;
 use ndarray_rand::{rand_distr::Uniform, RandomExt};
 use ocl::{Buffer, Context, Device, MemFlags, ProQue, Queue};
 
+use crate::ocl::*;
 use crate::layers::*;
 use crate::util::*;
-
-pub type LayerOclResult = Result<Vec<OclParams>, LayerError>;
-
-#[derive(Clone)]
-pub struct OclParams {
-    pub output: Rc<RefCell<Buffer<Num>>>,
-    pub ws: Rc<RefCell<Buffer<Num>>>,
-    pub neu_grad: Rc<RefCell<Buffer<Num>>>,
-    pub ws_grad: Rc<RefCell<Buffer<Num>>>,
-    pub uuid: Uuid,
-}
-
-impl OclParams {
-    // pub fn empty() -> Self {
-    //     Self {
-    //         output: Rc::new(RefCell::new(Buffer::builder().build().unwrap())),
-    //         ws: Rc::new(RefCell::new(Buffer::builder().build().unwrap())),
-    //         neu_grad: Rc::new(RefCell::new(Buffer::builder().build().unwrap())),
-    //         ws_grad: Rc::new(RefCell::new(Buffer::builder().build().unwrap())),
-    //     }
-    // }
-
-    pub fn only_output(buf: Buffer<f32>, queue: Queue) -> Self {
-        Self {
-            output: Rc::new(RefCell::new(buf)),
-            ws: Rc::new(RefCell::new(
-                Buffer::builder()
-                    .queue(queue.clone())
-                    .len(1)
-                    .build()
-                    .unwrap(),
-            )),
-            neu_grad: Rc::new(RefCell::new(
-                Buffer::builder()
-                    .queue(queue.clone())
-                    .len(1)
-                    .build()
-                    .unwrap(),
-            )),
-            ws_grad: Rc::new(RefCell::new(
-                Buffer::builder().queue(queue).len(1).build().unwrap(),
-            )),
-            uuid: Uuid::new_v4(),
-        }
-    }
-}
-
-pub type OclParamsBlob = Vec<OclParams>;
 
 pub trait AbstractLayerOcl: AbstractLayer {
     fn init_ocl(
@@ -87,7 +40,10 @@ pub trait AbstractLayerOcl: AbstractLayer {
         Err(LayerError::NotImpl)
     }
 
+    fn fetch_params_to_cpu(&self, t: FetchParams) { todo!() }
+
     fn ocl_params(&self) -> Option<OclParams>;
+    fn set_ocl_params(&mut self, params: OclParams) {}
 
     // Do copy layer memory(ws, output, ...)
     fn copy_layer_ocl(&self) -> Box<dyn AbstractLayerOcl>;
@@ -105,7 +61,8 @@ pub fn init_ocl_params(
         .queue(queue.clone())
         .flags(MemFlags::new().read_write())
         .len(self_size)
-        .build()?;
+        .build()?;#[cfg(feature = "opencl")]
+
     let neu_grad = Buffer::builder()
         .queue(queue.clone())
         .flags(MemFlags::new().read_write())

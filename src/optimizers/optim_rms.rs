@@ -7,6 +7,7 @@ use std::ops::Deref;
 use std::collections::HashMap;
 use crate::util::*;
 
+#[derive(Clone)]
 pub struct OptimizerRMS {
     pub learn_rate: f32,
     pub alpha: f32,
@@ -64,7 +65,7 @@ impl OptimizerRMS {
 }
 
 impl Optimizer for OptimizerRMS {
-    fn optimize_network(&mut self, lp: &mut LearnParams) {
+    fn optimize_params(&mut self, lp: &mut LearnParams) {
         let mut lr_ws = lp.ws.borrow_mut();
         let lr_grad = lp.ws_grad.borrow();
 
@@ -90,7 +91,9 @@ impl Optimizer for OptimizerRMS {
             );
         }
     }
-    
+}
+
+impl WithParams for OptimizerRMS {
     fn cfg(&self) -> HashMap<String, Variant> {
         let mut cfg_params = HashMap::new();
 

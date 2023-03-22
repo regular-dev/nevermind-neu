@@ -1,7 +1,7 @@
 use std::option::Option;
 
 use crate::learn_params::{LearnParams, ParamsBlob};
-use crate::util::DataVec;
+use crate::util::{DataVec, WithParams};
 use crate::layers::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
 
 // not used
@@ -60,3 +60,5 @@ impl DummyLayer {
         }
     }
 }
+
+impl WithParams for DummyLayer { }

@@ -13,7 +13,7 @@ impl fmt::Display for CustomError {
             WrongArgErr => {
                 write!(f, "{}", "Wrong arguments")
             },
-            Other => {
+            CustomError::Other => {
                 write!(f, "{}", "Other")
             }
         }
@@ -26,7 +26,7 @@ impl std::error::Error for CustomError {
             WrongArgErr => {
                 "Wrong arguments"
             },
-            Other => {
+            CustomError::Other => {
                 "Other"
             }
         }

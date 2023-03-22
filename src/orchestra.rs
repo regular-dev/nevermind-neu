@@ -14,7 +14,7 @@ use std::fs::File;
 use std::io::{ErrorKind, Write};
 use std::time::Instant;
 
-use ndarray::{Zip, Axis};
+use ndarray::{Axis, Zip};
 
 use ndarray_stats::QuantileExt;
 
@@ -25,7 +25,6 @@ use super::learn_params::LearnParams;
 use crate::err::CustomError;
 use crate::util::*;
 
-use super::optimizers::*;
 use crate::models::Model;
 
 pub enum CallbackReturnAction {
@@ -34,14 +33,13 @@ pub enum CallbackReturnAction {
     StopAndSave,
 }
 
-/// Neural-Network
-pub struct Network<T>
+/// Neural-Network learning orchestrator
+pub struct Orchestra<T>
 where
     T: Model + Serialize + Clone,
 {
     pub train_dl: Option<Box<dyn DataLoader>>,
     pub test_dl: Option<Box<dyn DataLoader>>,
-    optim: Box<dyn Optimizer>,
     test_err_non_dl: f32,
     test_batch_size: usize,
     is_write_test_err: bool,
@@ -54,22 +52,22 @@ where
     learn_rate_decay: f32,
     decay_step: usize,
     show_accuracy: bool,
+    save_on_finish: bool,
     pub name: String,
     // callback fn args : (iteration_number, current iteration loss, accuracy)
     callbacks: Vec<Box<dyn FnMut(usize, f32, f32) -> CallbackReturnAction>>,
 }
 
-impl<T> Network<T>
+impl<T> Orchestra<T>
 where
     T: Model + Serialize + Clone,
 {
     pub fn new(model: T) -> Self {
         let test_model = Some(model.clone());
 
-        Network {
+        Orchestra {
             train_dl: None,
             test_dl: None,
-            optim: Box::new(OptimizerRMS::new(1e-2, 0.9)),
             test_err_non_dl: 0.0,
             test_batch_size: 10,
             is_write_test_err: true,
@@ -82,6 +80,7 @@ where
             learn_rate_decay: 1.0,
             decay_step: 0,
             show_accuracy: true,
+            save_on_finish: true,
             name: "network".to_owned(),
             callbacks: Vec::new(),
         }
@@ -89,10 +88,9 @@ where
 
     pub fn new_for_eval(model: T) -> Self {
         let tbs = model.batch_size();
-        let test_net = Network {
+        let test_net = Orchestra {
             train_dl: None,
             test_dl: None,
-            optim: Box::new(OptimizerSGD::new(1e-2, 0.8)),
             test_err_non_dl: 0.0,
             test_batch_size: 1,
             is_write_test_err: true,
@@ -105,13 +103,14 @@ where
             learn_rate_decay: 1.0,
             decay_step: 0,
             show_accuracy: true,
+            save_on_finish: true,
             name: "network".to_owned(),
             callbacks: Vec::new(),
         };
-        test_net.test_batch_num(tbs)
+        test_net.test_batch_size(tbs)
     }
 
-    pub fn test_batch_num(mut self, batch_size: usize) -> Self {
+    pub fn test_batch_size(mut self, batch_size: usize) -> Self {
         if let Some(test_model) = self.test_model.as_mut() {
             test_model.set_batch_size_for_tests(batch_size);
         }
@@ -121,9 +120,17 @@ where
         self
     }
 
+    pub fn set_test_batch_size(&mut self, batch_size: usize) {
+        self.test_batch_size = batch_size;
+
+        if let Some(test_model) = self.test_model.as_mut() {
+            test_model.set_batch_size(self.test_batch_size);
+        }
+    }
+
     pub fn test_dataloader(mut self, test_dl: Box<dyn DataLoader>) -> Self {
         self.test_dl = Some(test_dl);
-        let s = self.test_batch_num(1);
+        let s = self.test_batch_size(1);
         s
     }
 
@@ -177,10 +184,6 @@ where
         self.test_dl = Some(data)
     }
 
-    pub fn set_optimizer(&mut self, optim: Box<dyn Optimizer>) {
-        self.optim = optim
-    }
-
     pub fn set_learn_rate_decay(&mut self, decay: f32) {
         self.learn_rate_decay = decay
     }
@@ -189,15 +192,15 @@ where
         self.decay_step = step;
     }
 
+    fn infer_train_error(&mut self) -> f32 {
+        let err = self.test_err_non_dl / self.test_batch_size as f32; // error average
+        self.test_err_non_dl = 0.0;
+        return err;
+    }
+
     /// Test net and returns and average error
     fn test_net(&mut self) -> f32 {
-        if self.test_dl.is_none() {
-            let err = self.test_err_non_dl / self.test_batch_size as f32; // error average
-            self.test_err_non_dl = 0.0;
-            return err;
-        }
-
-        let test_dl = self.test_dl.as_mut().unwrap();
+        let test_dl = self.test_dl.as_mut().expect("Test dataset isn't set");
         let mut err = 0.0;
 
         let test_batch = test_dl.next_batch(self.test_batch_size);
@@ -206,10 +209,7 @@ where
             .unwrap()
             .feedforward(test_batch.input);
 
-        let len_layers = self.test_model.as_ref().unwrap().layers_count(); // TODO : maybe somehow refactor ?
-        let last_layer = self.test_model.as_ref().unwrap().layer(len_layers - 1);
-
-        let lr = last_layer.learn_params().unwrap();
+        let lr = self.test_model.as_ref().unwrap().output_params();
         let out = lr.output.borrow();
 
         let mut accuracy_cnt = 0.0;
@@ -253,7 +253,7 @@ where
             let cvt = data.into_shape((1, data_len)).unwrap();
             test_model.feedforward(cvt);
 
-            let last_lp = test_model.last_layer().learn_params().unwrap();
+            let last_lp = test_model.output_params();
 
             return Ok(last_lp.output.clone());
         }
@@ -268,7 +268,7 @@ where
         if let Some(test_model) = self.test_model.as_mut() {
             test_model.feedforward(train_data);
 
-            let last_lp = test_model.last_layer().learn_params().unwrap();
+            let last_lp = test_model.output_params();
 
             return Ok(last_lp.output.clone());
         }
@@ -276,7 +276,7 @@ where
         if let Some(train_model) = self.train_model.as_mut() {
             train_model.feedforward(train_data);
 
-            let last_lp = train_model.last_layer().learn_params().unwrap();
+            let last_lp = train_model.output_params();
 
             return Ok(last_lp.output.clone());
         }
@@ -305,26 +305,32 @@ where
             return Some(lr_output[[1, 0]]);
         }
 
-        return None;
+        return Some(0.0);
+    }
+
+    pub fn set_save_on_finish_flag(&mut self, state: bool) {
+        self.save_on_finish = state;
     }
 
     fn perform_learn_rate_decay(&mut self) {
-        let opt_params = self.optim.cfg();
+        todo!()
 
-        if let Some(lr) = opt_params.get("learn_rate") {
-            if let Variant::Float(lr) = lr {
-                let decayed_lr = lr * self.learn_rate_decay;
+        // let opt_params = self.optim.cfg();
 
-                info!(
-                    "Perfoming learning rate decay : from {}, to {}",
-                    lr, decayed_lr
-                );
+        // if let Some(lr) = opt_params.get("learn_rate") {
+        //     if let Variant::Float(lr) = lr {
+        //         let decayed_lr = lr * self.learn_rate_decay;
 
-                let mut m = HashMap::new();
-                m.insert("learn_rate".to_owned(), Variant::Float(decayed_lr));
-                self.optim.set_cfg(&m);
-            }
-        }
+        //         info!(
+        //             "Perfoming learning rate decay : from {}, to {}",
+        //             lr, decayed_lr
+        //         );
+
+        //         let mut m = HashMap::new();
+        //         m.insert("learn_rate".to_owned(), Variant::Float(decayed_lr));
+        //         self.optim.set_cfg(&m);
+        //     }
+        // }
     }
 
     fn perform_step(&mut self) {
@@ -342,10 +348,10 @@ where
             train_model.feedforward(data.input);
             train_model.backpropagate(data.output);
 
-            Network::optimize_model(train_model, &mut self.optim);
+            train_model.optimize();
 
             // store current iteration loss and accuracy
-            let lr = train_model.last_layer().learn_params().unwrap();
+            let lr = train_model.output_params();
 
             self.cur_iter_err = Self::calc_avg_err(&lr);
             self.cur_iter_acc = Self::calc_accuracy(&lr).unwrap();
@@ -353,16 +359,6 @@ where
             if self.test_dl.is_none() {
                 self.test_err_non_dl += self.cur_iter_err;
             }
-        }
-    }
-
-    fn optimize_model(train_model: &mut T, optimizer: &mut Box<dyn Optimizer>) {
-        for i in 0..train_model.layers_count() {
-            let l = train_model.layer(i);
-
-            let mut lp = l.learn_params().unwrap();
-
-            optimizer.optimize_network(&mut lp);
         }
     }
 
@@ -381,6 +377,11 @@ where
     fn append_error(&self, f: &mut File, err: f32) -> Result<(), Box<dyn std::error::Error>> {
         write!(f, "{:.6}\n", err)?;
         Ok(())
+    }
+
+    pub fn update_test_model(&mut self) {
+        let test_mdl = self.train_model.as_ref().unwrap().clone();
+        self.test_model = Some(test_mdl);
     }
 
     pub fn train_for_error(&mut self, err: f32) -> Result<(), Box<dyn std::error::Error>> {
@@ -408,17 +409,26 @@ where
 
         loop {
             if self.test_dl.is_none() {
+                // if we have test dataset
                 if iter_num % self.test_batch_size == 0 && iter_num != 0 {
-                    test_err = self.test_net();
+                    test_err = self.infer_train_error(); // average error on train dataset
 
                     if test_err < err {
                         info!("Reached satisfying error value");
                         break;
                     }
-                }
-            }
 
-            if self.test_dl.is_some() {
+                    let elapsed = bench_time.elapsed();
+
+                    info!(
+                        "Did {} iterations for {} milliseconds",
+                        self.test_batch_size,
+                        elapsed.as_millis()
+                    );
+
+                    bench_time = Instant::now();
+                }
+            } else {
                 if iter_num % self.test_iter == 0 && iter_num != 0 {
                     test_err = self.test_net();
 
@@ -504,10 +514,28 @@ where
         info!("Trained for error : {}", test_err);
         info!("Iterations : {}", iter_num);
 
-        let filename = format!("{}_{}_final.state", self.name, iter_num);
-        self.save_model_state(&filename)?;
+        if self.save_on_finish {
+            let filename = format!("{}_{}_final.state", self.name, iter_num);
+            self.save_model_state(&filename)?;
+        }
 
         Ok(())
+    }
+
+    pub fn train_model(&self) -> Option<&T> {
+        self.train_model.as_ref()
+    }
+
+    pub fn test_model(&self) -> Option<&T> {
+        self.test_model.as_ref()
+    }
+
+    pub fn train_model_mut(&mut self) -> Option<&mut T> {
+        self.train_model.as_mut()
+    }
+
+    pub fn test_model_mut(&mut self) -> Option<&mut T> {
+        self.test_model.as_mut()
     }
 }
 
@@ -522,7 +550,7 @@ pub fn save_model_cfg<S: Model + Serialize>(solver: &S, path: &str) -> std::io::
             output.write_all(yaml_str.as_bytes())?;
         }
         Err(x) => {
-            eprintln!("Error (serde-yaml) serializing net layers !!!");
+            error!("Error (serde-yaml) serializing net layers !!!");
             return Err(std::io::Error::new(ErrorKind::Other, x));
         }
     }

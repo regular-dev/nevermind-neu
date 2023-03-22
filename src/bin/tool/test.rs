@@ -8,7 +8,7 @@ use clap::ArgMatches;
 
 // regular_mind
 use nevermind_neu::dataloader::*;
-use nevermind_neu::network::*;
+use nevermind_neu::orchestra::*;
 
 pub fn test_net(
     args: &ArgMatches,
@@ -26,7 +26,7 @@ pub fn test_net(
 
     model.set_batch_size(1);
 
-    let mut net = Network::new_for_eval(model);
+    let mut net = Orchestra::new_for_eval(model);
 
     // let mut counter = 0;
     // TODO : check label impl

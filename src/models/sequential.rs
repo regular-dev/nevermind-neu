@@ -5,25 +5,28 @@ use crate::layers_storage::SequentialLayersStorage;
 use crate::models::Model;
 
 use crate::models::pb::PbSequentialModel;
+use crate::optimizers::{Optimizer, OptimizerRMS};
 
-use std::fs;
+use std::{fs, cell::RefCell, rc::Rc};
 use std::fs::File;
 use std::io::prelude::*;
 
-use log::error;
+use log::{error, debug, info};
 use std::io::ErrorKind;
 
 use prost::Message;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Deserializer, *};
 
 use crate::layers::*;
 use crate::models::*;
 use crate::util::*;
+use crate::layer_fabric::*;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone)]
 pub struct Sequential {
     ls: SequentialLayersStorage,
     batch_size: usize,
+    optim: Box<dyn Optimizer>,
 }
 
 impl Sequential {
@@ -31,6 +34,7 @@ impl Sequential {
         Self {
             ls: SequentialLayersStorage::empty(),
             batch_size: 1,
+            optim: Box::new(OptimizerRMS::new(1e-2, 0.9)),
         }
     }
 
@@ -38,6 +42,7 @@ impl Sequential {
         let mut seq = Self {
             ls: SequentialLayersStorage::new_simple_network(net_cfg),
             batch_size: 1,
+            optim: Box::new(OptimizerRMS::new(1e-2, 0.9))
         };
         seq.compile_shapes();
 
@@ -45,12 +50,13 @@ impl Sequential {
     }
 
     pub fn new_with_layers(ls: SequentialLayersStorage) -> Self {
-        Self { ls, batch_size: 1 }
+        Self { ls, batch_size: 1, optim: Box::new(OptimizerRMS::new(1e-2, 0.9)) }
     }
 
     pub fn from_file(filepath: &str) -> Result<Self, Box<dyn Error>> {
         let cfg_file = File::open(filepath)?;
         let mut mdl: Sequential = serde_yaml::from_reader(cfg_file)?;
+
         mdl.compile_shapes();
         mdl.set_batch_size(mdl.batch_size);
 
@@ -87,6 +93,14 @@ impl Sequential {
             l.set_input_shape(&[prev_size]);
             prev_size = l.size();
         }
+    }
+
+    pub fn set_optim(&mut self, optim: Box<dyn Optimizer>) {
+        self.optim = optim;
+    }
+
+    pub fn add_layer(&mut self, l: Box<dyn AbstractLayer>) {
+        self.ls.add_layer(l);
     }
 }
 
@@ -170,6 +184,21 @@ impl Model for Sequential {
         }
     }
 
+    fn optimize(&mut self) {
+        for l in self.ls.iter_mut().skip(1) {
+            self.optim.optimize_params(&mut l.learn_params().unwrap());
+        }
+    }
+
+    fn model_type(&self) -> &str {
+        "mdl_sequential_cpu"
+    }
+
+    fn output_params(&self) -> LearnParams {
+        let last_layer_params = self.ls.last().expect("There is no layers in model !!!").learn_params().unwrap();
+        last_layer_params.clone()
+    }
+
     fn batch_size(&self) -> usize {
         self.batch_size
     }
@@ -227,5 +256,69 @@ impl Model for Sequential {
         }
 
         Ok(())
+    }
+}
+
+impl Default for Box<dyn Optimizer> {
+    fn default() -> Self {
+        Box::new(OptimizerRMS::new(1e-2, 0.9))
+    }
+}
+
+impl Clone for Box<dyn Optimizer> {
+    fn clone(&self) -> Self {
+        Box::new(OptimizerRMS::new(1e-2, 0.9))
+    }
+}
+
+impl Serialize for Sequential {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut seq_mdl = SerdeSequentialModel::default();
+
+        for l in self.ls .iter() {
+            let s_layer_param = SerdeLayerParam {
+                name: l.layer_type().to_owned(),
+                params: l.cfg(),
+            };
+            seq_mdl.ls.push(s_layer_param);
+        }
+
+        seq_mdl.batch_size = self.batch_size();
+        seq_mdl.mdl_type = self.model_type().to_string();
+
+        seq_mdl.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Sequential {
+    fn deserialize<D>(deserializer: D) -> Result<Sequential, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let serde_mdl = SerdeSequentialModel::deserialize(deserializer)?;
+        let mut seq_mdl = Sequential::new();
+
+        if serde_mdl.mdl_type != seq_mdl.model_type() {
+            todo!("Handle invalid model type on deserialization");
+        }
+
+        for i in serde_mdl.ls.iter() {
+            let l_opt = create_layer(i.name.as_str(), Some(&i.params));
+
+            if let Some(l) = l_opt {
+                debug!("Create layer : {}", i.name);
+                seq_mdl.add_layer(l);
+            } else {
+                // TODO : impl return D::Error
+                panic!("Bad deserialization");
+            }
+        }
+
+        seq_mdl.set_batch_size(serde_mdl.batch_size);
+
+        Ok(seq_mdl)
     }
 }

@@ -2,10 +2,10 @@ use std::collections::HashMap;
 
 use log::warn;
 
-use super::util::Variant;
 use crate::activation::Activation;
 use crate::activation::*;
 use crate::layers::*;
+use crate::util::*;
 
 /// Fabric used to create neural network layers, when deserialing and other cases
 pub fn create_layer(
@@ -30,7 +30,7 @@ pub fn create_layer(
                     l = Box::new(layers_macros::raw_error_layer!());
                 }
 
-                l.set_layer_cfg(cfg_val);
+                l.set_cfg(cfg_val);
 
                 return Some(l);
             } else {
@@ -59,7 +59,7 @@ pub fn create_layer(
                     l = Box::new(layers_macros::raw_rc_layer!());
                 }
 
-                l.set_layer_cfg(cfg_val);
+                l.set_cfg(cfg_val);
                 return Some(l);
             }
 
@@ -69,7 +69,7 @@ pub fn create_layer(
         "InputDataLayer" => {
             let mut l = Box::new(InputDataLayer::default());
             if cfg.is_some() {
-                l.set_layer_cfg(cfg.unwrap());
+                l.set_cfg(cfg.unwrap());
             }
             return Some(l);
         }
@@ -80,7 +80,7 @@ pub fn create_layer(
         "SoftmaxLossLayer" => {
             let mut l = Box::new(SoftmaxLossLayer::default());
             if let Some(cfg_val) = cfg {
-                l.set_layer_cfg(cfg_val);
+                l.set_cfg(cfg_val);
             }
             return Some(l);
         }
@@ -100,21 +100,21 @@ pub fn create_layer_ocl(
         "InputLayerOcl" => {
             let mut l = Box::new(InputLayerOcl::default());
             if let Some(cfg_val) = cfg {
-                l.set_layer_cfg(cfg_val);
+                l.set_cfg(cfg_val);
             }
             return Some(l);
         },
         "FcLayerOcl" => {
             let mut l = Box::new(FcLayerOcl::default());
             if let Some(cfg_val) = cfg {
-                l.set_layer_cfg(cfg_val);
+                l.set_cfg(cfg_val);
             }
             return Some(l);
         },
         "EuclideanLossLayerOcl" => {
             let mut l = Box::new(EuclideanLossLayerOcl::default());
             if let Some(cfg_val) = cfg {
-                l.set_layer_cfg(cfg_val);
+                l.set_cfg(cfg_val);
             }
             return Some(l);
         }

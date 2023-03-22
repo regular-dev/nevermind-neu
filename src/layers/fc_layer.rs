@@ -6,11 +6,11 @@ use log::debug;
 
 use rand::{thread_rng, Rng};
 
-use crate::learn_params::{LearnParams, ParamsBlob};
 use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
 use crate::activation::{sign, Activation};
+use crate::learn_params::{LearnParams, ParamsBlob};
 
-use crate::util::Variant;
+use crate::util::{Variant, WithParams};
 
 // Fully-connected layer
 #[derive(Clone)]
@@ -43,7 +43,8 @@ where
         // for each input batch
         Zip::from(inp_m.rows())
             .and(out_m.rows_mut())
-            .par_for_each(|inp_b, out_b| { // for each batch
+            .par_for_each(|inp_b, out_b| {
+                // for each batch
                 let mul_res = ws0.dot(&inp_b);
 
                 let mut counter_neu = 0;
@@ -51,7 +52,8 @@ where
                 Zip::from(out_b)
                     .and(&mul_res)
                     .and(bias_out)
-                    .for_each(|out_el, in_row, bias_el| { // for each "neuron"
+                    .for_each(|out_el, in_row, bias_el| {
+                        // for each "neuron"
                         if counter_neu >= dropout_n && counter_neu < dropout_y {
                             // zero neuron
                             *out_el = 0.0;
@@ -156,7 +158,7 @@ where
     }
 
     fn layer_type(&self) -> &str {
-        "HiddenLayer"
+        "FcLayer"
     }
 
     /// Carefull this method overwrites weights and all other params
@@ -164,61 +166,12 @@ where
         self.lr_params = LearnParams::new_with_const_bias(self.size, sh[0]);
     }
 
-    fn layer_cfg(&self) -> HashMap<String, Variant> {
-        let mut cfg: HashMap<String, Variant> = HashMap::new();
-
-        cfg.insert("size".to_owned(), Variant::Int(self.size as i32));
-        // cfg.insert("prev_size".to_owned(), Variant::Int(self.prev_size as i32));
-        cfg.insert(
-            "activation".to_owned(),
-            Variant::String(self.activation.name.clone()),
-        );
-        cfg.insert("l2_regul".to_owned(), Variant::Float(self.l2_regul));
-        cfg.insert("l1_regul".to_owned(), Variant::Float(self.l1_regul));
-        cfg.insert("dropout".to_owned(), Variant::Float(self.dropout));
-
-        cfg
-    }
-
-    fn set_layer_cfg(&mut self, cfg: &HashMap<String, Variant>) {
-        let (mut size, mut prev_size): (usize, usize) = (0, 0);
-
-        if let Variant::Int(var_size) = cfg.get("size").unwrap() {
-            size = *var_size as usize;
-        }
-
-        if let Variant::Int(var_prev_size) = cfg.get("prev_size").unwrap() {
-            prev_size = *var_prev_size as usize;
-        }
-
-        if size > 0 && prev_size > 0 {
-            self.size = size;
-            // self.prev_size = prev_size;
-            self.lr_params = LearnParams::empty();
-        }
-
-        if let Variant::Float(dropout) = cfg.get("dropout").unwrap() {
-            self.dropout = *dropout;
-        }
-
-        if let Variant::Float(l1_regul) = cfg.get("l1_regul").unwrap() {
-            self.l1_regul = *l1_regul;
-        }
-
-        if let Variant::Float(l2_regul) = cfg.get("l2_regul").unwrap() {
-            self.l2_regul = *l2_regul;
-        }
-    }
-
     fn size(&self) -> usize {
         self.size
     }
 
     fn copy_layer(&self) -> Box<dyn AbstractLayer> {
-        let mut copy_l = Box::new(FcLayer::new(
-            self.size,
-            self.activation.clone(),
-        ));
+        let mut copy_l = Box::new(FcLayer::new(self.size, self.activation.clone()));
         copy_l.set_learn_params(self.lr_params.copy());
         copy_l
     }
@@ -257,5 +210,52 @@ where
     pub fn l1_regularization(mut self, coef: f32) -> Self {
         self.l1_regul = coef;
         self
+    }
+}
+
+impl<T, TD> WithParams for FcLayer<T, TD>
+where
+    T: Fn(f32) -> f32 + Sync + Clone + 'static,
+    TD: Fn(f32) -> f32 + Sync + Clone + 'static,
+{
+    fn cfg(&self) -> HashMap<String, Variant> {
+        let mut cfg: HashMap<String, Variant> = HashMap::new();
+
+        cfg.insert("size".to_owned(), Variant::Int(self.size as i32));
+        // cfg.insert("prev_size".to_owned(), Variant::Int(self.prev_size as i32));
+        cfg.insert(
+            "activation".to_owned(),
+            Variant::String(self.activation.name.clone()),
+        );
+        cfg.insert("l2_regul".to_owned(), Variant::Float(self.l2_regul));
+        cfg.insert("l1_regul".to_owned(), Variant::Float(self.l1_regul));
+        cfg.insert("dropout".to_owned(), Variant::Float(self.dropout));
+
+        cfg
+    }
+
+    fn set_cfg(&mut self, cfg: &HashMap<String, Variant>) {
+        let mut size: usize = 0;
+
+        if let Variant::Int(var_size) = cfg.get("size").unwrap() {
+            size = *var_size as usize;
+        }
+
+        if size > 0 {
+            self.size = size;
+            self.lr_params = LearnParams::empty();
+        }
+
+        if let Variant::Float(dropout) = cfg.get("dropout").unwrap() {
+            self.dropout = *dropout;
+        }
+
+        if let Variant::Float(l1_regul) = cfg.get("l1_regul").unwrap() {
+            self.l1_regul = *l1_regul;
+        }
+
+        if let Variant::Float(l2_regul) = cfg.get("l2_regul").unwrap() {
+            self.l2_regul = *l2_regul;
+        }
     }
 }

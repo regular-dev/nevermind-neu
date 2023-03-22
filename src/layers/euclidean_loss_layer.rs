@@ -5,10 +5,10 @@ use ndarray::Zip;
 
 use log::{debug, info};
 
-use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
+use crate::layers::*;
 use crate::activation::*;
-use crate::learn_params::{LearnParams, ParamsBlob};
-use crate::util::{Batch, DataVec, Variant};
+use crate::learn_params::*;
+use crate::util::*;
 
 #[derive(Clone)]
 pub struct EuclideanLossLayer<T: Fn(f32) -> f32 + Clone, TD: Fn(f32) -> f32 + Clone> {
@@ -133,49 +133,6 @@ where
         self.lr_params = LearnParams::new_with_const_bias(self.size, sh[0]);
     }
 
-    fn layer_cfg(&self) -> HashMap<String, Variant> {
-        let mut cfg: HashMap<String, Variant> = HashMap::new();
-
-        cfg.insert("size".to_owned(), Variant::Int(self.size as i32));
-        // cfg.insert("prev_size".to_owned(), Variant::Int(self.prev_size as i32));
-
-        cfg.insert(
-            "activation".to_owned(),
-            Variant::String(self.activation.name.clone()),
-        );
-
-        cfg.insert("l2_regul".to_owned(), Variant::Float(self.l2_regul));
-        cfg.insert("l1_regul".to_owned(), Variant::Float(self.l1_regul));
-
-        cfg
-    }
-
-    fn set_layer_cfg(&mut self, cfg: &HashMap<String, Variant>) {
-        let (mut size, mut prev_size): (usize, usize) = (0, 0);
-
-        if let Variant::Int(var_size) = cfg.get("size").unwrap() {
-            size = *var_size as usize;
-        }
-
-        if let Variant::Int(var_prev_size) = cfg.get("prev_size").unwrap() {
-            prev_size = *var_prev_size as usize;
-        }
-
-        if size > 0 && prev_size > 0 {
-            self.size = size;
-            // self.prev_size = prev_size;
-            self.lr_params = LearnParams::empty();
-        }
-
-        if let Variant::Float(l1_regul) = cfg.get("l1_regul").unwrap() {
-            self.l1_regul = *l1_regul;
-        }
-
-        if let Variant::Float(l2_regul) = cfg.get("l2_regul").unwrap() {
-            self.l2_regul = *l2_regul;
-        }
-    }
-
     fn size(&self) -> usize {
         self.size
     }
@@ -214,5 +171,49 @@ where
     pub fn l1_regularization(mut self, coef: f32) -> Self {
         self.l1_regul = coef;
         self
+    }
+}
+
+impl<T, TD> WithParams for EuclideanLossLayer<T, TD>
+where
+    T: Fn(f32) -> f32 + Sync + Clone + 'static,
+    TD: Fn(f32) -> f32 + Sync + Clone + 'static
+{
+    fn cfg(&self) -> HashMap<String, Variant> {
+        let mut cfg: HashMap<String, Variant> = HashMap::new();
+
+        cfg.insert("size".to_owned(), Variant::Int(self.size as i32));
+        // cfg.insert("prev_size".to_owned(), Variant::Int(self.prev_size as i32));
+
+        cfg.insert(
+            "activation".to_owned(),
+            Variant::String(self.activation.name.clone()),
+        );
+
+        cfg.insert("l2_regul".to_owned(), Variant::Float(self.l2_regul));
+        cfg.insert("l1_regul".to_owned(), Variant::Float(self.l1_regul));
+
+        cfg
+    }
+
+    fn set_cfg(&mut self, cfg: &HashMap<String, Variant>) {
+        let mut size: usize = 0;
+
+        if let Variant::Int(var_size) = cfg.get("size").unwrap() {
+            size = *var_size as usize;
+        }
+
+        if size > 0 {
+            self.size = size;
+            self.lr_params = LearnParams::empty();
+        }
+
+        if let Variant::Float(l1_regul) = cfg.get("l1_regul").unwrap() {
+            self.l1_regul = *l1_regul;
+        }
+
+        if let Variant::Float(l2_regul) = cfg.get("l2_regul").unwrap() {
+            self.l2_regul = *l2_regul;
+        }
     }
 }

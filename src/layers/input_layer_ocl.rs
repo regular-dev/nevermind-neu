@@ -4,6 +4,7 @@ use log::debug;
 
 use crate::layers::*;
 use crate::learn_params::LearnParams;
+use crate::ocl::*;
 use crate::util::*;
 
 use std::{collections::HashMap, error::Error};
@@ -48,13 +49,6 @@ impl AbstractLayer for InputLayerOcl {
 
     fn set_input_shape(&mut self, sh: &[usize]) {}
 
-    fn layer_cfg(&self) -> HashMap<String, Variant> {
-        let cfg: HashMap<String, Variant> = HashMap::new();
-        cfg
-    }
-
-    fn set_layer_cfg(&mut self, _cfg: &HashMap<String, Variant>) {}
-
     // Do copy layer memory(ws, output, ...)
     fn copy_layer(&self) -> Box<dyn AbstractLayer> {
         panic!("Do not copy OCL layers !");
@@ -86,7 +80,7 @@ impl AbstractLayerOcl for InputLayerOcl {
             .copy_host_slice(input_data.as_slice().unwrap())
             .build()
             .expect("[inp_ocl] Couldn't create "); // TODO : handle unwrap
-        
+
         self.ocl_params = Some(OclParams::only_output(ocl_buf, ocl_queue.clone()));
 
         Ok(vec![self.ocl_params.as_ref().unwrap().clone()])
@@ -115,7 +109,25 @@ impl Default for InputLayerOcl {
             ocl_params: None,
             size: 0,
             batch_size: 1,
-            ocl_queue: None
+            ocl_queue: None,
+        }
+    }
+}
+
+impl WithParams for InputLayerOcl {
+    fn cfg(&self) -> HashMap<String, Variant> {
+        let mut out = HashMap::new();
+
+        out.insert("size".to_string(), Variant::Int(self.size as i32));
+
+        out
+    }
+
+    fn set_cfg(&mut self, args: &HashMap<String, Variant>) {
+        if let Some(size) = args.get("size") {
+            if let Variant::Int(size) = size {
+                self.size = *size as usize;
+            }
         }
     }
 }

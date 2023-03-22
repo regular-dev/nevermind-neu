@@ -1,6 +1,8 @@
-use crate::layers::*;
+use crate::ocl::*;
+use crate::util::*;
+use crate::optimizers::*;
 
-use ocl::{Buffer, Context, Device, Kernel, MemFlags, Program, Queue};
+use ocl::{Buffer, Kernel, MemFlags, Program, Queue};
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -56,8 +58,10 @@ impl OptimizerOclSgd {
             kernel,
         }
     }
+}
 
-    pub fn optimize(&mut self, params: OclParams) {
+impl OptimizerOcl for OptimizerOclSgd {
+    fn optimize_ocl_params(&mut self, params: OclParams) {
         if !self.ws_delta.contains_key(&params.uuid) {
             let ws_grad = params.ws_grad.borrow();
 
@@ -94,6 +98,31 @@ impl OptimizerOclSgd {
 
         unsafe {
             self.kernel.enq().expect("[opt_ocl_sgd] Failed to enqueue kernel");
+        }
+    }
+}
+
+impl WithParams for OptimizerOclSgd {
+    fn cfg(&self) -> HashMap<String, Variant> {
+        let mut out = HashMap::new();
+
+        out.insert("type".to_string(), Variant::String("sgd".to_string()));
+        out.insert("learning_rate".to_string(), Variant::Float(self.learn_rate));
+        out.insert("momentum".to_string(), Variant::Float(self.momentum));
+
+        out
+    }
+
+    fn set_cfg(&mut self, args: &HashMap<String, Variant>) {
+        if let Some(lr) = args.get("learning_rate") {
+            if let Variant::Float(lr) = lr {
+                self.learn_rate = *lr as f32;
+            }
+        }
+        if let Some(momentum) = args.get("momentum") {
+            if let Variant::Float(momentum) = momentum {
+                self.momentum = *momentum as f32;
+            }
         }
     }
 }

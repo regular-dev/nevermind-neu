@@ -59,7 +59,7 @@ impl OptimizerAdaGrad {
 }
 
 impl Optimizer for OptimizerAdaGrad {
-    fn optimize_network(&mut self, lp: &mut LearnParams) {
+    fn optimize_params(&mut self, lp: &mut LearnParams) {
         let mut lr_ws = lp.ws.borrow_mut();
         let lr_grad = lp.ws_grad.borrow();
 
@@ -84,7 +84,9 @@ impl Optimizer for OptimizerAdaGrad {
             );
         }
     }
-    
+}
+
+impl WithParams for OptimizerAdaGrad {
     fn cfg(&self) -> HashMap<String, Variant> {
         let mut cfg_params = HashMap::new();
 

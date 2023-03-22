@@ -1,11 +1,13 @@
 use crate::layers::*;
 use crate::learn_params::LearnParams;
 use crate::util::*;
+use crate::ocl::*;
 
 use log::debug;
 
 use ocl::{Buffer, Context, Device, Kernel, MemFlags, Program, Queue};
 
+use std::hash::Hash;
 use std::{collections::HashMap, error::Error};
 
 static FC_LAYER_KERNEL_FWD: &'static str = r#"
@@ -172,13 +174,6 @@ impl AbstractLayer for FcLayerOcl {
         );
     }
 
-    fn layer_cfg(&self) -> HashMap<String, Variant> {
-        let cfg: HashMap<String, Variant> = HashMap::new();
-        cfg
-    }
-
-    fn set_layer_cfg(&mut self, _cfg: &HashMap<String, Variant>) {}
-
     // Do copy layer memory(ws, output, ...)
     fn copy_layer(&self) -> Box<dyn AbstractLayer> {
         panic!("Do not copy OCL layers !");
@@ -267,15 +262,6 @@ impl AbstractLayerOcl for FcLayerOcl {
                 .expect("[fc_ocl] Enqueue forward kernel failure");
         }
 
-        let mut out_vec = vec![0.0; self.size * self.batch_size];
-        let mut in_vec = vec![0.0; prev_output.len()];
-
-        self_output
-            .read(&mut out_vec)
-            .enq()
-            .expect("Failed to read test data");
-        prev_output.read(&mut in_vec).enq().unwrap();
-
         debug!("[fc_ocl] forward");
 
         Ok(vec![self.ocl_params.as_ref().unwrap().clone()])
@@ -335,6 +321,10 @@ impl AbstractLayerOcl for FcLayerOcl {
         Some(self.ocl_params.as_ref().unwrap().clone())
     }
 
+    fn set_ocl_params(&mut self, params: OclParams) {
+        self.ocl_params = Some(params);
+    }
+
     fn copy_layer_ocl(&self) -> Box<dyn AbstractLayerOcl> {
         todo!()
     }
@@ -375,5 +365,23 @@ impl Clone for FcLayerOcl {
 
     fn clone_from(&mut self, _source: &Self) {
         todo!()
+    }
+}
+
+impl WithParams for FcLayerOcl { 
+    fn cfg(&self) -> HashMap<String, Variant> {
+        let mut out = HashMap::new();
+
+        out.insert("size".to_string(), Variant::Int(self.size as i32));
+
+        out
+    }
+
+    fn set_cfg(&mut self, args: &HashMap<String, Variant>) {
+        if let Some(size) = args.get("size") {
+            if let Variant::Int(size) = size {
+                self.size = *size as usize;
+            }
+        }
     }
 }

@@ -10,10 +10,12 @@ pub mod activation;
 pub mod layer_fabric;
 pub mod layers_storage;
 pub mod learn_params;
-pub mod network;
+pub mod orchestra;
 pub mod err;
+#[cfg(feature = "opencl")]
+pub mod ocl;
 
 pub mod prelude {
-    pub use crate::network::save_model_cfg;
+    pub use crate::orchestra::save_model_cfg;
     // pub use crate::network::* and etc...
 }

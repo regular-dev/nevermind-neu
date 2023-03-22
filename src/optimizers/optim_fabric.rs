@@ -1,17 +1,15 @@
-use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fs::File;
 use std::io::{Write, ErrorKind};
 
+use log::error;
+
 use crate::err::*;
 use crate::optimizers::*;
 
-#[derive(Serialize, Deserialize, Default)]
-struct SerdeOptimParams(HashMap<String, Variant>);
-
 pub fn optimizer_from_file(filepath: &str) -> Result<Box<dyn Optimizer>, Box<dyn Error>> {
     let cfg_file = File::open(filepath)?;
-    let optim_params: SerdeOptimParams = serde_yaml::from_reader(cfg_file)?;
+    let optim_params: SerdeWithParams = serde_yaml::from_reader(cfg_file)?;
 
     let optim_type = optim_params.0.get("type");
 
@@ -52,7 +50,7 @@ pub fn optimizer_to_file<T: Optimizer>(
     optimizer: T,
     filepath: &str,
 ) -> Result<(), Box<dyn Error>> {
-    let mut helper = SerdeOptimParams::default();
+    let mut helper = SerdeWithParams::default();
 
     let serde_params = optimizer.cfg();
     helper.0 = serde_params;
@@ -65,7 +63,7 @@ pub fn optimizer_to_file<T: Optimizer>(
             output.write_all(yaml_str.as_bytes())?;
         },
         Err(x) => {
-            eprintln!("Error serializing optimizer");
+            error!("Error serializing optimizer");
             return Err(Box::new(std::io::Error::new(ErrorKind::Other, x)));
         }
     }

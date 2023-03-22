@@ -1,7 +1,9 @@
-use crate::layers::*;
+use crate::ocl::*;
+use crate::optimizers::*;
 
-use ocl::{Buffer, Context, Device, Kernel, MemFlags, Program, Queue};
+use ocl::{Buffer, Kernel, MemFlags, Program, Queue};
 use std::collections::HashMap;
+use std::hash::Hash;
 use uuid::Uuid;
 
 static SRC_RMS_KERNEL: &'static str = r#"
@@ -55,7 +57,7 @@ impl OptimizerOclRms {
             .expect("Failed to create RMS optimizer kernel");
 
         Self {
-            learn_rate: 1e-1,
+            learn_rate: 1e-2,
             alpha: 0.9,
             theta: 1e-7,
             ws_rms: HashMap::new(),
@@ -63,8 +65,10 @@ impl OptimizerOclRms {
             kernel,
         }
     }
+}
 
-    pub fn optimize(&mut self, params: OclParams) {
+impl OptimizerOcl for OptimizerOclRms {
+    fn optimize_ocl_params(&mut self, params: OclParams) {
         if !self.ws_rms.contains_key(&params.uuid) {
             let ws_grad = params.ws_grad.borrow();
 
@@ -101,7 +105,34 @@ impl OptimizerOclRms {
             .expect("[opt_ocl_sgd] Failed to set WS_OPTIM arg");
 
         unsafe {
-            self.kernel.enq().expect("[opt_ocl_sgd] Failed to enqueue kernel");
+            self.kernel
+                .enq()
+                .expect("[opt_ocl_sgd] Failed to enqueue kernel");
+        }
+    }
+}
+
+impl WithParams for OptimizerOclRms {
+    fn cfg(&self) -> HashMap<String, Variant> {
+        let mut out = HashMap::new();
+
+        out.insert("type".to_string(), Variant::String("rmsprop".to_string()));
+        out.insert("learning_rate".to_string(), Variant::Float(self.learn_rate));
+        out.insert("alpha".to_string(), Variant::Float(self.alpha));
+
+        out
+    }
+
+    fn set_cfg(&mut self, args: &HashMap<String, Variant>) {
+        if let Some(lr) = args.get("learning_rate") {
+            if let Variant::Float(lr) = lr {
+                self.learn_rate = *lr as f32;
+            }
+        }
+        if let Some(alpha) = args.get("alpha") {
+            if let Variant::Float(alpha) = alpha {
+                self.alpha = *alpha as f32;
+            }
         }
     }
 }

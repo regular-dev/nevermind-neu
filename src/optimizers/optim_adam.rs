@@ -70,7 +70,7 @@ impl OptimizerAdam {
 }
 
 impl Optimizer for OptimizerAdam {
-    fn optimize_network(&mut self, lp: &mut LearnParams) {
+    fn optimize_params(&mut self, lp: &mut LearnParams) {
         let mut lr_ws = lp.ws.borrow_mut();
         let lr_grad = lp.ws_grad.borrow();
 
@@ -100,7 +100,9 @@ impl Optimizer for OptimizerAdam {
             );
         }
     }
-    
+}
+
+impl WithParams for OptimizerAdam {
     fn cfg(&self) -> HashMap<String, Variant> {
         let mut cfg_params = HashMap::new();
 
