@@ -10,12 +10,12 @@ pub enum CustomError {
 impl fmt::Display for CustomError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            WrongArgErr => {
+            CustomError::WrongArg => {
                 write!(f, "{}", "Wrong arguments")
             },
-            CustomError::Other => {
+            _ => {
                 write!(f, "{}", "Other")
-            }
+            },
         }
     }
 }
@@ -23,10 +23,10 @@ impl fmt::Display for CustomError {
 impl std::error::Error for CustomError {
     fn description(&self) -> &str {
         match self {
-            WrongArgErr => {
+            CustomError::WrongArg => {
                 "Wrong arguments"
             },
-            CustomError::Other => {
+            _ => {
                 "Other"
             }
         }
