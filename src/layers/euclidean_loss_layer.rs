@@ -199,8 +199,10 @@ where
     fn set_cfg(&mut self, cfg: &HashMap<String, Variant>) {
         let mut size: usize = 0;
 
-        if let Variant::Int(var_size) = cfg.get("size").unwrap() {
-            size = *var_size as usize;
+        if let Some(var_size) = cfg.get("sie") {
+            if let Variant::Int(var_size) = var_size {
+                size = *var_size as usize;
+            }
         }
 
         if size > 0 {
@@ -208,12 +210,16 @@ where
             self.lr_params = LearnParams::empty();
         }
 
-        if let Variant::Float(l1_regul) = cfg.get("l1_regul").unwrap() {
-            self.l1_regul = *l1_regul;
+        if let Some(l1_regul) = cfg.get("l1_regul") {
+            if let Variant::Float(l1_regul) = l1_regul {
+                self.l1_regul = *l1_regul;
+            }
         }
 
-        if let Variant::Float(l2_regul) = cfg.get("l2_regul").unwrap() {
-            self.l2_regul = *l2_regul;
+        if let Some(l2_regul) = cfg.get("l2_regul") {
+            if let Variant::Float(l2_regul) = l2_regul {
+                self.l2_regul = *l2_regul;
+            }
         }
     }
 }

@@ -127,7 +127,6 @@ fn create_layers(stdin: &io::Stdin) -> Result<Sequential, Box<dyn Error>> {
     ls.add_layer(Box::new(InputDataLayer::new(inp_layer_size)));
 
     // Hidden layer
-    let mut prev_s = inp_layer_size;
     loop {
         println!("Do you want to add a hidden layer [y/n] ?");
         let mut answ: String = read_from_stdin(stdin)?;
@@ -174,7 +173,6 @@ fn create_layers(stdin: &io::Stdin) -> Result<Sequential, Box<dyn Error>> {
                     return Err(Box::new(CustomError::WrongArg));
                 }
             }
-            prev_s = l_size;
         } else {
             break;
         }
@@ -192,7 +190,7 @@ fn create_layers(stdin: &io::Stdin) -> Result<Sequential, Box<dyn Error>> {
             activation_macros::raw_activation!(),
         )));
     } else if out_l_type == "softmax_loss" {
-        ls.add_layer(Box::new(SoftmaxLossLayer::new(out_l_size, prev_s)));
+        ls.add_layer(Box::new(SoftmaxLossLayer::new(out_l_size)));
     } else if out_l_type == "sigmoid" {
         ls.add_layer(Box::new(EuclideanLossLayer::new(
             out_l_size,
