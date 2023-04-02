@@ -190,6 +190,22 @@ impl Model for Sequential {
         }
     }
 
+    fn optimizer(&self) -> &Box<dyn WithParams> {
+        // https://github.com/rust-lang/rust/issues/65991
+        unsafe {
+            let out = std::mem::transmute::<&Box<dyn Optimizer>, &Box<dyn WithParams>>(&self.optim);
+            return out;
+        }
+    }
+
+    fn optimizer_mut(&mut self) -> &mut Box<dyn WithParams> {
+        // https://github.com/rust-lang/rust/issues/65991
+        unsafe {
+            let out = std::mem::transmute::<&mut Box<dyn Optimizer>, &mut Box<dyn WithParams>>(&mut self.optim);
+            return out;
+        }
+    }
+
     fn model_type(&self) -> &str {
         "mdl_sequential_cpu"
     }

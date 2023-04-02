@@ -23,7 +23,10 @@ pub trait Model {
     // TODO : maybe make return value Option<...>
     fn layer(&self, id: usize) -> &Box<dyn AbstractLayer>;
     fn layers_count(&self) -> usize;
-    fn last_layer(&self) -> &Box<dyn AbstractLayer >; 
+    fn last_layer(&self) -> &Box<dyn AbstractLayer >;
+
+    fn optimizer(&self) -> &Box<dyn WithParams>;
+    fn optimizer_mut(&mut self) -> &mut Box<dyn WithParams>;
 
     fn output_params(&self) -> LearnParams;
 

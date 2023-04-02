@@ -313,24 +313,23 @@ where
     }
 
     fn perform_learn_rate_decay(&mut self) {
-        todo!()
+        let optim = self.train_model.as_mut().unwrap().optimizer_mut();
+        let optim_prm = optim.cfg();
 
-        // let opt_params = self.optim.cfg();
+        if let Some(lr) = optim_prm.get("learn_rate") {
+            if let Variant::Float(lr) = lr {
+                let decayed_lr = lr * self.learn_rate_decay;
 
-        // if let Some(lr) = opt_params.get("learn_rate") {
-        //     if let Variant::Float(lr) = lr {
-        //         let decayed_lr = lr * self.learn_rate_decay;
+                info!(
+                    "Perfoming learning rate decay : from {}, to {}",
+                    lr, decayed_lr
+                );
 
-        //         info!(
-        //             "Perfoming learning rate decay : from {}, to {}",
-        //             lr, decayed_lr
-        //         );
-
-        //         let mut m = HashMap::new();
-        //         m.insert("learn_rate".to_owned(), Variant::Float(decayed_lr));
-        //         self.optim.set_cfg(&m);
-        //     }
-        // }
+                let mut m = HashMap::new();
+                m.insert("learn_rate".to_owned(), Variant::Float(decayed_lr));
+                optim.set_cfg(&m);
+            }
+        }
     }
 
     fn perform_step(&mut self) {
