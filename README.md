@@ -16,6 +16,7 @@ OpenCL support is based on *ocl* crate. It is optional feature and enabled by de
  - FullyConnected layer
  - Euclidean Loss, Softmax Loss
  - Optimizers: Adam, RMSProp, AdaGrad, AdaDelta
+ - Protobuf, CSV dataloaders
  - (De)Serializing neural network state to protobuf
  - (De)Serializing neural network configuration net yaml file
  - Activation functions : *sigmoid, tanh, relu, leaky_relu*
