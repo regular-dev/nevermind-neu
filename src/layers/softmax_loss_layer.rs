@@ -18,7 +18,6 @@ use crate::util::*;
 #[derive(Default, Clone)]
 pub struct SoftmaxLossLayer {
     pub size: usize,
-    pub prev_size: usize,
     pub lr_params: LearnParams,
 }
 
@@ -143,7 +142,7 @@ impl AbstractLayer for SoftmaxLossLayer {
     }
 
     fn copy_layer(&self) -> Box<dyn AbstractLayer> {
-        let mut copy_l = SoftmaxLossLayer::new(self.size, self.prev_size);
+        let mut copy_l = SoftmaxLossLayer::new(self.size);
         copy_l.set_learn_params(self.lr_params.copy());
         Box::new(copy_l)
     }
@@ -160,14 +159,10 @@ impl AbstractLayer for SoftmaxLossLayer {
 }
 
 impl SoftmaxLossLayer {
-    pub fn new(size: usize, prev_size: usize) -> Self {
-        let mut lr_params = LearnParams::new(size, prev_size);
-        lr_params.output = Rc::new(RefCell::new(Batch::zeros((2, size))));
-
+    pub fn new(size: usize) -> Self {
         Self {
             size,
-            prev_size,
-            lr_params,
+            lr_params: LearnParams::empty()
         }
     }
 }
@@ -177,26 +172,22 @@ impl WithParams for SoftmaxLossLayer {
         let mut cfg = HashMap::new();
 
         cfg.insert("size".to_owned(), Variant::Int(self.size as i32));
-        cfg.insert("prev_size".to_owned(), Variant::Int(self.prev_size as i32));
 
         cfg
     }
 
     fn set_cfg(&mut self, cfg: &HashMap<String, Variant>) {
-        let (mut size, mut prev_size): (usize, usize) = (0, 0);
+        let mut size = 0;
 
-        if let Variant::Int(var_size) = cfg.get("size").unwrap() {
-            size = *var_size as usize;
+        if let Some(var_size) = cfg.get("size") {
+            if let Variant::Int(var_size) = var_size {
+                size = *var_size as usize;
+            }
         }
 
-        if let Variant::Int(var_prev_size) = cfg.get("prev_size").unwrap() {
-            prev_size = *var_prev_size as usize;
-        }
-
-        if size > 0 && prev_size > 0 {
+        if size > 0 {
             self.size = size;
-            self.prev_size = prev_size;
-            self.lr_params = LearnParams::new(self.size, self.prev_size);
+            self.lr_params = LearnParams::empty();
         }
     }
 }

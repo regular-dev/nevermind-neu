@@ -1,6 +1,6 @@
-use std::cell::RefCell;
+use std::{cell::RefCell, error::Error, fs::File};
 
-use crate::dataloader::{LabeledEntry, MiniBatch, DataLoader};
+use crate::dataloader::{DataLoader, LabeledEntry, MiniBatch};
 
 pub struct SimpleDataLoader {
     pub id: RefCell<usize>,
@@ -14,7 +14,7 @@ impl DataLoader for SimpleDataLoader {
         let mut self_id = self.id.borrow_mut();
 
         if *self_id < self.data.len() {
-            let ret = &self.data[ *self_id ];
+            let ret = &self.data[*self_id];
             *self_id += 1;
             return ret;
         } else {
@@ -46,6 +46,41 @@ impl SimpleDataLoader {
             id: RefCell::new(0),
             data,
         }
+    }
+
+    pub fn from_csv_file(filepath: &str, lbl_col_count: usize) -> Result<Self, Box<dyn Error>> {
+        let file = File::open(filepath)?;
+        let mut rdr = csv::Reader::from_reader(file);
+
+        let records = rdr.records();
+
+        let mut data = Vec::new();
+
+        for row in records {
+            let row = row?;
+
+            let inp_len = row.len() - lbl_col_count;
+
+            let mut inp_vec = Vec::with_capacity(inp_len);
+            let mut out_vec = Vec::with_capacity(lbl_col_count);
+
+            for (idx, val) in row.iter().enumerate() {
+                if idx > inp_len {
+                    break;
+                }
+
+                inp_vec.push(val.parse::<f32>()?);
+            }
+
+            for val in row.iter().skip(inp_len) {
+                out_vec.push(val.parse::<f32>()?);
+            }
+
+            let lbl_entry = LabeledEntry::new(inp_vec, out_vec);
+            data.push(lbl_entry);
+        }
+
+        Ok(SimpleDataLoader::new(data))
     }
 
     pub fn empty() -> Self {

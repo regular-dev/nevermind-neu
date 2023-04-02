@@ -6,7 +6,6 @@ pub mod dataloader;
 pub mod models;
 
 /// Files
-pub mod activation;
 pub mod layer_fabric;
 pub mod layers_storage;
 pub mod learn_params;

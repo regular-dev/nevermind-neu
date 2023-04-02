@@ -1,21 +1,15 @@
 use crate::layers::*;
 use crate::learn_params::LearnParams;
-use crate::util::*;
 use crate::ocl::*;
+use crate::util::*;
 
-use log::debug;
+use log::{debug, warn};
 
 use ocl::{Buffer, Context, Device, Kernel, MemFlags, Program, Queue};
 
-use std::hash::Hash;
 use std::{collections::HashMap, error::Error};
 
 static FC_LAYER_KERNEL_FWD: &'static str = r#"
-    float sigmoid(float v) 
-    {
-        return 1.0 / (1.0 + exp(-v)); 
-    }
-
     __kernel void fc_layer_product(
                 __private int const batch_size,
                 __private int const prev_shape,
@@ -34,21 +28,11 @@ static FC_LAYER_KERNEL_FWD: &'static str = r#"
             sum += ws[real_idx * prev_shape + j] * in[j + prev_shape * batch_idx];
         }
             
-        out[idx] = sigmoid(sum);
+        out[idx] = activation(sum);
     }
 "#;
 
 static FC_LAYER_KERNEL_BWD: &'static str = r#"
-    float sigmoid(float v) 
-    {
-        return 1.0 / (1.0 + exp(-v)); 
-    }
-
-    float sigmoid_deriv(float v) 
-    {
-        return (1.0 - sigmoid(v)) * sigmoid(v);
-    }
-
     __kernel void fc_layer_grad(
                 __private int const batch_size,
                 __private int const prev_shape,
@@ -70,7 +54,7 @@ static FC_LAYER_KERNEL_BWD: &'static str = r#"
                 sum_err += next_grad[i * next_shape + j] * next_ws[self_shape * j + idx];
             }
 
-            neu_grad[i * self_shape + idx] = sum_err * sigmoid_deriv(self_out[i * self_shape + idx]);
+            neu_grad[i * self_shape + idx] = sum_err * deriv(self_out[i * self_shape + idx]);
         }
 
         for (int i = 0; i < prev_shape; ++i) {
@@ -96,10 +80,11 @@ pub struct FcLayerOcl {
     ocl_kernel: Option<Kernel>,
     ocl_kernel_grad: Option<Kernel>,
     ocl_queue: Option<Queue>,
+    ocl_act_func: OclActivationFunc,
 }
 
 impl FcLayerOcl {
-    pub fn new(size: usize) -> Self {
+    pub fn new(size: usize, act: OclActivationFunc) -> Self {
         Self {
             cpu_params: LearnParams::empty(),
             ocl_params: None,
@@ -108,7 +93,17 @@ impl FcLayerOcl {
             ocl_kernel: None,
             ocl_queue: None,
             ocl_kernel_grad: None,
+            ocl_act_func: act,
         }
+    }
+
+    /// Must be set before init_ocl() was called
+    pub fn set_activation_function(&mut self, act: OclActivationFunc) {
+        if self.ocl_kernel.is_some() {
+            warn!("Setting ocl activation function, while kernel is already built");
+        }
+
+        self.ocl_act_func = act;
     }
 }
 
@@ -192,13 +187,34 @@ impl AbstractLayerOcl for FcLayerOcl {
         device: Device,
         queue: Queue,
     ) -> Result<(), Box<dyn Error>> {
+        let fwd_act = match self.ocl_act_func {
+            OclActivationFunc::Sigmoid => OCL_ACTIVATION_SIGMOID,
+            OclActivationFunc::Tanh => OCL_ACTIVATION_TANH,
+            OclActivationFunc::ReLU => OCL_ACTIVATION_RELU,
+            OclActivationFunc::Raw => OCL_ACTIVATION_RAW,
+            OclActivationFunc::LeakyReLU => OCL_ACTIVATION_LEAKY_RELU,
+            _ => todo!(),
+        };
+
+        let bwd_act = match self.ocl_act_func {
+            OclActivationFunc::Sigmoid => OCL_ACTIVATION_SIGMOID_DERIV,
+            OclActivationFunc::Tanh => OCL_ACTIVATION_TANH_DERIV,
+            OclActivationFunc::ReLU => OCL_ACTIVATION_RELU_DERIV,
+            OclActivationFunc::LeakyReLU => OCL_ACTIVATION_LEAKY_RELU_DERIV,
+            OclActivationFunc::Raw => OCL_ACTIVATION_RAW_DERIV,
+            _ => todo!(),
+        };
+
+        let program_fwd = [fwd_act, FC_LAYER_KERNEL_FWD].join("\n");
+        let program_bwd = [bwd_act, FC_LAYER_KERNEL_BWD].join("\n");
+
         let program = Program::builder()
             .devices(device)
-            .src(FC_LAYER_KERNEL_FWD)
+            .src(program_fwd)
             .build(&ocl_ctx)?;
         let program_grad = Program::builder()
             .devices(device)
-            .src(FC_LAYER_KERNEL_BWD)
+            .src(program_bwd)
             .build(&ocl_ctx)?;
 
         let kern = Kernel::builder()
@@ -206,7 +222,7 @@ impl AbstractLayerOcl for FcLayerOcl {
             .program(&program)
             .queue(queue.clone())
             .global_work_size(self.size * self.batch_size)
-            .arg_named("batch_size", 1 as i32)
+            .arg_named("batch_size", self.batch_size as i32)
             .arg_named("prev_shape", 0 as i32)
             .arg_named("self_shape", self.size as i32)
             .arg_named("in", None::<&Buffer<f32>>)
@@ -344,6 +360,7 @@ impl Default for FcLayerOcl {
             ocl_kernel: None,
             ocl_kernel_grad: None,
             ocl_queue: None,
+            ocl_act_func: OclActivationFunc::Sigmoid,
         }
     }
 }
@@ -360,6 +377,7 @@ impl Clone for FcLayerOcl {
             ocl_kernel: None,
             ocl_kernel_grad: None,
             ocl_queue: Some(queue.clone()),
+            ocl_act_func: self.ocl_act_func.clone(),
         }
     }
 
@@ -368,11 +386,15 @@ impl Clone for FcLayerOcl {
     }
 }
 
-impl WithParams for FcLayerOcl { 
+impl WithParams for FcLayerOcl {
     fn cfg(&self) -> HashMap<String, Variant> {
         let mut out = HashMap::new();
 
         out.insert("size".to_string(), Variant::Int(self.size as i32));
+        out.insert(
+            "activation".to_string(),
+            Variant::String(self.ocl_act_func.to_string()),
+        );
 
         out
     }
@@ -381,6 +403,15 @@ impl WithParams for FcLayerOcl {
         if let Some(size) = args.get("size") {
             if let Variant::Int(size) = size {
                 self.size = *size as usize;
+            }
+        }
+
+        if let Some(act_f) = args.get("activation") {
+            if let Variant::String(act_f) = act_f {
+                let cvt_res = OclActivationFunc::try_from(act_f.as_str());
+                if let Ok(cvt) = cvt_res {
+                    self.ocl_act_func = cvt;
+                }
             }
         }
     }

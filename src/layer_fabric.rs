@@ -2,8 +2,7 @@ use std::collections::HashMap;
 
 use log::warn;
 
-use crate::activation::Activation;
-use crate::activation::*;
+use crate::util::*;
 use crate::layers::*;
 use crate::util::*;
 
