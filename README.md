@@ -2,7 +2,7 @@
 [![crates.io](https://img.shields.io/crates/v/nevermind-neu.svg)](https://crates.io/crates/nevermind-neu)
 
 Machine learning library and tool with terminal user interface written in rust. It supports OpenCL layers (beta WIP) and CPU layers.
-Core math matrix library is *ndarray* which use *matrixmultiply* crate for CPU matrix multiplication.
+Core math matrix library is **ndarray** which use **matrixmultiply** crate for CPU matrix multiplication.
 
 ## Design goals
   - Fast optimized computations
@@ -10,7 +10,7 @@ Core math matrix library is *ndarray* which use *matrixmultiply* crate for CPU m
   - Provide utility terminal application to create, train, manage models with user-friendly terminal interface
 
 ## OpenCL
-OpenCL support is based on *ocl* crate. It is optional feature and enabled by default.
+OpenCL support is based on **ocl** crate. It is optional feature and enabled by default.
 
 ## Features
  - FullyConnected layer
