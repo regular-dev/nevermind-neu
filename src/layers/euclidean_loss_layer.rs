@@ -6,7 +6,6 @@ use ndarray::Zip;
 use log::{debug, info};
 
 use crate::layers::*;
-use crate::activation::*;
 use crate::learn_params::*;
 use crate::util::*;
 

@@ -62,7 +62,7 @@ impl SequentialOcl {
                 continue;
             }
 
-            mdl.add_layer(Box::new(FcLayerOcl::new(*i)));
+            mdl.add_layer(Box::new(FcLayerOcl::new(*i, OclActivationFunc::Sigmoid)));
         }
 
         mdl.init_layers();

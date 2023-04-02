@@ -3,7 +3,7 @@ use crate::learn_params::*;
 use crate::ocl::*;
 use crate::util::*;
 
-use log::debug;
+use log::{debug, warn};
 
 use ocl::MemFlags;
 use ocl::{Buffer, Context, Device, Kernel, Program, Queue};
@@ -11,11 +11,6 @@ use ocl::{Buffer, Context, Device, Kernel, Program, Queue};
 use std::collections::HashMap;
 
 static EUCLIDEAN_LOSS_KERNEL_FWD: &'static str = r#"
-    float sigmoid(float v) 
-    {
-        return 1.0 / (1.0 + exp(-v)); 
-    }
-
     __kernel void euclidean_loss(
                 __private int const batch_size,
                 __private int const prev_shape,
@@ -34,16 +29,11 @@ static EUCLIDEAN_LOSS_KERNEL_FWD: &'static str = r#"
             sum += ws[real_idx * prev_shape + j] * in[j + prev_shape * batch_idx];
         }
             
-        out[idx] = sum;
+        out[idx] = activation(sum);
     }
 "#;
 
 static EUCLIDEAN_LOSS_KERNEL_BWD: &'static str = r#"
-    float sigmoid(float v) 
-    {
-        return 1.0 / (1.0 + exp(-v)); 
-    }
-
     __kernel void euclidean_loss_grad(
                 __private int const batch_size,
                 __private int const prev_shape,
@@ -58,7 +48,7 @@ static EUCLIDEAN_LOSS_KERNEL_BWD: &'static str = r#"
 
         for (int i = 0; i < batch_size; ++i) {
             __private int inner_idx = i * self_shape + idx;
-            neu_grad[inner_idx] = labels[inner_idx] - self_out[inner_idx];
+            neu_grad[inner_idx] = (labels[inner_idx] - self_out[inner_idx]) * deriv(self_out[inner_idx]);
         }
             
         for (int i = 0; i < prev_shape; ++i) {
@@ -83,6 +73,7 @@ pub struct EuclideanLossLayerOcl {
     ocl_queue: Option<Queue>,
     ocl_kernel: Option<Kernel>,
     ocl_kernel_grad: Option<Kernel>,
+    ocl_act_func: OclActivationFunc,
 }
 
 impl EuclideanLossLayerOcl {
@@ -95,7 +86,23 @@ impl EuclideanLossLayerOcl {
             ocl_queue: None,
             ocl_kernel: None,
             ocl_kernel_grad: None,
+            ocl_act_func: OclActivationFunc::Raw,
         }
+    }
+
+    pub fn new_with_activation(size: usize, act: OclActivationFunc) -> Self {
+        let mut out = EuclideanLossLayerOcl::new(size);
+        out.set_activation_function(act);
+        out
+    }
+
+    /// Must be set before init_ocl() was called
+    pub fn set_activation_function(&mut self, act: OclActivationFunc) {
+        if self.ocl_kernel.is_some() {
+            warn!("Setting ocl activation function, while kernel is already built");
+        }
+
+        self.ocl_act_func = act;
     }
 }
 
@@ -184,13 +191,34 @@ impl AbstractLayerOcl for EuclideanLossLayerOcl {
         device: Device,
         queue: Queue,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        let fwd_act = match self.ocl_act_func {
+            OclActivationFunc::Sigmoid => OCL_ACTIVATION_SIGMOID,
+            OclActivationFunc::Tanh => OCL_ACTIVATION_TANH,
+            OclActivationFunc::ReLU => OCL_ACTIVATION_RELU,
+            OclActivationFunc::Raw => OCL_ACTIVATION_RAW,
+            OclActivationFunc::LeakyReLU => OCL_ACTIVATION_LEAKY_RELU,
+            _ => todo!(),
+        };
+
+        let bwd_act = match self.ocl_act_func {
+            OclActivationFunc::Sigmoid => OCL_ACTIVATION_SIGMOID_DERIV,
+            OclActivationFunc::Tanh => OCL_ACTIVATION_TANH_DERIV,
+            OclActivationFunc::ReLU => OCL_ACTIVATION_RELU_DERIV,
+            OclActivationFunc::LeakyReLU => OCL_ACTIVATION_LEAKY_RELU_DERIV,
+            OclActivationFunc::Raw => OCL_ACTIVATION_RAW_DERIV,
+            _ => todo!(),
+        };
+
+        let program_fwd = [fwd_act, EUCLIDEAN_LOSS_KERNEL_FWD].join("\n");
+        let program_bwd = [bwd_act, EUCLIDEAN_LOSS_KERNEL_BWD].join("\n");
+
         let program = Program::builder()
             .devices(device)
-            .src(EUCLIDEAN_LOSS_KERNEL_FWD)
+            .src(program_fwd)
             .build(&ocl_ctx)?;
         let program_grad = Program::builder()
             .devices(device)
-            .src(EUCLIDEAN_LOSS_KERNEL_BWD)
+            .src(program_bwd)
             .build(&ocl_ctx)?;
 
         let kern_fwd = Kernel::builder()
@@ -331,6 +359,7 @@ impl Default for EuclideanLossLayerOcl {
             ocl_queue: None,
             ocl_kernel: None,
             ocl_kernel_grad: None,
+            ocl_act_func: OclActivationFunc::Raw,
         }
     }
 }
@@ -346,6 +375,7 @@ impl Clone for EuclideanLossLayerOcl {
             batch_size: self.batch_size,
             ocl_kernel: None,
             ocl_kernel_grad: None,
+            ocl_act_func: self.ocl_act_func.clone(),
             ocl_queue: Some(queue.clone()),
         }
     }
@@ -360,6 +390,10 @@ impl WithParams for EuclideanLossLayerOcl {
         let mut out = HashMap::new();
 
         out.insert("size".to_string(), Variant::Int(self.size as i32));
+        out.insert(
+            "activation".to_string(),
+            Variant::String(self.ocl_act_func.to_string()),
+        );
 
         out
     }
@@ -368,6 +402,15 @@ impl WithParams for EuclideanLossLayerOcl {
         if let Some(size) = args.get("size") {
             if let Variant::Int(size) = size {
                 self.size = *size as usize;
+            }
+        }
+
+        if let Some(act_f) = args.get("activation") {
+            if let Variant::String(act_f) = act_f {
+                let cvt_res = OclActivationFunc::try_from(act_f.as_str());
+                if let Ok(cvt) = cvt_res {
+                    self.ocl_act_func = cvt;
+                }
             }
         }
     }

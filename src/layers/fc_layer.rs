@@ -7,7 +7,7 @@ use log::debug;
 use rand::{thread_rng, Rng};
 
 use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
-use crate::activation::{sign, Activation};
+use crate::util::*;
 use crate::learn_params::{LearnParams, ParamsBlob};
 
 use crate::util::{Variant, WithParams};

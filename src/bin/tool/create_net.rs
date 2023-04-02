@@ -9,7 +9,7 @@ use log::info;
 #[cfg(feature = "opencl")]
 use crate::create_net_ocl::*;
 
-use nevermind_neu::activation::*;
+use nevermind_neu::util::*;
 use nevermind_neu::err::*;
 use nevermind_neu::layers::*;
 use nevermind_neu::layers_storage::*;

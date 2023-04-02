@@ -13,9 +13,7 @@ use super::layers::AbstractLayer;
 use super::layers::EuclideanLossLayer;
 use super::layers::FcLayer;
 use super::layers::InputDataLayer;
-use super::util::Variant;
-
-use crate::activation::*;
+use crate::util::*;
 
 
 pub trait LayersStorage {
