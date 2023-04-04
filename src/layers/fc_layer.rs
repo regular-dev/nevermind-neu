@@ -197,6 +197,10 @@ where
         }
     }
 
+    pub fn new_box(size: usize, activation: Activation<T, TD>) -> Box<Self> {
+        Box::new(FcLayer::new(size, activation))
+    }
+
     pub fn dropout(mut self, val: f32) -> Self {
         self.dropout = val;
         self

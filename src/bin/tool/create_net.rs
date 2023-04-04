@@ -124,7 +124,7 @@ fn create_layers(stdin: &io::Stdin) -> Result<Sequential, Box<dyn Error>> {
     // Input layer
     println!("Now tell me the input layer size");
     let inp_layer_size: usize = read_from_stdin(stdin)?;
-    ls.add_layer(Box::new(InputDataLayer::new(inp_layer_size)));
+    ls.add_layer(Box::new(InputLayer::new(inp_layer_size)));
 
     // Hidden layer
     loop {

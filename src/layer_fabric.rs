@@ -66,7 +66,7 @@ pub fn create_layer(
             return Some(l);
         }
         "InputDataLayer" => {
-            let mut l = Box::new(InputDataLayer::default());
+            let mut l = Box::new(InputLayer::default());
             if cfg.is_some() {
                 l.set_cfg(cfg.unwrap());
             }

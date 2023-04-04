@@ -165,6 +165,10 @@ impl SoftmaxLossLayer {
             lr_params: LearnParams::empty()
         }
     }
+
+    pub fn new_box(size: usize) -> Box<Self> {
+        Box::new(SoftmaxLossLayer::new(size))
+    }
 }
 
 impl WithParams for SoftmaxLossLayer {

@@ -12,7 +12,7 @@ use super::layer_fabric::*;
 use super::layers::AbstractLayer;
 use super::layers::EuclideanLossLayer;
 use super::layers::FcLayer;
-use super::layers::InputDataLayer;
+use super::layers::InputLayer;
 use crate::util::*;
 
 
@@ -44,7 +44,7 @@ impl SequentialLayersStorage {
 
         for (idx, val) in layers.iter().enumerate() {
             if idx == 0 {
-                let l = Box::new(InputDataLayer::new(*val));
+                let l = Box::new(InputLayer::new(*val));
                 ls.add_layer(l);
                 continue;
             }

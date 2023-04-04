@@ -162,6 +162,10 @@ where
         }
     }
 
+    pub fn new_box(size: usize, activation: Activation<T, TD>) -> Box<Self> {
+        Box::new(EuclideanLossLayer::new(size, activation))
+    }
+
     pub fn l2_regularization(mut self, coef: f32) -> Self {
         self.l2_regul = coef;
         self

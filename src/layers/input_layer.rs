@@ -6,12 +6,12 @@ use crate::learn_params::LearnParams;
 use crate::util::{Batch, Blob, DataVecPtr, Variant, WithParams};
 
 #[derive(Default, Clone)]
-pub struct InputDataLayer {
+pub struct InputLayer {
     pub input_size: usize,
     pub lr_params: LearnParams,
 }
 
-impl AbstractLayer for InputDataLayer {
+impl AbstractLayer for InputLayer {
     fn forward_input(&mut self, input: Batch) -> LayerForwardResult {
         if input.ncols() != self.input_size {
             eprintln!(
@@ -45,7 +45,7 @@ impl AbstractLayer for InputDataLayer {
     }
 
     fn copy_layer(&self) -> Box<dyn AbstractLayer> {
-        let mut copy_l = InputDataLayer::new(self.input_size);
+        let mut copy_l = InputLayer::new(self.input_size);
         copy_l.set_learn_params(self.lr_params.copy());
         Box::new(copy_l)
     }
@@ -55,16 +55,20 @@ impl AbstractLayer for InputDataLayer {
     }
 }
 
-impl InputDataLayer {
+impl InputLayer {
     pub fn new(input_size: usize) -> Self {
         Self {
             input_size,
             lr_params: LearnParams::empty(),
         }
     }
+
+    pub fn new_box(size: usize) -> Box<Self> {
+        Box::new(InputLayer::new(size))
+    }
 }
 
-impl WithParams for InputDataLayer {
+impl WithParams for InputLayer {
     fn cfg(&self) -> HashMap<String, Variant> {
         let mut cfg: HashMap<String, Variant> = HashMap::new();
 
