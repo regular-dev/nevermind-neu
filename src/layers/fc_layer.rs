@@ -206,14 +206,26 @@ where
         self
     }
 
+    pub fn set_dropout(&mut self, val: f32) {
+        self.dropout = val;
+    }
+
     pub fn l2_regularization(mut self, coef: f32) -> Self {
         self.l2_regul = coef;
         self
     }
 
+    pub fn set_l2_regularization(&mut self, coef: f32) {
+        self.l2_regul = coef;
+    }
+
     pub fn l1_regularization(mut self, coef: f32) -> Self {
         self.l1_regul = coef;
         self
+    }
+
+    pub fn set_l1_regularization(&mut self, coef: f32) {
+        self.l1_regul = coef;
     }
 }
 
