@@ -171,7 +171,7 @@ pub fn create_net_from_cmd_args(args: &ArgMatches) -> Result<Orchestra<Sequentia
             info!("Writing error is disabled");
         }
 
-        net = net.write_test_err_to_file(is_true);
+        net = net.write_err_to_file(is_true);
     }
 
     Ok(net)

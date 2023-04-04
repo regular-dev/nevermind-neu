@@ -142,9 +142,13 @@ where
         self.test_model = self.train_model.clone();
     }
 
-    pub fn write_test_err_to_file(mut self, state: bool) -> Self {
+    pub fn write_err_to_file(mut self, state: bool) -> Self {
         self.is_write_test_err = state;
         self
+    }
+
+    pub fn set_write_err_to_file(&mut self, state: bool) {
+        self.is_write_test_err = state;
     }
 
     pub fn train_batch_size(&self) -> Option<usize> {
@@ -164,9 +168,17 @@ where
         self
     }
 
-    pub fn test_iter(mut self, err_iter: usize) -> Self {
-        self.test_iter = err_iter;
+    pub fn set_snap_iter(&mut self, snap_each_iter: usize) {
+        self.snap_iter = snap_each_iter;
+    }
+
+    pub fn test_iter(mut self, test_iter: usize) -> Self {
+        self.test_iter = test_iter;
         self
+    }
+
+    pub fn set_test_iter(&mut self, test_iter: usize) {
+        self.test_iter = test_iter;
     }
 
     pub fn save_model_state(&self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
