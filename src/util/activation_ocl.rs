@@ -73,21 +73,21 @@ pub static OCL_ACTIVATION_RELU: &'static str = r#"
 pub static OCL_ACTIVATION_RELU_DERIV: &'static str = r#"
     float deriv(float v)
     {
-        return v > 0.0 : 1.0 : 0.0;
+        return v > 0.0 ? 1.0 : 0.0;
     }
 "#;
 
 pub static OCL_ACTIVATION_LEAKY_RELU: &'static str = r#"
     float activation(float v)
     {
-        return v > 0.0 ? v : 0.01 * val;
+        return v > 0.0 ? v : 0.01 * v;
     }
 "#;
 
 pub static OCL_ACTIVATION_LEAKY_RELU_DERIV: &'static str = r#"
     float deriv(float v)
     {
-        return v > 0.0 : 1.0 : 0.01;
+        return v > 0.0 ? 1.0 : 0.01;
     }
 "#;
 
