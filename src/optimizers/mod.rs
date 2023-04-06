@@ -55,3 +55,15 @@ pub fn optimizer_from_type(opt_type: &str) -> Result<Box<dyn Optimizer>, CustomE
         }
     }
 }
+
+impl Default for Box<dyn Optimizer> {
+    fn default() -> Self {
+        Box::new(OptimizerRMS::new(1e-2, 0.9))
+    }
+}
+
+impl Clone for Box<dyn Optimizer> {
+    fn clone(&self) -> Self {
+        Box::new(OptimizerRMS::new(1e-2, 0.9))
+    }
+}
