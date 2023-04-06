@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::vec::Vec;
 
 use serde::{Deserialize, Serialize, Serializer};
-use serde_json;
 use serde_yaml;
 
 use log::{debug, error, info, warn};
@@ -63,7 +62,10 @@ where
     T: Model + Serialize + Clone,
 {
     pub fn new(model: T) -> Self {
-        let test_model = Some(model.clone());
+        let mut test_model = model.clone();
+        // Creates separate output buffer for test network, 
+        // weights buffer is the same as in train model
+        test_model.set_batch_size_for_tests(model.batch_size());
 
         Orchestra {
             train_dl: None,
@@ -72,9 +74,9 @@ where
             test_batch_size: 10,
             is_write_test_err: true,
             train_model: Some(model),
-            test_model,
+            test_model: Some(test_model),
             snap_iter: 0,
-            test_iter: 0,
+            test_iter: 100,
             cur_iter_acc: -1.0,
             cur_iter_err: 0.0,
             learn_rate_decay: 1.0,
@@ -97,7 +99,7 @@ where
             train_model: None,
             test_model: Some(model),
             snap_iter: 0,
-            test_iter: 0,
+            test_iter: 100,
             cur_iter_err: 0.0,
             cur_iter_acc: -1.0,
             learn_rate_decay: 1.0,
