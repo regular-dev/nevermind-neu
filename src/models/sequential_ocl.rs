@@ -1,11 +1,13 @@
-use std::{cell::RefCell, fmt, fs::File, io::prelude::*, io::ErrorKind, rc::Rc};
+use std::{cell::RefCell, fmt, fs, fs::File, io::prelude::*, io::ErrorKind, rc::Rc};
 
 use crate::layers::*;
 use crate::learn_params::LearnParams;
 use crate::models::*;
+use crate::models::pb::PbSequentialModel;
 use crate::optimizers::*;
 use crate::util::*;
 
+use prost::Message;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use log::{debug, error, info};
@@ -72,7 +74,7 @@ impl SequentialOcl {
 
     pub fn from_file(filepath: &str) -> Result<Self, Box<dyn Error>> {
         let cfg_file = File::open(filepath)?;
-        let mut mdl: SequentialOcl = serde_yaml::from_reader(cfg_file)?;        
+        let mdl: SequentialOcl = serde_yaml::from_reader(cfg_file)?;        
         Ok(mdl)
     }
 
@@ -362,10 +364,33 @@ impl Model for SequentialOcl {
     }
 
     fn save_state(&self, filepath: &str) -> Result<(), Box<dyn Error>> {
-        todo!()
+        let mut vec_ws = Vec::with_capacity(self.layers.len());
+
+        for l in self.layers.iter() {
+            let ocl_params = l.ocl_params().unwrap();
+            vec_ws.push(ocl_params.serialize_ws_to_pb());
+        }
+
+        let pb_model = PbSequentialModel { layers: vec_ws };
+
+        let mut file = File::create(filepath)?;
+        file.write_all(pb_model.encode_to_vec().as_slice())?;
+
+        Ok(())
     }
     fn load_state(&mut self, filepath: &str) -> Result<(), Box<dyn Error>> {
-        todo!()
+        let buf = fs::read(filepath)?;
+
+        let mut pb_model = PbSequentialModel::decode(buf.as_slice())?;
+        let q = self.queue();
+
+        for (self_l, dec_l) in self.layers.iter_mut().zip(&mut pb_model.layers) {
+            let mut ocl_prms = self_l.ocl_params().unwrap();
+            ocl_prms.set_ws_from_vec(&mut dec_l.ws[0].vals, q.clone());
+            self_l.set_ocl_params(ocl_prms);
+        }
+
+        Ok(())
     }
 }
 

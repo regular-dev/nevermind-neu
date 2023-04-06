@@ -243,7 +243,7 @@ impl Model for Sequential {
 
     fn save_state(&self, filepath: &str) -> Result<(), Box<dyn std::error::Error>> {
         // create vector of layers learn_params
-        let mut vec_lr = Vec::new();
+        let mut vec_lr = Vec::with_capacity(self.ls.len());
         for l in 0..self.ls.len() {
             let lr_params = self.ls.at(l).learn_params().unwrap();
             let ws = lr_params.ws.borrow();
@@ -272,18 +272,6 @@ impl Model for Sequential {
         }
 
         Ok(())
-    }
-}
-
-impl Default for Box<dyn Optimizer> {
-    fn default() -> Self {
-        Box::new(OptimizerRMS::new(1e-2, 0.9))
-    }
-}
-
-impl Clone for Box<dyn Optimizer> {
-    fn clone(&self) -> Self {
-        Box::new(OptimizerRMS::new(1e-2, 0.9))
     }
 }
 
