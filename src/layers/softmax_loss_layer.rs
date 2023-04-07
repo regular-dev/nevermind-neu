@@ -57,7 +57,7 @@ impl AbstractLayer for SoftmaxLossLayer {
         expected_vec: Batch,
     ) -> LayerBackwardResult {
         let prev_input = &prev_input[0].output.borrow();
-        let mut self_err_vals = self.lr_params.err_vals.borrow_mut();
+        let mut self_err_vals = self.lr_params.neu_grad.borrow_mut();
         let mut self_output = self.lr_params.output.borrow_mut();
 
         let match_cnt = AtomicU32::new(0);

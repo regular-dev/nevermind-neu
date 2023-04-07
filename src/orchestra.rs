@@ -301,7 +301,7 @@ where
     }
 
     fn calc_avg_err(last_layer_lr: &LearnParams) -> f32 {
-        let err = last_layer_lr.err_vals.borrow();
+        let err = last_layer_lr.neu_grad.borrow();
 
         let sq_sum = err.fold(0.0, |mut sq_sum, el| {
             sq_sum += el.powf(2.0);

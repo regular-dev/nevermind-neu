@@ -71,9 +71,9 @@ where
     }
 
     fn backward(&mut self, prev_input: ParamsBlob, next_input: ParamsBlob) -> LayerBackwardResult {
-        let next_err_vals = next_input[0].err_vals.borrow();
+        let next_err_vals = next_input[0].neu_grad.borrow();
         let next_ws = next_input[0].ws.borrow();
-        let mut self_err_vals = self.lr_params.err_vals.borrow_mut();
+        let mut self_err_vals = self.lr_params.neu_grad.borrow_mut();
         let self_output = self.lr_params.output.borrow();
         let next_ws0 = &next_ws[0];
 

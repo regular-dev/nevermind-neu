@@ -17,7 +17,7 @@ use super::util::{Batch, DataVec, WsBlob, WsMat};
 pub struct LearnParams {
     pub ws: Rc<RefCell<WsBlob>>,
     pub ws_grad: Rc<RefCell<WsBlob>>,
-    pub err_vals: Rc<RefCell<Batch>>,
+    pub neu_grad: Rc<RefCell<Batch>>,
     pub output: Rc<RefCell<Batch>>,
     pub uuid: Uuid,
 }
@@ -33,7 +33,7 @@ impl LearnParams {
                 Uniform::new(-0.9, 0.9),
             )])),
             ws_grad: Rc::new(RefCell::new(vec![WsMat::zeros((size, prev_size))])),
-            err_vals: Rc::new(RefCell::new(Batch::zeros((1, size)))),
+            neu_grad: Rc::new(RefCell::new(Batch::zeros((1, size)))),
             output: Rc::new(RefCell::new(Batch::zeros((1, size)))),
             uuid: Uuid::new_v4(),
         }
@@ -43,7 +43,7 @@ impl LearnParams {
         Self {
             ws: Rc::new(RefCell::new(vec![WsMat::zeros((0, 0))])),
             ws_grad: Rc::new(RefCell::new(vec![WsMat::zeros((0, 0))])),
-            err_vals: Rc::new(RefCell::new(Batch::zeros((0, 0)))),
+            neu_grad: Rc::new(RefCell::new(Batch::zeros((0, 0)))),
             output: Rc::new(RefCell::new(Batch::zeros((0, 0)))),
             uuid: Uuid::new_v4(),
         }
@@ -53,7 +53,7 @@ impl LearnParams {
         Self {
             ws: Rc::new(RefCell::new(vec![WsMat::zeros((0, 0))])),
             ws_grad: Rc::new(RefCell::new(vec![WsMat::zeros((0, 0))])),
-            err_vals: Rc::new(RefCell::new(Batch::zeros((0, 0)))),
+            neu_grad: Rc::new(RefCell::new(Batch::zeros((0, 0)))),
             output: Rc::new(RefCell::new(Batch::zeros((1, size)))),
             uuid: Uuid::new_v4(),
         }
@@ -70,7 +70,7 @@ impl LearnParams {
                 WsMat::zeros((size, prev_size)),
                 WsMat::zeros((size, 1)),
             ])),
-            err_vals: Rc::new(RefCell::new(Batch::zeros((1, size)))),
+            neu_grad: Rc::new(RefCell::new(Batch::zeros((1, size)))),
             output: Rc::new(RefCell::new(Batch::zeros((1, size)))),
             uuid: Uuid::new_v4(),
         }
@@ -78,7 +78,7 @@ impl LearnParams {
 
     pub fn fit_to_batch_size(&mut self, new_batch_size: usize) {
         let mut out_m = self.output.borrow_mut();
-        let mut err_m = self.err_vals.borrow_mut();
+        let mut err_m = self.neu_grad.borrow_mut();
         let size = out_m.ncols();
 
         if out_m.nrows() != new_batch_size {
@@ -90,7 +90,7 @@ impl LearnParams {
     pub fn prepare_for_tests(&mut self, batch_size: usize) {
         let out_size = self.output.borrow().ncols();
 
-        self.err_vals = Rc::new(RefCell::new(Batch::zeros((0, 0))));
+        self.neu_grad = Rc::new(RefCell::new(Batch::zeros((0, 0))));
         self.output = Rc::new(RefCell::new(Batch::zeros((batch_size, out_size))));
     }
 
@@ -104,13 +104,13 @@ impl LearnParams {
             let mut ws_b = lp.ws.borrow_mut();
             let mut ws_grad_b = lp.ws_grad.borrow_mut();
             let mut output_b = lp.output.borrow_mut();
-            let mut err_val_b = lp.err_vals.borrow_mut();
+            let mut err_val_b = lp.neu_grad.borrow_mut();
             let uuid_b = lp.uuid.clone();
 
             *ws_b = self.ws.borrow().clone();
             *ws_grad_b = self.ws_grad.borrow().clone();
             *output_b = self.output.borrow().clone();
-            *err_val_b = self.err_vals.borrow().clone();
+            *err_val_b = self.neu_grad.borrow().clone();
             lp.uuid = uuid_b;
         }
 

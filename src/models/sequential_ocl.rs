@@ -314,7 +314,7 @@ impl Model for SequentialOcl {
             .learn_params()
             .unwrap();
         let mut cpu_output = cpu_lp.output.borrow_mut();
-        let mut cpu_neu_grad = cpu_lp.err_vals.borrow_mut();
+        let mut cpu_neu_grad = cpu_lp.neu_grad.borrow_mut();
 
         // Fetch data from OCL Buffer to cpu memory
         let ocl_params_output = ocl_params.output.borrow();
