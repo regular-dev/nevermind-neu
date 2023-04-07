@@ -71,7 +71,7 @@ impl AbstractLayerOcl for InputLayerOcl {
         Ok(())
     }
 
-    fn forward_input_ocl(&mut self, input_data: Batch) -> LayerOclResult {
+    fn forward_input_ocl(&mut self, input_data: Array2D) -> LayerOclResult {
         let ocl_queue = self.ocl_queue.as_ref().unwrap();
         let ocl_buf = Buffer::builder()
             .queue(ocl_queue.clone())

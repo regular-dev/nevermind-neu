@@ -19,7 +19,7 @@ pub trait AbstractLayerOcl: AbstractLayer {
         todo!("ocl")
     }
 
-    fn forward_input_ocl(&mut self, input_data: Batch) -> LayerOclResult {
+    fn forward_input_ocl(&mut self, input_data: Array2D) -> LayerOclResult {
         Err(LayerError::NotImpl)
     }
     fn forward_ocl(&mut self, params: OclParamsBlob) -> LayerOclResult {
@@ -35,7 +35,7 @@ pub trait AbstractLayerOcl: AbstractLayer {
     fn backward_output_ocl(
         &mut self,
         prev_input: OclParamsBlob,
-        expected: Batch,
+        expected: Array2D,
     ) -> LayerOclResult {
         Err(LayerError::NotImpl)
     }

@@ -11,14 +11,14 @@ use ndarray_rand::rand::SeedableRng;
 use ndarray_rand::rand_distr::{Distribution, Uniform};
 use ndarray_rand::RandomExt;
 
-use super::util::{Batch, DataVec, WsBlob, WsMat};
+use super::util::{Array2D, DataVec, WsBlob, WsMat};
 
 #[derive(Clone, Default)]
 pub struct LearnParams {
     pub ws: Rc<RefCell<WsBlob>>,
     pub ws_grad: Rc<RefCell<WsBlob>>,
-    pub neu_grad: Rc<RefCell<Batch>>,
-    pub output: Rc<RefCell<Batch>>,
+    pub neu_grad: Rc<RefCell<Array2D>>,
+    pub output: Rc<RefCell<Array2D>>,
     pub uuid: Uuid,
 }
 
@@ -33,8 +33,8 @@ impl LearnParams {
                 Uniform::new(-0.9, 0.9),
             )])),
             ws_grad: Rc::new(RefCell::new(vec![WsMat::zeros((size, prev_size))])),
-            neu_grad: Rc::new(RefCell::new(Batch::zeros((1, size)))),
-            output: Rc::new(RefCell::new(Batch::zeros((1, size)))),
+            neu_grad: Rc::new(RefCell::new(Array2D::zeros((1, size)))),
+            output: Rc::new(RefCell::new(Array2D::zeros((1, size)))),
             uuid: Uuid::new_v4(),
         }
     }
@@ -43,8 +43,8 @@ impl LearnParams {
         Self {
             ws: Rc::new(RefCell::new(vec![WsMat::zeros((0, 0))])),
             ws_grad: Rc::new(RefCell::new(vec![WsMat::zeros((0, 0))])),
-            neu_grad: Rc::new(RefCell::new(Batch::zeros((0, 0)))),
-            output: Rc::new(RefCell::new(Batch::zeros((0, 0)))),
+            neu_grad: Rc::new(RefCell::new(Array2D::zeros((0, 0)))),
+            output: Rc::new(RefCell::new(Array2D::zeros((0, 0)))),
             uuid: Uuid::new_v4(),
         }
     }
@@ -53,8 +53,8 @@ impl LearnParams {
         Self {
             ws: Rc::new(RefCell::new(vec![WsMat::zeros((0, 0))])),
             ws_grad: Rc::new(RefCell::new(vec![WsMat::zeros((0, 0))])),
-            neu_grad: Rc::new(RefCell::new(Batch::zeros((0, 0)))),
-            output: Rc::new(RefCell::new(Batch::zeros((1, size)))),
+            neu_grad: Rc::new(RefCell::new(Array2D::zeros((0, 0)))),
+            output: Rc::new(RefCell::new(Array2D::zeros((1, size)))),
             uuid: Uuid::new_v4(),
         }
     }
@@ -70,8 +70,8 @@ impl LearnParams {
                 WsMat::zeros((size, prev_size)),
                 WsMat::zeros((size, 1)),
             ])),
-            neu_grad: Rc::new(RefCell::new(Batch::zeros((1, size)))),
-            output: Rc::new(RefCell::new(Batch::zeros((1, size)))),
+            neu_grad: Rc::new(RefCell::new(Array2D::zeros((1, size)))),
+            output: Rc::new(RefCell::new(Array2D::zeros((1, size)))),
             uuid: Uuid::new_v4(),
         }
     }
@@ -82,16 +82,16 @@ impl LearnParams {
         let size = out_m.ncols();
 
         if out_m.nrows() != new_batch_size {
-            *out_m = Batch::zeros((new_batch_size, size));
-            *err_m = Batch::zeros((new_batch_size, size));
+            *out_m = Array2D::zeros((new_batch_size, size));
+            *err_m = Array2D::zeros((new_batch_size, size));
         }
     }
 
     pub fn prepare_for_tests(&mut self, batch_size: usize) {
         let out_size = self.output.borrow().ncols();
 
-        self.neu_grad = Rc::new(RefCell::new(Batch::zeros((0, 0))));
-        self.output = Rc::new(RefCell::new(Batch::zeros((batch_size, out_size))));
+        self.neu_grad = Rc::new(RefCell::new(Array2D::zeros((0, 0))));
+        self.output = Rc::new(RefCell::new(Array2D::zeros((batch_size, out_size))));
     }
 
     /// Copies learn_params memory of (weights, gradients, output...)

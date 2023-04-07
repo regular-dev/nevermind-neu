@@ -13,8 +13,8 @@ pub use sequential_ocl::*;
 use serde::{Serialize, Deserialize};
 
 pub trait Model {
-    fn feedforward(&mut self, train_data: Batch);
-    fn backpropagate(&mut self, expected: Batch);
+    fn feedforward(&mut self, train_data: Array2D);
+    fn backpropagate(&mut self, expected: Array2D);
     fn optimize(&mut self);
     fn batch_size(&self) -> usize;
     fn set_batch_size(&mut self, batch_size: usize);

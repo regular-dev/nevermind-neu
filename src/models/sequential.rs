@@ -105,7 +105,7 @@ impl Sequential {
 }
 
 impl Model for Sequential {
-    fn feedforward(&mut self, train_data: Batch) {
+    fn feedforward(&mut self, train_data: Array2D) {
         let mut out = None;
 
         // for the first(input) layer
@@ -137,7 +137,7 @@ impl Model for Sequential {
         }
     }
 
-    fn backpropagate(&mut self, expected: Batch) {
+    fn backpropagate(&mut self, expected: Array2D) {
         let expected_data = expected;
 
         let mut out = None;

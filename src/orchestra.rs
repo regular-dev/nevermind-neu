@@ -256,7 +256,7 @@ where
     pub fn eval_one(
         &mut self,
         data: DataVec,
-    ) -> Result<Rc<RefCell<Batch>>, Box<dyn std::error::Error>> {
+    ) -> Result<Rc<RefCell<Array2D>>, Box<dyn std::error::Error>> {
         if self.test_batch_size != 1 {
             error!("Invalid batch size {} for test model", self.test_batch_size);
             return Err(Box::new(CustomError::Other));
@@ -277,8 +277,8 @@ where
 
     pub fn eval(
         &mut self,
-        train_data: Batch,
-    ) -> Result<Rc<RefCell<Batch>>, Box<dyn std::error::Error>> {
+        train_data: Array2D,
+    ) -> Result<Rc<RefCell<Array2D>>, Box<dyn std::error::Error>> {
         if let Some(test_model) = self.test_model.as_mut() {
             test_model.feedforward(train_data);
 

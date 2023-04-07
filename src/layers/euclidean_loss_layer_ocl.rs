@@ -288,7 +288,7 @@ impl AbstractLayerOcl for EuclideanLossLayerOcl {
     fn backward_output_ocl(
         &mut self,
         prev_input: OclParamsBlob,
-        expected: Batch,
+        expected: Array2D,
     ) -> LayerOclResult {
         let ocl_queue = self.ocl_queue.as_ref().unwrap();
 

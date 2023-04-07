@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::dataloader::LabeledEntry;
 use crate::learn_params::{LearnParams, ParamsBlob};
-use crate::util::{Batch, DataVec, DataVecPtr, Variant, WithParams};
+use crate::util::{Array2D, DataVec, DataVecPtr, Variant, WithParams};
 
 #[derive(Debug)]
 pub enum LayerError {
@@ -17,7 +17,7 @@ pub type LayerBackwardResult = Result<ParamsBlob, LayerError>;
 
 pub trait AbstractLayer : WithParams {
     // for signature for input layers
-    fn forward_input(&mut self, input_data: Batch) -> LayerForwardResult {
+    fn forward_input(&mut self, input_data: Array2D) -> LayerForwardResult {
         Err(LayerError::NotImpl)
     }
 
@@ -30,7 +30,7 @@ pub trait AbstractLayer : WithParams {
         Err(LayerError::NotImpl)
     }
 
-    fn backward_output(&mut self, prev_input: ParamsBlob, expected: Batch) -> LayerBackwardResult {
+    fn backward_output(&mut self, prev_input: ParamsBlob, expected: Array2D) -> LayerBackwardResult {
         Err(LayerError::NotImpl)
     }
 

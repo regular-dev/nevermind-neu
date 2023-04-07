@@ -54,7 +54,7 @@ impl AbstractLayer for SoftmaxLossLayer {
     fn backward_output(
         &mut self,
         prev_input: ParamsBlob,
-        expected_vec: Batch,
+        expected_vec: Array2D,
     ) -> LayerBackwardResult {
         let prev_input = &prev_input[0].output.borrow();
         let mut self_err_vals = self.lr_params.neu_grad.borrow_mut();
@@ -153,7 +153,7 @@ impl AbstractLayer for SoftmaxLossLayer {
 
     fn set_input_shape(&mut self, sh: &[usize]) {
         let mut lr_params = LearnParams::new(self.size, sh[0]);
-        lr_params.output = Rc::new(RefCell::new(Batch::zeros((2, self.size))));
+        lr_params.output = Rc::new(RefCell::new(Array2D::zeros((2, self.size))));
         self.lr_params = lr_params;
     }
 }

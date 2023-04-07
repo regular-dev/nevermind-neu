@@ -1,6 +1,6 @@
 use ndarray::{Array, Axis};
 
-use crate::util::{DataVec, Batch};
+use crate::util::{DataVec, Array2D};
 
 
 #[derive(Clone, Default)]
@@ -20,16 +20,16 @@ impl LabeledEntry {
 
 #[derive(Default, Clone)]
 pub struct MiniBatch {
-    pub input: Batch,
-    pub output: Batch,
+    pub input: Array2D,
+    pub output: Array2D,
 }
 
 impl MiniBatch {
     pub fn new(b: Vec<&LabeledEntry>) -> Self {
         assert!( !b.is_empty() );
 
-        let mut inp_arr = Batch::zeros( (b.len(), b.first().unwrap().input.shape()[0]) );
-        let mut out_arr = Batch::zeros( (b.len(), b.first().unwrap().expected.shape()[0]) );
+        let mut inp_arr = Array2D::zeros( (b.len(), b.first().unwrap().input.shape()[0]) );
+        let mut out_arr = Array2D::zeros( (b.len(), b.first().unwrap().expected.shape()[0]) );
 
         // Copies memory into batch
 

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use super::abstract_layer::{AbstractLayer, LayerError, LayerForwardResult};
 
 use crate::learn_params::LearnParams;
-use crate::util::{Batch, Blob, DataVecPtr, Variant, WithParams};
+use crate::util::{Array2D, Blob, DataVecPtr, Variant, WithParams};
 
 #[derive(Default, Clone)]
 pub struct InputLayer {
@@ -12,7 +12,7 @@ pub struct InputLayer {
 }
 
 impl AbstractLayer for InputLayer {
-    fn forward_input(&mut self, input: Batch) -> LayerForwardResult {
+    fn forward_input(&mut self, input: Array2D) -> LayerForwardResult {
         if input.ncols() != self.input_size {
             eprintln!(
                 "Invalid input size for InputDataLayer : {}",

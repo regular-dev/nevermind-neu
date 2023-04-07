@@ -52,7 +52,7 @@ where
     fn backward_output(
         &mut self,
         prev_input: ParamsBlob,
-        expected_vec: Batch,
+        expected_vec: Array2D,
     ) -> LayerBackwardResult {
         let prev_input = &prev_input[0].output.borrow();
         let mut self_err_vals = self.lr_params.neu_grad.borrow_mut();

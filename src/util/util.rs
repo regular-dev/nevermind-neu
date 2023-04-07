@@ -16,7 +16,7 @@ pub enum Variant {
 pub type Num = f32;
 pub type DataVec = Array1< Num >;
 pub type DataVecPtr = Rc<RefCell<DataVec>>;
-pub type Batch = Array2< Num >;
+pub type Array2D = Array2< Num >;
 pub type WsMat = Array2< Num >;
 pub type WsBlob = Vec< WsMat >;
 pub type WsBlobPtr = Rc<RefCell<WsBlob>>;
