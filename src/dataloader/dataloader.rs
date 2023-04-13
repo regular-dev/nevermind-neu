@@ -6,4 +6,5 @@ pub trait DataLoader {
 
     fn reset(&mut self) { }
     fn len(&self) -> Option< usize > { None }
+    fn pos(&self) -> Option< usize > { None }
 }

@@ -39,7 +39,7 @@ where
 {
     pub train_dl: Option<Box<dyn DataLoader>>,
     pub test_dl: Option<Box<dyn DataLoader>>,
-    test_err_non_dl: f32,
+    test_err_accum: f64,
     test_batch_size: usize,
     is_write_test_err: bool,
     train_model: Option<T>,
@@ -63,14 +63,14 @@ where
 {
     pub fn new(model: T) -> Self {
         let mut test_model = model.clone();
-        // Creates separate output buffer for test network, 
+        // Creates separate output buffer for test network,
         // weights buffer is the same as in train model
         test_model.set_batch_size_for_tests(model.batch_size());
 
         Orchestra {
             train_dl: None,
             test_dl: None,
-            test_err_non_dl: 0.0,
+            test_err_accum: 0.0,
             test_batch_size: 10,
             is_write_test_err: true,
             train_model: Some(model),
@@ -93,7 +93,7 @@ where
         let test_net = Orchestra {
             train_dl: None,
             test_dl: None,
-            test_err_non_dl: 0.0,
+            test_err_accum: 0.0,
             test_batch_size: 1,
             is_write_test_err: true,
             train_model: None,
@@ -206,14 +206,14 @@ where
         self.decay_step = step;
     }
 
-    fn infer_train_error(&mut self) -> f32 {
-        let err = self.test_err_non_dl / self.test_batch_size as f32; // error average
-        self.test_err_non_dl = 0.0;
+    fn infer_train_error(&mut self, divider_iter: f64) -> f64 {
+        let err = self.test_err_accum / divider_iter; // error average
+        self.test_err_accum = 0.0;
         return err;
     }
 
     /// Test net and returns and average error
-    fn test_net(&mut self) -> f32 {
+    fn test_net(&mut self) -> f64 {
         let test_dl = self.test_dl.as_mut().expect("Test dataset isn't set");
         let mut err = 0.0;
 
@@ -250,7 +250,7 @@ where
             info!("Accuracy : {}", accuracy_cnt);
         }
 
-        err / self.test_batch_size as f32
+        err as f64 / self.test_batch_size as f64
     }
 
     pub fn eval_one(
@@ -370,7 +370,7 @@ where
             self.cur_iter_acc = Self::calc_accuracy(&lr).unwrap();
 
             if self.test_dl.is_none() {
-                self.test_err_non_dl += self.cur_iter_err;
+                self.test_err_accum += self.cur_iter_err as f64;
             }
         }
     }
@@ -387,7 +387,7 @@ where
         Ok(file)
     }
 
-    fn append_error(&self, f: &mut File, err: f32) -> Result<(), Box<dyn std::error::Error>> {
+    fn append_error(&self, f: &mut File, err: f64) -> Result<(), Box<dyn std::error::Error>> {
         write!(f, "{:.6}\n", err)?;
         Ok(())
     }
@@ -397,17 +397,17 @@ where
         self.test_model = Some(test_mdl);
     }
 
-    pub fn train_for_error(&mut self, err: f32) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn train_for_error(&mut self, err: f64) -> Result<(), Box<dyn std::error::Error>> {
         self.train_for_error_or_iter(err, 0)
     }
 
-    /// Trains till MSE(error) becomes lower than err or
+    /// Trains till error becomes lower than err or
     /// train iteration more then max_iter.
     /// If err is 0, it will ignore the error threshold.
     /// If max_iter is 0, it will ignore max_iter argument.
     pub fn train_for_error_or_iter(
         &mut self,
-        err: f32,
+        err: f64,
         max_iter: usize,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut iter_num = 0;
@@ -420,11 +420,45 @@ where
         let mut flag_stop = false;
         let mut flag_save = false;
 
+        let mut flag_test_next_iter = false;
+        let mut epoch_cnt = 1;
+        let ds_len = self.train_dl.as_ref().unwrap().len().unwrap();
+        let train_batch_size = self.train_model.as_ref().unwrap().batch_size();
+
+        let ten_perc_metric = ds_len as f64 * 0.1; // for 10% , 20% done displaying
+        let mut prev_pos = 0;
+        let mut ten_perc_num = 0;
+
         loop {
             if self.test_dl.is_none() {
+                let ds_pos = self.train_dl.as_ref().unwrap().pos().unwrap();
+
+                if ds_pos + train_batch_size > ds_len {
+                    flag_test_next_iter = true;
+                }
+
+                if train_batch_size * 10 < ds_len // for small datasets not displaying percentages
+                    && (ds_pos >= (ten_perc_num + 1) as usize * ten_perc_metric as usize
+                        || prev_pos > ds_pos)
+                {
+                    info!(
+                        "Done {}% of {} epoch...",
+                        (ten_perc_num + 1) * 10,
+                        epoch_cnt
+                    );
+
+                    ten_perc_num += 1;
+
+                    if ten_perc_num > 9 {
+                        ten_perc_num = 0;
+                    }
+
+                    prev_pos = ds_pos;
+                }
+
                 // if we have test dataset
-                if iter_num % self.test_batch_size == 0 && iter_num != 0 {
-                    test_err = self.infer_train_error(); // average error on train dataset
+                if flag_test_next_iter && iter_num != 0 {
+                    test_err = self.infer_train_error((ds_len / train_batch_size) as f64); // average error on train dataset
 
                     if test_err < err {
                         info!("Reached satisfying error value");
@@ -434,11 +468,15 @@ where
                     let elapsed = bench_time.elapsed();
 
                     info!(
-                        "Did {} iterations for {} milliseconds",
-                        self.test_batch_size,
-                        elapsed.as_millis()
+                        "Epoch {} for {:.3} seconds, error : {}",
+                        epoch_cnt,
+                        elapsed.as_secs_f64(),
+                        test_err,
                     );
 
+                    prev_pos = 0;
+                    epoch_cnt += 1;
+                    flag_test_next_iter = false;
                     bench_time = Instant::now();
                 }
             } else {
@@ -460,6 +498,14 @@ where
                         break;
                     }
                 }
+
+                if self.test_iter != 0 && iter_num % self.test_iter == 0 && iter_num != 0 {
+                    info!("On iter {} , error is : {}", iter_num, test_err);
+
+                    if self.is_write_test_err {
+                        self.append_error(&mut err_file, test_err)?;
+                    }
+                }
             }
 
             if max_iter != 0 && iter_num >= max_iter {
@@ -476,15 +522,6 @@ where
             if self.snap_iter != 0 && iter_num % self.snap_iter == 0 && iter_num != 0 {
                 let filename = format!("{}_{}.state", self.name, iter_num);
                 self.save_model_state(&filename)?;
-            }
-
-            if self.test_iter != 0
-                && iter_num % self.test_iter == 0
-                && iter_num != 0
-                && self.is_write_test_err
-            {
-                info!("On iter {} , error is : {}", iter_num, test_err);
-                self.append_error(&mut err_file, test_err)?;
             }
 
             for it_cb in self.callbacks.iter_mut() {

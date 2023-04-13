@@ -70,7 +70,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Arg::new("Err")
                 .long("err")
                 .help("Train till the net error will be less than this value")
-                .action(ArgAction::Set).value_parser(clap::value_parser!(f32))
+                .action(ArgAction::Set).value_parser(clap::value_parser!(f64))
                 .require_equals(true)
         )
         .arg(

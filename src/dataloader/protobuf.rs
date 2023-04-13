@@ -108,6 +108,10 @@ impl DataLoader for ProtobufDataLoader {
         Some(self.data.len())
     }
 
+    fn pos(&self) -> Option< usize > {
+        Some(*self.id.borrow())
+    }
+
     fn reset(&mut self) {
         *self.id.borrow_mut() = 0;
     }

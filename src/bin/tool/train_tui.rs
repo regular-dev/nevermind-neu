@@ -337,7 +337,7 @@ fn create_net_thread(
         let mut opt_err = None;
         let mut opt_max_iter = None;
 
-        if let Some(err) = args_cloned.get_one::<f32>("Err") {
+        if let Some(err) = args_cloned.get_one::<f64>("Err") {
             opt_err = Some(err);
         }
 

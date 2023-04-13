@@ -23,7 +23,7 @@ pub fn train_net_ocl(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
     let mut opt_err = None;
     let mut opt_max_iter = None;
 
-    if let Some(err) = args.get_one::<f32>("Err") {
+    if let Some(err) = args.get_one::<f64>("Err") {
         info!("Satisfying error : {}", err);
         opt_err = Some(err);
     }

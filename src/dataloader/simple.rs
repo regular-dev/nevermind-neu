@@ -38,6 +38,14 @@ impl DataLoader for SimpleDataLoader {
     fn reset(&mut self) {
         *self.id.borrow_mut() = 0;
     }
+
+    fn len(&self) -> Option< usize > {
+        Some(self.data.len())
+    }
+
+    fn pos(&self) -> Option< usize > {
+        Some(*self.id.borrow())
+    }
 }
 
 impl SimpleDataLoader {
