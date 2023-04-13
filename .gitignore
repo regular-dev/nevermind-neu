@@ -19,3 +19,5 @@ network.cfg
 err.log
 *.state
 *.zip
+*.old
+*.data
