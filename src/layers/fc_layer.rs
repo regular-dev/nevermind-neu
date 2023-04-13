@@ -98,22 +98,22 @@ where
         let ws = self.lr_params.ws.borrow();
         let mut ws_grad = self.lr_params.ws_grad.borrow_mut();
 
-        let ws0_shape = ws[0].shape();
+        // somehow refactor below
+        // This could be done with parallel iterator
+        // But parallel iterator will make value only with big arrays (a lot of ws, big batch size)
+        for w in ws_grad[0].indexed_iter_mut() {
+            let cur_ws_idx = [w.0.0, w.0.1];
 
-        for neu_idx in 0..ws0_shape[0] {
-            for prev_idx in 0..ws0_shape[1] {
-                let cur_ws_idx = [neu_idx, prev_idx];
+            let mut avg = 0.0;
+            Zip::from(prev_input.column(w.0.1)).and(self_err_vals.column(w.0.0)).for_each(
+                |prev_val, err_val| {
+                    avg += prev_val * err_val;
+                }
+            );
 
-                let mut avg = 0.0;
-                Zip::from(prev_input.column(prev_idx))
-                    .and(self_err_vals.column(neu_idx))
-                    .for_each(|prev_val, err_val| {
-                        avg += prev_val * err_val;
-                    });
+            avg = avg / prev_input.column(w.0.1).len() as f32;
 
-                avg = avg / prev_input.column(prev_idx).len() as f32;
-
-                let mut l2_penalty = 0.0;
+            let mut l2_penalty = 0.0;
                 if self.l2_regul != 0.0 {
                     l2_penalty = self.l2_regul * ws[0][cur_ws_idx];
                 }
@@ -122,26 +122,31 @@ where
                 if self.l1_regul == 0.0 {
                     l1_penalty = self.l1_regul * sign(ws[0][cur_ws_idx]);
                 }
-
-                ws_grad[0][cur_ws_idx] = avg - l2_penalty - l1_penalty;
-            }
+            *w.1 = avg - l2_penalty - l1_penalty;
         }
 
-        // for bias :
-        for neu_idx in 0..ws[1].shape()[0] {
-            // self.size
-            for prev_idx in 0..ws[1].shape()[1] {
-                let cur_ws_idx = [neu_idx, prev_idx];
+        // bias
+        for w in ws_grad[1].indexed_iter_mut() {
+            let cur_ws_idx = [w.0.0, w.0.1];
 
                 let mut avg = 0.0;
-                Zip::from(self_err_vals.column(neu_idx)).for_each(|err_val| {
+                Zip::from(self_err_vals.column(w.0.0)).for_each(|err_val| {
                     avg += err_val;
                 });
 
-                avg = avg / self_err_vals.column(prev_idx).len() as f32;
+                avg = avg / self_err_vals.column(w.0.1).len() as f32;
 
-                ws_grad[1][cur_ws_idx] = avg;
-            }
+                let mut l2_penalty = 0.0;
+                if self.l2_regul != 0.0 {
+                    l2_penalty = self.l2_regul * ws[1][cur_ws_idx];
+                }
+
+                let mut l1_penalty = 0.0;
+                if self.l1_regul == 0.0 {
+                    l1_penalty = self.l1_regul * sign(ws[1][cur_ws_idx]);
+                }
+
+                *w.1 = avg - l2_penalty - l1_penalty;
         }
 
         debug!("[ok] HiddenLayer backward()");

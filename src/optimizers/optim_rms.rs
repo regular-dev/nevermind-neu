@@ -46,20 +46,15 @@ impl OptimizerRMS {
         alpha: &f32,
         theta: &f32,
     ) {
-        for neu_idx in 0..ws.shape()[0] {
-            for prev_idx in 0..ws.shape()[1] {
-                let cur_ws_idx = [neu_idx, prev_idx];
+        for w in ws.indexed_iter_mut() {
+            let cur_ws_idx = [w.0.0, w.0.1]; // neu_idx, prev_idx
 
-                // grad is 0.0 when weights is in dropout selection
-                if ws_grad[cur_ws_idx] == 0.0 {
-                    continue;
-                }
-
-                rms[cur_ws_idx] =
-                    alpha * rms[cur_ws_idx] + (1.0 - alpha) * ws_grad[cur_ws_idx].powf(2.0);
-                ws[cur_ws_idx] +=
-                    (learn_rate / (rms[cur_ws_idx] + theta).sqrt()) * ws_grad[cur_ws_idx];
+            if ws_grad[cur_ws_idx] == 0.0 {
+                continue;
             }
+
+            rms[cur_ws_idx] = alpha * rms[cur_ws_idx] + (1.0 - alpha) * ws_grad[cur_ws_idx].powf(2.0);
+            *w.1 += (learn_rate / (rms[cur_ws_idx] + theta).sqrt()) * ws_grad[cur_ws_idx];
         }
     }
 }

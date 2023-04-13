@@ -1,7 +1,7 @@
 use std::{
     cell::RefCell,
     rc::Rc,
-    sync::atomic::{AtomicU32, Ordering},
+    sync::{atomic::{AtomicU32, Ordering}, Arc},
 };
 
 use std::collections::HashMap;
@@ -153,7 +153,7 @@ impl AbstractLayer for SoftmaxLossLayer {
 
     fn set_input_shape(&mut self, sh: &[usize]) {
         let mut lr_params = LearnParams::new(self.size, sh[0]);
-        lr_params.output = Rc::new(RefCell::new(Array2D::zeros((2, self.size))));
+        lr_params.output = Arc::new(RefCell::new(Array2D::zeros((2, self.size))));
         self.lr_params = lr_params;
     }
 }
