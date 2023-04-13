@@ -12,6 +12,9 @@ homepage = "https://regular-dev.org/nevermind-neu"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+#[profile.release] # for profiling
+#debug = true
+
 [[example]]
 name = "xor"
 
@@ -24,7 +27,7 @@ name = "xor_ocl"
 [dependencies]
 rand = "0.5"
 serde = { version = "1.0", features = ["derive"] }
-log = { version = "0.4" } #features = ["release_max_level_off"] }
+log = { version = "0.4", features = ["release_max_level_info"] }
 #simple-logging = "2.0.2"
 env_logger = "0.9.0"
 log4rs = "1.1.1"
@@ -36,7 +39,7 @@ csv = "1.1"
 serde_json = "1.0"
 serde_yaml = "0.8"
 
-ndarray = { version= "0.15.0", features = ["rayon"] }
+ndarray = { version= "0.15.6", features = ["rayon"] }
 
 ndarray-rand = "0.14.0"
 ndarray-stats = "0.5.1"
