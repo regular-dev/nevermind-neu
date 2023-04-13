@@ -98,7 +98,6 @@ where
         let ws = self.lr_params.ws.borrow();
         let mut ws_grad = self.lr_params.ws_grad.borrow_mut();
 
-        // somehow refactor below
         // This could be done with parallel iterator
         // But parallel iterator will make value only with big arrays (a lot of ws, big batch size)
         for w in ws_grad[0].indexed_iter_mut() {
