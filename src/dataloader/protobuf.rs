@@ -6,12 +6,13 @@ use std::cell::RefCell;
 
 use crate::models::pb::{PbDataStorage, PbDataBatch};
 
+use log::info;
+
 use prost::Message;
 
 use ndarray::Array;
 
 use crate::dataloader::*;
-use crate::util::DataVecPtr;
 
 
 #[derive(Default)]
