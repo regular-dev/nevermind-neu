@@ -33,14 +33,14 @@ impl TryFrom<&str> for OclActivationFunc {
 pub static OCL_ACTIVATION_SIGMOID: &'static str = r#"
     float activation(float v)
     {
-        return 1.0 / (1.0 / exp(-v));
+        return 1.0 / (1.0 + pow(M_E_F, -v));
     }
 "#;
 
 pub static OCL_ACTIVATION_SIGMOID_DERIV: &'static str = r#"
     float sigmoid(float v)
     {
-        return 1.0 / (1.0 / exp(-v));
+        return 1.0 / (1.0 + pow(M_E_F, -v));
     }
 
     float deriv(float v) 
