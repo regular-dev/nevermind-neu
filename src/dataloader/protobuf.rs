@@ -6,10 +6,7 @@ use std::cell::RefCell;
 
 use crate::models::pb::{PbDataStorage, PbDataBatch};
 
-use log::info;
-
 use prost::Message;
-
 use ndarray::Array;
 
 use crate::dataloader::*;
@@ -45,8 +42,8 @@ impl ProtobufDataLoader {
             let expected = Array::from_shape_vec(expected_vec.len(), expected_vec)?;
 
             dl.data.push(LabeledEntry{ 
-                input: input,
-                expected: expected
+                input,
+                expected,
             });
         }
 

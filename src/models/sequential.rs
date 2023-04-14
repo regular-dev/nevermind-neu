@@ -266,9 +266,20 @@ impl Model for Sequential {
         let mut pb_model = PbSequentialModel::decode(buf.as_slice())?;
 
         for (self_l, l) in self.ls.iter_mut().zip(&mut pb_model.layers) {
+            if self_l.layer_type() == "InputLayer" {
+                continue;
+            }
+
             let layer_param = self_l.learn_params().unwrap();
             let mut l_ws = layer_param.ws.borrow_mut();
-            *l_ws = model_helper::convert_pb_to_ws_blob(l);
+            let mut ws_blob = model_helper::convert_pb_to_ws_blob(l);
+
+            // if there is no bias -> add empty bias values
+            if ws_blob.len() < 2 {
+                ws_blob.push(WsMat::zeros((self_l.size(), 1)));
+            }
+
+            *l_ws = ws_blob;
         }
 
         Ok(())

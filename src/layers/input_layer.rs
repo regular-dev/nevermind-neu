@@ -29,7 +29,7 @@ impl AbstractLayer for InputLayer {
     }
 
     fn layer_type(&self) -> &str {
-        "InputDataLayer"
+        "InputLayer"
     }
 
     fn learn_params(&self) -> Option<LearnParams> {

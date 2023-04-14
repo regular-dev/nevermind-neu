@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::vec::Vec;
 
-use serde::{Deserialize, Serialize, Serializer};
+use serde::Serialize;
 use serde_yaml;
 
 use log::{debug, error, info, warn};
@@ -161,7 +161,7 @@ where
         }
     }
 
-    pub fn save_network_cfg(&mut self, path: &str) -> std::io::Result<()> {
+    pub fn save_network_cfg(&mut self, _path: &str) -> std::io::Result<()> {
         todo!() // TODO : need to save net.cfg with layers_cfg and optimizer_cfg
     }
 
@@ -401,6 +401,23 @@ where
         self.train_for_error_or_iter(err, 0)
     }
 
+    pub fn train_epochs_or_error(
+        &mut self,
+        epochs: usize,
+        err: f64,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let train_batch_size = self.train_model.as_ref().unwrap().batch_size();
+        let iter = epochs
+            * self
+                .train_dl
+                .as_ref()
+                .unwrap()
+                .len()
+                .expect("Train dataset has not length!")
+            / train_batch_size;
+        self.train_for_error_or_iter(err, iter)
+    }
+
     /// Trains till error becomes lower than err or
     /// train iteration more then max_iter.
     /// If err is 0, it will ignore the error threshold.
@@ -420,7 +437,6 @@ where
         let mut flag_stop = false;
         let mut flag_save = false;
 
-        let mut flag_test_next_iter = false;
         let mut epoch_cnt = 1;
         let ds_len = self.train_dl.as_ref().unwrap().len().unwrap();
         let train_batch_size = self.train_model.as_ref().unwrap().batch_size();
@@ -433,51 +449,45 @@ where
             if self.test_dl.is_none() {
                 let ds_pos = self.train_dl.as_ref().unwrap().pos().unwrap();
 
-                if ds_pos + train_batch_size > ds_len {
-                    flag_test_next_iter = true;
-                }
-
                 if train_batch_size * 10 < ds_len // for small datasets not displaying percentages
                     && (ds_pos >= (ten_perc_num + 1) as usize * ten_perc_metric as usize
                         || prev_pos > ds_pos)
                 {
                     info!(
-                        "Done {}% of {} epoch...",
+                        "Done {}% of {} epoch, error : {}...",
                         (ten_perc_num + 1) * 10,
-                        epoch_cnt
+                        epoch_cnt,
+                        self.test_err_accum
+                            / (ten_perc_metric * (ten_perc_num + 1) as f64
+                                / train_batch_size as f64) as f64,
                     );
 
                     ten_perc_num += 1;
 
                     if ten_perc_num > 9 {
+                        test_err = self.infer_train_error((ds_len / train_batch_size) as f64); // average error on train dataset
+
+                        if test_err < err {
+                            info!("Reached satisfying error value");
+                            break;
+                        }
+
+                        let elapsed = bench_time.elapsed();
+
+                        info!(
+                            "Epoch {} for {:.3} seconds, error : {}",
+                            epoch_cnt,
+                            elapsed.as_secs_f64(),
+                            test_err,
+                        );
+                        epoch_cnt += 1;
                         ten_perc_num = 0;
+                        prev_pos = 0;
+
+                        bench_time = Instant::now();
+                    } else {
+                        prev_pos = ds_pos;
                     }
-
-                    prev_pos = ds_pos;
-                }
-
-                // if we have test dataset
-                if flag_test_next_iter && iter_num != 0 {
-                    test_err = self.infer_train_error((ds_len / train_batch_size) as f64); // average error on train dataset
-
-                    if test_err < err {
-                        info!("Reached satisfying error value");
-                        break;
-                    }
-
-                    let elapsed = bench_time.elapsed();
-
-                    info!(
-                        "Epoch {} for {:.3} seconds, error : {}",
-                        epoch_cnt,
-                        elapsed.as_secs_f64(),
-                        test_err,
-                    );
-
-                    prev_pos = 0;
-                    epoch_cnt += 1;
-                    flag_test_next_iter = false;
-                    bench_time = Instant::now();
                 }
             } else {
                 if iter_num % self.test_iter == 0 && iter_num != 0 {

@@ -8,7 +8,6 @@ use std::str::FromStr;
 use crate::models::pb::{PbFloatVec, PbWsBlob};
 use crate::util::WsBlob;
 
-
 pub fn convert_ws_blob_to_pb(ws_blob: &WsBlob) -> PbWsBlob {
     let mut pb_ws_blob = PbWsBlob::default();
 
@@ -41,9 +40,17 @@ pub fn convert_pb_to_ws_blob(pb_ws_blob: &mut PbWsBlob) -> WsBlob {
     for it in pb_ws_blob.ws.iter_mut() {
         // TODO : handle unwrap
         let vals = std::mem::replace(&mut it.vals, Vec::new());
+        let vals_len = vals.len();
+
         let ws_mat =
             Array2::from_shape_vec((it.shape_size as usize, it.shape_prev_size as usize), vals)
-                .unwrap();
+                .expect(
+                    format!(
+                        "Invalid weights shape. Given : {}, Self : {} / {}",
+                        vals_len, it.shape_size, it.shape_prev_size
+                    )
+                    .as_str(),
+                );
         ws_blob.push(ws_mat);
     }
 

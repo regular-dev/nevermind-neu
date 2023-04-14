@@ -46,7 +46,7 @@ impl SequentialOcl {
             batch_size: 1,
             ocl_ctx: context,
             ocl_queue: kern_queue.clone(),
-            optim: Box::new(OptimizerOclRms::new(kern_queue.clone())),
+            optim: Box::new(OptimizerOclRms::new(0.01, kern_queue.clone())),
         })
     }
 
@@ -385,6 +385,9 @@ impl Model for SequentialOcl {
         let q = self.queue();
 
         for (self_l, dec_l) in self.layers.iter_mut().zip(&mut pb_model.layers) {
+            if self_l.layer_type() == "InputLayerOcl" {
+                continue;
+            }
             let mut ocl_prms = self_l.ocl_params().unwrap();
             ocl_prms.set_ws_from_vec(&mut dec_l.ws[0].vals, q.clone());
             self_l.set_ocl_params(ocl_prms);

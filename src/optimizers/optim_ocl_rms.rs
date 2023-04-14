@@ -3,7 +3,6 @@ use crate::optimizers::*;
 
 use ocl::{Buffer, Kernel, MemFlags, Program, Queue};
 use std::collections::HashMap;
-use std::hash::Hash;
 use uuid::Uuid;
 
 static SRC_RMS_KERNEL: &'static str = r#"
@@ -27,16 +26,16 @@ static SRC_RMS_KERNEL: &'static str = r#"
 "#;
 
 pub struct OptimizerOclRms {
-    pub learn_rate: f32,
-    pub alpha: f32,
-    pub theta: f32,
-    pub ws_rms: HashMap<Uuid, Buffer<f32>>,
-    pub queue: Queue,
-    pub kernel: Kernel,
+    learn_rate: f32,
+    alpha: f32,
+    theta: f32,
+    ws_rms: HashMap<Uuid, Buffer<f32>>,
+    queue: Queue,
+    kernel: Kernel,
 }
 
 impl OptimizerOclRms {
-    pub fn new(queue: Queue) -> Self {
+    pub fn new(learn_rate: f32, queue: Queue) -> Self {
         let program = Program::builder()
             .devices(queue.device())
             .src(SRC_RMS_KERNEL)
@@ -47,7 +46,7 @@ impl OptimizerOclRms {
             .name("rms_optim")
             .program(&program)
             .queue(queue.clone())
-            .arg_named("learn_rate", 1e-2 as f32)
+            .arg_named("learn_rate", learn_rate)
             .arg_named("alpha", 0.9 as f32)
             .arg_named("theta", 1e-7 as f32)
             .arg_named("ws_grad", None::<&Buffer<f32>>)
@@ -64,6 +63,42 @@ impl OptimizerOclRms {
             queue,
             kernel,
         }
+    }
+
+    pub fn set_learn_rate(&mut self, learn_rate: f32) {
+        self.learn_rate = learn_rate;
+
+        self.kernel
+            .set_arg("learn_rate", learn_rate as f32)
+            .expect("[OCL_RMS] Failed to set learning rate");
+    }
+
+    pub fn set_alpha(&mut self, alpha: f32) {
+        self.alpha = alpha;
+
+        self.kernel
+            .set_arg("alpha", self.alpha)
+            .expect("[OCL_RMS] Failed to set alpha");
+    }
+
+    pub fn set_theta(&mut self, theta: f32) {
+        self.theta = theta;
+
+        self.kernel
+            .set_arg("theta", self.theta)
+            .expect("[OCL_RMS] Failed to set theta");
+    }
+
+    pub fn learn_rate(&self) -> f32 {
+        self.learn_rate
+    }
+
+    pub fn alpha(&self) -> f32 {
+        self.alpha
+    }
+
+    pub fn theta(&self) -> f32 {
+        self.theta
     }
 }
 
@@ -88,11 +123,6 @@ impl OptimizerOcl for OptimizerOclRms {
 
         self.kernel
             .set_default_global_work_size(ocl::SpatialDims::One(ws_delta_buf.len()));
-
-        // TODO : learn_rate and momentum will be removed from here
-        self.kernel.set_arg("learn_rate", self.learn_rate).unwrap();
-        self.kernel.set_arg("alpha", self.alpha).unwrap();
-        self.kernel.set_arg("theta", self.theta).unwrap();
 
         self.kernel
             .set_arg("ws", &*ws_buf)

@@ -8,7 +8,6 @@ use log::info;
 use ocl::Queue;
 
 use crate::create_net::*;
-use nevermind_neu::err::*;
 use nevermind_neu::layers::*;
 use nevermind_neu::models::*;
 use nevermind_neu::optimizers::*;
@@ -61,7 +60,7 @@ fn handle_optimizer_ocl(
 
         optimizer_ocl_to_file(optimizer, filepath)?;
     } else if opt_type == "rmsprop" {
-        let mut optimizer = OptimizerOclRms::new(ocl_queue);
+        let mut optimizer = OptimizerOclRms::new(0.01, ocl_queue);
 
         println!("Tell me learning rate [0.01 or 1e-2 format]");
         let lr: f32 = read_from_stdin(&stdin)?;
@@ -69,8 +68,8 @@ fn handle_optimizer_ocl(
         println!("Tell me alpha [0.9 format]");
         let alpha: f32 = read_from_stdin(&stdin)?;
 
-        optimizer.learn_rate = lr;
-        optimizer.alpha = alpha;
+        optimizer.set_learn_rate(lr);
+        optimizer.set_alpha(alpha);
 
         optimizer_ocl_to_file(optimizer, filepath)?;
     } else if opt_type == "adagrad" {

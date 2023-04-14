@@ -21,7 +21,7 @@ pub fn optimizer_ocl_from_file(filepath: &str, queue: Queue) -> Result<Box<dyn O
 
     if let Variant::String(optim_type) = optim_type.unwrap() {
         if optim_type == "rmsprop" {
-            let mut rmsprop = Box::new(OptimizerOclRms::new(queue.clone()));
+            let mut rmsprop = Box::new(OptimizerOclRms::new(0.01, queue.clone()));
             rmsprop.set_cfg(&optim_params.0);
 
             return Ok(rmsprop);
