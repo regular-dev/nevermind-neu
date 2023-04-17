@@ -11,4 +11,5 @@ pub use activation_ocl::*;
 pub use util::*;
 pub use normalize::*;
 pub use activation::*;
+pub use activation_macros::*;
 pub use with_params::*;
