@@ -7,20 +7,20 @@ use crate::models::Model;
 use crate::models::pb::PbSequentialModel;
 use crate::optimizers::{Optimizer, OptimizerRMS};
 
-use std::{fs, cell::RefCell, rc::Rc};
 use std::fs::File;
 use std::io::prelude::*;
+use std::{cell::RefCell, fs, rc::Rc};
 
-use log::{error, debug, info};
+use log::{debug, error, info};
 use std::io::ErrorKind;
 
 use prost::Message;
-use serde::{Deserialize, Serialize, Deserializer, *};
+use serde::{Deserialize, Deserializer, Serialize, *};
 
+use crate::layer_fabric::*;
 use crate::layers::*;
 use crate::models::*;
 use crate::util::*;
-use crate::layer_fabric::*;
 
 #[derive(Clone)]
 pub struct Sequential {
@@ -42,7 +42,7 @@ impl Sequential {
         let mut seq = Self {
             ls: SequentialLayersStorage::new_simple_network(net_cfg),
             batch_size: 1,
-            optim: Box::new(OptimizerRMS::new(1e-2, 0.9))
+            optim: Box::new(OptimizerRMS::new(1e-2, 0.9)),
         };
         seq.compile_shapes();
 
@@ -50,7 +50,11 @@ impl Sequential {
     }
 
     pub fn new_with_layers(ls: SequentialLayersStorage) -> Self {
-        Self { ls, batch_size: 1, optim: Box::new(OptimizerRMS::new(1e-2, 0.9)) }
+        Self {
+            ls,
+            batch_size: 1,
+            optim: Box::new(OptimizerRMS::new(1e-2, 0.9)),
+        }
     }
 
     pub fn from_file(filepath: &str) -> Result<Self, Box<dyn Error>> {
@@ -81,7 +85,8 @@ impl Sequential {
         Ok(())
     }
 
-    pub fn compile_shapes(&mut self) { // TODO : may return some result in further
+    pub fn compile_shapes(&mut self) {
+        // TODO : may return some result in further
         let mut prev_size = 0;
 
         for (idx, l) in self.ls.iter_mut().enumerate() {
@@ -201,7 +206,9 @@ impl Model for Sequential {
     fn optimizer_mut(&mut self) -> &mut Box<dyn WithParams> {
         // https://github.com/rust-lang/rust/issues/65991
         unsafe {
-            let out = std::mem::transmute::<&mut Box<dyn Optimizer>, &mut Box<dyn WithParams>>(&mut self.optim);
+            let out = std::mem::transmute::<&mut Box<dyn Optimizer>, &mut Box<dyn WithParams>>(
+                &mut self.optim,
+            );
             return out;
         }
     }
@@ -211,7 +218,12 @@ impl Model for Sequential {
     }
 
     fn output_params(&self) -> LearnParams {
-        let last_layer_params = self.ls.last().expect("There is no layers in model !!!").learn_params().unwrap();
+        let last_layer_params = self
+            .ls
+            .last()
+            .expect("There is no layers in model !!!")
+            .learn_params()
+            .unwrap();
         last_layer_params.clone()
     }
 
@@ -276,6 +288,7 @@ impl Model for Sequential {
 
             // if there is no bias -> add empty bias values
             if ws_blob.len() < 2 {
+                info!("Added zeroed bias");
                 ws_blob.push(WsMat::zeros((self_l.size(), 1)));
             }
 
@@ -293,7 +306,7 @@ impl Serialize for Sequential {
     {
         let mut seq_mdl = SerdeSequentialModel::default();
 
-        for l in self.ls .iter() {
+        for l in self.ls.iter() {
             let s_layer_param = SerdeLayerParam {
                 name: l.layer_type().to_owned(),
                 params: l.cfg(),

@@ -454,7 +454,7 @@ where
                         || prev_pos > ds_pos)
                 {
                     info!(
-                        "Done {}% of {} epoch, error : {}...",
+                        "Done {}% of {} epoch, error : {:.5}...",
                         (ten_perc_num + 1) * 10,
                         epoch_cnt,
                         self.test_err_accum
