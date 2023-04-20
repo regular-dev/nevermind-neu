@@ -4,7 +4,7 @@ use ndarray::Zip;
 
 use log::debug;
 
-use rand::{thread_rng, Rng};
+use rand::{thread_rng, Rng, ThreadRng};
 
 use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
 use crate::util::*;
@@ -16,11 +16,12 @@ use crate::util::{Variant, WithParams};
 #[derive(Clone)]
 pub struct FcLayer<T: Fn(f32) -> f32 + Clone, TD: Fn(f32) -> f32 + Clone> {
     pub lr_params: LearnParams,
-    pub size: usize,
-    pub dropout: f32,
-    pub l2_regul: f32,
-    pub l1_regul: f32,
+    size: usize,
+    dropout: f32,
+    l2_regul: f32,
+    l1_regul: f32,
     pub activation: Activation<T, TD>,
+    rng: ThreadRng,
 }
 
 impl<T, TD> AbstractLayer for FcLayer<T, TD>
@@ -35,9 +36,8 @@ where
         let ws0 = &ws[0];
         let bias_out = ws[1].column(0);
 
-        let mut rng = thread_rng();
         let dropout_len = (self.size as f32 * self.dropout) as usize;
-        let dropout_n = rng.gen_range(0, self.size - dropout_len as usize);
+        let dropout_n = self.rng.gen_range(0, self.size - dropout_len as usize);
         let dropout_y = dropout_n + dropout_len;
 
         // for each input batch
@@ -198,6 +198,7 @@ where
             activation,
             l2_regul: 0.0,
             l1_regul: 0.0,
+            rng: thread_rng(),
         }
     }
 

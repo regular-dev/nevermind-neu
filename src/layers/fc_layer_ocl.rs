@@ -5,6 +5,8 @@ use crate::util::*;
 
 use log::{debug, warn};
 
+use rand::{thread_rng, Rng, ThreadRng};
+
 use ocl::{Buffer, Context, Device, Kernel, MemFlags, Program, Queue};
 
 use std::{collections::HashMap, error::Error};
@@ -14,6 +16,8 @@ static FC_LAYER_KERNEL_FWD: &'static str = r#"
                 __private int const batch_size,
                 __private int const prev_shape,
                 __private int const self_shape,
+                __private int const dropout_idx,
+                __private int const dropout_len,
                 __global const float *in,
                 __global const float *ws,
                 __global float *out)
@@ -27,8 +31,12 @@ static FC_LAYER_KERNEL_FWD: &'static str = r#"
         for (int j = 0; j < prev_shape; ++j) {
             sum += ws[real_idx * prev_shape + j] * in[j + prev_shape * batch_idx];
         }
-            
+
         out[idx] = activation(sum);
+
+        if (real_idx >= dropout_idx && real_idx < dropout_idx + dropout_len) {
+            out[idx] = 0.0;
+        }
     }
 "#;
 
@@ -77,6 +85,9 @@ pub struct FcLayerOcl {
     size: usize,
     batch_size: usize,
 
+    dropout: f32,
+    rng: ThreadRng,
+
     ocl_kernel: Option<Kernel>,
     ocl_kernel_grad: Option<Kernel>,
     ocl_queue: Option<Queue>,
@@ -94,6 +105,8 @@ impl FcLayerOcl {
             ocl_queue: None,
             ocl_kernel_grad: None,
             ocl_act_func: act,
+            dropout: 0.0,
+            rng: thread_rng(),
         }
     }
 
@@ -104,6 +117,14 @@ impl FcLayerOcl {
         }
 
         self.ocl_act_func = act;
+    }
+
+    pub fn set_dropout(&mut self, dropout: f32) {
+        self.dropout = dropout;
+    }
+
+    pub fn dropout(&self) -> f32 {
+        self.dropout
     }
 }
 
@@ -225,6 +246,8 @@ impl AbstractLayerOcl for FcLayerOcl {
             .arg_named("batch_size", self.batch_size as i32)
             .arg_named("prev_shape", 0 as i32)
             .arg_named("self_shape", self.size as i32)
+            .arg_named("dropout_idx", 0 as i32)
+            .arg_named("dropout_len", 0 as i32)
             .arg_named("in", None::<&Buffer<f32>>)
             .arg_named("ws", None::<&Buffer<f32>>)
             .arg_named("out", None::<&Buffer<f32>>)
@@ -262,6 +285,10 @@ impl AbstractLayerOcl for FcLayerOcl {
 
         let self_kern = self.ocl_kernel.as_ref().unwrap();
 
+        // dropout
+        let dropout_len = (self.size as f32 * self.dropout) as i32;
+        let dropout_idx = self.rng.gen_range(0, self.size - dropout_len as usize);
+
         self_kern
             .set_arg("in", &*prev_output)
             .expect("[fc_ocl] Setting param IN failure");
@@ -271,6 +298,12 @@ impl AbstractLayerOcl for FcLayerOcl {
         self_kern
             .set_arg("out", &*self_output)
             .expect("[fc_ocl] Setting param OUT failure");
+        self_kern
+            .set_arg("dropout_idx", dropout_idx as i32)
+            .expect("[fc_ocl] Failed to set DROPOUT_IDX");
+        self_kern
+            .set_arg("dropout_len", dropout_len as i32)
+            .expect("[fc_ocl] Failed to set DROPOUT LEN");
 
         unsafe {
             self_kern
@@ -361,6 +394,9 @@ impl Default for FcLayerOcl {
             ocl_kernel_grad: None,
             ocl_queue: None,
             ocl_act_func: OclActivationFunc::Sigmoid,
+
+            dropout: 0.0,
+            rng: thread_rng(),
         }
     }
 }
@@ -378,6 +414,9 @@ impl Clone for FcLayerOcl {
             ocl_kernel_grad: None,
             ocl_queue: Some(queue.clone()),
             ocl_act_func: self.ocl_act_func.clone(),
+
+            dropout: 0.0,
+            rng: thread_rng(),
         }
     }
 
