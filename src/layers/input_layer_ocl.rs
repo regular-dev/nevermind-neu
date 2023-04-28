@@ -1,6 +1,6 @@
 use ocl::{Buffer, Context, Device, MemFlags, Queue};
 
-use log::debug;
+use log::{debug, error};
 
 use crate::layers::*;
 use crate::learn_params::LearnParams;
@@ -72,6 +72,11 @@ impl AbstractLayerOcl for InputLayerOcl {
     }
 
     fn forward_input_ocl(&mut self, input_data: Array2D) -> LayerOclResult {
+        if input_data.ncols() != self.size {
+            error!("[InputOCL] Invalid data size : {} | {}", input_data.ncols(), self.size);
+            return Result::Err(LayerError::InvalidSize);
+        }
+
         let ocl_queue = self.ocl_queue.as_ref().unwrap();
         let ocl_buf = Buffer::builder()
             .queue(ocl_queue.clone())
