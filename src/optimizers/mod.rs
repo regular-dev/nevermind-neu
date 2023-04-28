@@ -8,6 +8,8 @@ mod optim_ocl_sgd;
 #[cfg(feature = "opencl")]
 mod optim_ocl_rms;
 #[cfg(feature = "opencl")]
+mod optim_ocl_adam;
+#[cfg(feature = "opencl")]
 mod optim_ocl;
 #[cfg(feature = "opencl")]
 mod optim_ocl_fabric;
@@ -23,6 +25,8 @@ pub use optim_fabric::*;
 pub use optim_ocl_sgd::*;
 #[cfg(feature = "opencl")]
 pub use optim_ocl_rms::*;
+#[cfg(feature = "opencl")]
+pub use optim_ocl_adam::*;
 #[cfg(feature = "opencl")]
 pub use optim_ocl::*;
 #[cfg(feature ="opencl")]
