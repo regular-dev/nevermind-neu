@@ -330,7 +330,7 @@ where
         let optim = self.train_model.as_mut().unwrap().optimizer_mut();
         let optim_prm = optim.cfg();
 
-        if let Some(lr) = optim_prm.get("learn_rate") {
+        if let Some(lr) = optim_prm.get("learning_rate") {
             if let Variant::Float(lr) = lr {
                 let decayed_lr = lr * self.learn_rate_decay;
 
@@ -340,9 +340,11 @@ where
                 );
 
                 let mut m = HashMap::new();
-                m.insert("learn_rate".to_owned(), Variant::Float(decayed_lr));
+                m.insert("learning_rate".to_owned(), Variant::Float(decayed_lr));
                 optim.set_cfg(&m);
             }
+        } else {
+            warn!("Coudln't perform learning rate decay due to cfg entry miss");
         }
     }
 

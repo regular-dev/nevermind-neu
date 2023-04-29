@@ -93,7 +93,7 @@ impl WithParams for OptimizerRMS {
         let mut cfg_params = HashMap::new();
 
         cfg_params.insert("type".to_string(), Variant::String("rmsprop".to_string()));
-        cfg_params.insert("learn_rate".to_string(), Variant::Float(self.learn_rate));
+        cfg_params.insert("learning_rate".to_string(), Variant::Float(self.learn_rate));
         cfg_params.insert("alpha".to_string(), Variant::Float(self.alpha));
         cfg_params.insert("theta".to_string(), Variant::Float(self.theta));
 
@@ -101,8 +101,8 @@ impl WithParams for OptimizerRMS {
     }
 
     fn set_cfg(&mut self, args: &HashMap<String, Variant>) {
-        if args.contains_key("learn_rate") {
-            if let Variant::Float(v) = args.get("learn_rate").unwrap() {
+        if args.contains_key("learning_rate") {
+            if let Variant::Float(v) = args.get("learning_rate").unwrap() {
                 self.learn_rate = *v;
             }
         }
