@@ -19,8 +19,11 @@ use ndarray_stats::QuantileExt;
 
 use std::fs::OpenOptions;
 
-use super::dataloader::DataLoader;
+use crossbeam::channel;
+use std::thread;
+
 use super::learn_params::LearnParams;
+use crate::dataloader::*;
 use crate::err::CustomError;
 use crate::util::*;
 
@@ -32,13 +35,19 @@ pub enum CallbackReturnAction {
     StopAndSave,
 }
 
+enum DataloaderMsg {
+    Batch(MiniBatch),
+    DoNext,
+    Stop,
+}
+
 /// Neural-Network learning orchestrator
 pub struct Orchestra<T>
 where
     T: Model + Serialize + Clone,
 {
-    pub train_dl: Option<Box<dyn DataLoader>>,
-    pub test_dl: Option<Box<dyn DataLoader>>,
+    pub train_dl: Option<Box<dyn DataLoader + Send>>,
+    pub test_dl: Option<Box<dyn DataLoader + Send>>,
     test_err_accum: f64,
     test_batch_size: usize,
     is_write_test_err: bool,
@@ -130,7 +139,7 @@ where
         }
     }
 
-    pub fn test_dataloader(mut self, test_dl: Box<dyn DataLoader>) -> Self {
+    pub fn test_dataloader(mut self, test_dl: Box<dyn DataLoader + Send>) -> Self {
         self.test_dl = Some(test_dl);
         let s = self.test_batch_size(1);
         s
@@ -190,11 +199,11 @@ where
         Err(Box::new(CustomError::Other))
     }
 
-    pub fn set_train_dataset(&mut self, data: Box<dyn DataLoader>) {
+    pub fn set_train_dataset(&mut self, data: Box<dyn DataLoader + Send>) {
         self.train_dl = Some(data)
     }
 
-    pub fn set_test_dataset(&mut self, data: Box<dyn DataLoader>) {
+    pub fn set_test_dataset(&mut self, data: Box<dyn DataLoader + Send>) {
         self.test_dl = Some(data)
     }
 
@@ -348,20 +357,15 @@ where
         }
     }
 
-    fn perform_step(&mut self) {
+    fn perform_step(&mut self, mb: MiniBatch) {
         if self.train_dl.is_none() {
             error!("Train dataset isn't set !!!");
             return;
         }
 
         if let Some(train_model) = self.train_model.as_mut() {
-            let data = self
-                .train_dl
-                .as_ref()
-                .unwrap()
-                .next_batch(train_model.batch_size());
-            train_model.feedforward(data.input);
-            train_model.backpropagate(data.output);
+            train_model.feedforward(mb.input);
+            train_model.backpropagate(mb.output);
 
             train_model.optimize();
 
@@ -431,7 +435,11 @@ where
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut iter_num = 0;
 
-        let mut err_file = self.create_empty_error_file()?;
+        let mut err_file = None;
+
+        if self.is_write_test_err {
+            err_file = Some(self.create_empty_error_file()?);
+        }
 
         let mut bench_time = Instant::now();
         let mut test_err = 0.0;
@@ -446,6 +454,29 @@ where
         let ten_perc_metric = ds_len as f64 * 0.1; // for 10% , 20% done displaying
         let mut prev_pos = 0;
         let mut ten_perc_num = 0;
+
+        let (tx_thr, rx_cur) = channel::bounded(1);
+        let (tx_cur, rx_thr) = channel::bounded(1);
+
+        let mut train_dl_to_thr = std::mem::replace(&mut self.train_dl, None); // we need to move dataloader to another thread for async batch preparing
+
+        let thread_join = thread::spawn(move || {
+            loop {
+                let batch = train_dl_to_thr
+                    .as_mut()
+                    .unwrap()
+                    .next_batch(train_batch_size);
+                tx_thr.send(DataloaderMsg::Batch(batch)).unwrap();
+
+                let resp = rx_thr.recv().unwrap();
+
+                match resp {
+                    DataloaderMsg::Stop => break,
+                    _ => continue,
+                };
+            }
+            return train_dl_to_thr;
+        });
 
         loop {
             if self.test_dl.is_none() {
@@ -515,7 +546,7 @@ where
                     info!("On iter {} , error is : {}", iter_num, test_err);
 
                     if self.is_write_test_err {
-                        self.append_error(&mut err_file, test_err)?;
+                        self.append_error(err_file.as_mut().unwrap(), test_err)?;
                     }
                 }
             }
@@ -525,7 +556,12 @@ where
                 break;
             }
 
-            self.perform_step();
+            if let DataloaderMsg::Batch(minibatch) = rx_cur.recv().unwrap() {
+                tx_cur.send(DataloaderMsg::DoNext).unwrap();
+                self.perform_step(minibatch);
+            } else {
+                todo!("Handle");
+            }
 
             if iter_num != 0 && self.decay_step != 0 && iter_num % self.decay_step == 0 {
                 self.perform_learn_rate_decay();
@@ -571,6 +607,12 @@ where
         if flag_stop {
             return Ok(());
         }
+
+        tx_cur.send(DataloaderMsg::Stop).unwrap();
+        let train_dl = thread_join
+            .join()
+            .expect("Failed to join dataloader thread");
+        self.train_dl = train_dl;
 
         info!("Training finished !");
         info!("Trained for error : {}", test_err);
