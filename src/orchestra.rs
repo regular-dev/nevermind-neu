@@ -38,6 +38,7 @@ pub enum CallbackReturnAction {
 enum DataloaderMsg {
     Batch(MiniBatch),
     DoNext,
+    Pos(usize),
     Stop,
 }
 
@@ -358,10 +359,10 @@ where
     }
 
     fn perform_step(&mut self, mb: MiniBatch) {
-        if self.train_dl.is_none() {
-            error!("Train dataset isn't set !!!");
-            return;
-        }
+        // if self.train_dl.is_none() {
+        //     error!("Train dataset isn't set !!!");
+        //     return;
+        // }
 
         if let Some(train_model) = self.train_model.as_mut() {
             train_model.feedforward(mb.input);
@@ -455,17 +456,21 @@ where
         let mut prev_pos = 0;
         let mut ten_perc_num = 0;
 
-        let (tx_thr, rx_cur) = channel::bounded(1);
-        let (tx_cur, rx_thr) = channel::bounded(1);
+        let (tx_thr, rx_cur) = channel::bounded(2);
+        let (tx_cur, rx_thr) = channel::bounded(2);
 
         let mut train_dl_to_thr = std::mem::replace(&mut self.train_dl, None); // we need to move dataloader to another thread for async batch preparing
 
         let thread_join = thread::spawn(move || {
             loop {
+                let ds_pos = train_dl_to_thr.as_ref().unwrap().pos().unwrap();
+
                 let batch = train_dl_to_thr
                     .as_mut()
                     .unwrap()
                     .next_batch(train_batch_size);
+
+                tx_thr.send(DataloaderMsg::Pos(ds_pos)).expect("Failed to send dataset position from thread");
                 tx_thr.send(DataloaderMsg::Batch(batch)).unwrap();
 
                 let resp = rx_thr.recv().unwrap();
@@ -480,7 +485,10 @@ where
 
         loop {
             if self.test_dl.is_none() {
-                let ds_pos = self.train_dl.as_ref().unwrap().pos().unwrap();
+                let ds_pos = match rx_cur.recv().unwrap() {
+                    DataloaderMsg::Pos(p) => p,
+                    _ => panic!("Invalid message"),
+                };
 
                 if train_batch_size * 10 < ds_len // for small datasets not displaying percentages
                     && (ds_pos >= (ten_perc_num + 1) as usize * ten_perc_metric as usize
