@@ -1,7 +1,7 @@
 # nevermind-neu
 [![crates.io](https://img.shields.io/crates/v/nevermind-neu.svg)](https://crates.io/crates/nevermind-neu)
 
-Machine learning library and tool with terminal user interface written in rust. It supports OpenCL layers (beta WIP) and CPU layers.
+Machine learning library and tool with terminal user interface written in rust. It supports OpenCL layers and CPU layers.
 Core math matrix library is **ndarray** which use **matrixmultiply** crate for CPU matrix multiplication.
 
 ## Design goals
@@ -16,6 +16,7 @@ OpenCL support is based on **ocl** crate. It is optional feature and enabled by 
  - FullyConnected layer
  - Euclidean Loss, Softmax Loss
  - Optimizers: Adam, RMSProp, AdaGrad, AdaDelta
+ - Async parallel data loading
  - Protobuf, CSV dataloaders
  - (De)Serializing neural network state to protobuf
  - (De)Serializing neural network configuration net yaml file
