@@ -288,7 +288,7 @@ impl Model for Sequential {
 
             // if there is no bias -> add empty bias values
             if ws_blob.len() < 2 {
-                info!("Added zeroed bias");
+                debug!("Added zeroed bias");
                 ws_blob.push(WsMat::zeros((self_l.size(), 1)));
             }
 

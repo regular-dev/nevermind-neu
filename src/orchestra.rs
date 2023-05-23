@@ -487,7 +487,7 @@ where
             if self.test_dl.is_none() {
                 let ds_pos = match rx_cur.recv().unwrap() {
                     DataloaderMsg::Pos(p) => p,
-                    _ => panic!("Invalid message"),
+                    _ => panic!("Invalid message"), // TODO : handle without panic
                 };
 
                 if train_batch_size * 10 < ds_len // for small datasets not displaying percentages
@@ -529,6 +529,8 @@ where
                     } else {
                         prev_pos = ds_pos;
                     }
+                } else {
+                    test_err = self.cur_iter_err as f64;
                 }
             } else {
                 if iter_num % self.test_iter == 0 && iter_num != 0 {
