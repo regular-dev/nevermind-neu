@@ -25,6 +25,18 @@ OpenCL support is based on **ocl** crate. It is optional feature and enabled by 
 ## Terminal user interface tool
 ![tui](https://github.com/regular-dev/nevermind-neu/blob/master/doc/tui_train.gif?raw=true)
 
+## Examples
+XOR function approximation
+
+`cargo run --release --example xor`
+
+XOR function approximation with OpenCL support
+
+`cargo run --release --example xor_ocl`
+
+For MNIST digits classification example read [MNIST example readme](https://github.com/regular-dev/nevermind-neu/tree/master/examples/mnist)
+
+
 ## Roadmap
   - Conv2D layer
   - RNN + LSTM

@@ -21,3 +21,4 @@ err.log
 *.zip
 *.old
 *.data
+mnist_data/
