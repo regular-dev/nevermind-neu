@@ -8,9 +8,19 @@ use std::ops::DerefMut;
 use nevermind_neu::dataloader::*;
 use nevermind_neu::util::*;
 
+use env_logger::Env;
+use log::info;
+
 use rust_mnist::{print_sample_image, Mnist};
 
+#[cfg(feature = "log_env_logger")]
+fn init_logger() {
+    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
+    init_logger();
+
     let mut train_loader = ProtobufDataLoader::empty();
     let mut test_loader = ProtobufDataLoader::empty();
 
@@ -68,6 +78,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     train_loader.to_file("mnist_train.proto")?;
     test_loader.to_file("mnist_test.proto")?;
+
+    info!("Train MNIST dataset is serialized to mnist_train.proto");
+    info!("Test MNIST dataset is serialized to mnist_test.proto");
 
     Ok(())
 }
