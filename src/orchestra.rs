@@ -57,14 +57,14 @@ where
     snap_iter: usize,
     test_iter: usize,
     cur_iter_err: f32,
-    cur_iter_acc: f32,
+    cur_iter_acc: f64,
     learn_rate_decay: f32,
     decay_step: usize,
     show_accuracy: bool,
     save_on_finish: bool,
     pub name: String,
     // callback fn args : (iteration_number, current iteration loss, accuracy)
-    callbacks: Vec<Box<dyn FnMut(usize, f32, f32) -> CallbackReturnAction>>,
+    callbacks: Vec<Box<dyn FnMut(usize, f32, f64) -> CallbackReturnAction>>,
 }
 
 impl<T> Orchestra<T>
@@ -87,7 +87,7 @@ where
             test_model: Some(test_model),
             snap_iter: 0,
             test_iter: 100,
-            cur_iter_acc: -1.0,
+            cur_iter_acc: 0.0,
             cur_iter_err: 0.0,
             learn_rate_decay: 1.0,
             decay_step: 0,
@@ -111,7 +111,7 @@ where
             snap_iter: 0,
             test_iter: 100,
             cur_iter_err: 0.0,
-            cur_iter_acc: -1.0,
+            cur_iter_acc: 0.0,
             learn_rate_decay: 1.0,
             decay_step: 0,
             show_accuracy: true,
@@ -146,7 +146,7 @@ where
         s
     }
 
-    pub fn add_callback(&mut self, c: Box<dyn FnMut(usize, f32, f32) -> CallbackReturnAction>) {
+    pub fn add_callback(&mut self, c: Box<dyn FnMut(usize, f32, f64) -> CallbackReturnAction>) {
         self.callbacks.push(c);
     }
 
@@ -257,7 +257,7 @@ where
         accuracy_cnt = accuracy_cnt / self.test_batch_size as f32;
 
         if self.show_accuracy {
-            info!("Accuracy : {}", accuracy_cnt);
+            info!("Validation accuracy : {}", accuracy_cnt);
         }
 
         err as f64 / self.test_batch_size as f64
@@ -322,14 +322,12 @@ where
         return test_err;
     }
 
-    fn calc_accuracy(last_layer_lr: &LearnParams) -> Option<f32> {
-        let lr_output = last_layer_lr.output.borrow();
-
-        if lr_output.len_of(Axis(0)) > 1 {
-            return Some(lr_output[[1, 0]]);
+    fn calc_accuracy(metrics: Option<&Metrics>) -> f64 {
+        if let Some(metrics) = metrics {
+            return metrics["accuracy"];
+        } else {
+            return 0.0; // none ?
         }
-
-        return Some(0.0);
     }
 
     pub fn set_save_on_finish_flag(&mut self, state: bool) {
@@ -359,11 +357,6 @@ where
     }
 
     fn perform_step(&mut self, mb: MiniBatch) {
-        // if self.train_dl.is_none() {
-        //     error!("Train dataset isn't set !!!");
-        //     return;
-        // }
-
         if let Some(train_model) = self.train_model.as_mut() {
             train_model.feedforward(mb.input);
             train_model.backpropagate(mb.output);
@@ -374,11 +367,9 @@ where
             let lr = train_model.output_params();
 
             self.cur_iter_err = Self::calc_avg_err(&lr);
-            self.cur_iter_acc = Self::calc_accuracy(&lr).unwrap();
+            self.cur_iter_acc = Self::calc_accuracy(train_model.last_layer_metrics());
 
-            if self.test_dl.is_none() {
-                self.test_err_accum += self.cur_iter_err as f64;
-            }
+            self.test_err_accum += self.cur_iter_err as f64;
         }
     }
 
@@ -456,6 +447,8 @@ where
         let mut prev_pos = 0;
         let mut ten_perc_num = 0;
 
+        let mut accuracy_sum = 0.0;
+
         let (tx_thr, rx_cur) = channel::bounded(2);
         let (tx_cur, rx_thr) = channel::bounded(2);
 
@@ -470,7 +463,9 @@ where
                     .unwrap()
                     .next_batch(train_batch_size);
 
-                tx_thr.send(DataloaderMsg::Pos(ds_pos)).expect("Failed to send dataset position from thread");
+                tx_thr
+                    .send(DataloaderMsg::Pos(ds_pos))
+                    .expect("Failed to send dataset position from thread");
                 tx_thr.send(DataloaderMsg::Batch(batch)).unwrap();
 
                 let resp = rx_thr.recv().unwrap();
@@ -484,24 +479,36 @@ where
         });
 
         loop {
-            if self.test_dl.is_none() {
+            // Error calc for each 10%
+            {
                 let ds_pos = match rx_cur.recv().unwrap() {
                     DataloaderMsg::Pos(p) => p,
                     _ => panic!("Invalid message"), // TODO : handle without panic
                 };
 
-                if train_batch_size * 10 < ds_len // for small datasets not displaying percentages
+                accuracy_sum += self.cur_iter_acc;
+
+                if train_batch_size * 10 < ds_len // for small datasets do not display percentages
                     && (ds_pos >= (ten_perc_num + 1) as usize * ten_perc_metric as usize
                         || prev_pos > ds_pos)
                 {
                     info!(
-                        "Done {}% of {} epoch, error : {:.5}...",
+                        "Done {}% of {} epoch, error : {:.5}",
                         (ten_perc_num + 1) * 10,
                         epoch_cnt,
                         self.test_err_accum
                             / (ten_perc_metric * (ten_perc_num + 1) as f64
-                                / train_batch_size as f64) as f64,
+                                / train_batch_size as f64),
                     );
+
+                    if accuracy_sum != 0.0 {
+                        info!(
+                            "Accuracy : {:.4}",
+                            accuracy_sum
+                                / (ten_perc_metric * (ten_perc_num + 1) as f64
+                                    / train_batch_size as f64)
+                        );
+                    }
 
                     ten_perc_num += 1;
 
@@ -516,14 +523,16 @@ where
                         let elapsed = bench_time.elapsed();
 
                         info!(
-                            "Epoch {} for {:.3} seconds, error : {}",
+                            "Epoch {} for {:.3} seconds, error : {:.6}",
                             epoch_cnt,
                             elapsed.as_secs_f64(),
                             test_err,
                         );
+
                         epoch_cnt += 1;
                         ten_perc_num = 0;
                         prev_pos = 0;
+                        accuracy_sum = 0.0;
 
                         bench_time = Instant::now();
                     } else {
@@ -532,29 +541,24 @@ where
                 } else {
                     test_err = self.cur_iter_err as f64;
                 }
-            } else {
+            }
+
+            // Validation dataset or (testing dataset)
+            if self.test_dl.is_some() {
                 if iter_num % self.test_iter == 0 && iter_num != 0 {
-                    test_err = self.test_net();
+                    info!("Testing net on {} iteration", iter_num);
 
-                    let elapsed = bench_time.elapsed();
+                    let val_test_err = self.test_net();
 
-                    info!(
-                        "Did {} iterations for {} milliseconds",
-                        self.test_iter,
-                        elapsed.as_millis()
-                    );
+                    info!("Validation error value : {:.5}", val_test_err);
 
-                    bench_time = Instant::now();
-
-                    if test_err < err {
-                        info!("Reached satisfying error value");
+                    if val_test_err < err {
+                        info!("Reached satisfying error value on validation dataset!");
                         break;
                     }
                 }
 
                 if self.test_iter != 0 && iter_num % self.test_iter == 0 && iter_num != 0 {
-                    info!("On iter {} , error is : {}", iter_num, test_err);
-
                     if self.is_write_test_err {
                         self.append_error(err_file.as_mut().unwrap(), test_err)?;
                     }
@@ -614,15 +618,15 @@ where
             self.save_model_state(&filename)?;
         }
 
-        if flag_stop {
-            return Ok(());
-        }
-
         tx_cur.send(DataloaderMsg::Stop).unwrap();
         let train_dl = thread_join
             .join()
             .expect("Failed to join dataloader thread");
         self.train_dl = train_dl;
+
+        if flag_stop {
+            return Ok(());
+        }
 
         info!("Training finished !");
         info!("Trained for error : {}", test_err);
