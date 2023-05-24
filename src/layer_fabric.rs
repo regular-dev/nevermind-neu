@@ -65,7 +65,7 @@ pub fn create_layer(
             let l = Box::new(layers_macros::sigmoid_fc_layer!());
             return Some(l);
         }
-        "InputDataLayer" => {
+        "InputLayer" => {
             let mut l = Box::new(InputLayer::default());
             if cfg.is_some() {
                 l.set_cfg(cfg.unwrap());
