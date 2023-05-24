@@ -1,7 +1,7 @@
 use std::{
     cell::RefCell,
     rc::Rc,
-    sync::{atomic::{AtomicU32, Ordering}, Arc},
+    sync::{atomic::{AtomicU32, Ordering}, Arc}, hash::Hash,
 };
 
 use std::collections::HashMap;
@@ -19,6 +19,7 @@ use crate::util::*;
 pub struct SoftmaxLossLayer {
     pub size: usize,
     pub lr_params: LearnParams,
+    metrics: HashMap<String, f64>,
 }
 
 impl AbstractLayer for SoftmaxLossLayer {
@@ -58,10 +59,10 @@ impl AbstractLayer for SoftmaxLossLayer {
     ) -> LayerBackwardResult {
         let prev_input = &prev_input[0].output.borrow();
         let mut self_err_vals = self.lr_params.neu_grad.borrow_mut();
-        let mut self_output = self.lr_params.output.borrow_mut();
+        let self_output = self.lr_params.output.borrow_mut();
 
         let match_cnt = AtomicU32::new(0);
-        let batch_len = self_output.len_of(Axis(0)) as f32;
+        let batch_len = self_output.len_of(Axis(0)) as f64;
 
         Zip::from(self_err_vals.rows_mut())
             .and(self_output.rows())
@@ -95,8 +96,8 @@ impl AbstractLayer for SoftmaxLossLayer {
                 }
             });
 
-        let accuracy = match_cnt.load(Ordering::SeqCst) as f32 / batch_len;
-        self_output[[1, 0]] = accuracy;
+        let accuracy = match_cnt.load(Ordering::SeqCst) as f64 / batch_len;
+        self.metrics.insert("accuracy".to_string(), accuracy);
 
         // calc per-weight gradient, TODO : refactor code below
         // for prev_layer :
@@ -141,6 +142,10 @@ impl AbstractLayer for SoftmaxLossLayer {
         self.size
     }
 
+    fn metrics(&self) -> Option<&HashMap<String, f64>> {
+        Some(&self.metrics)
+    }
+
     fn copy_layer(&self) -> Box<dyn AbstractLayer> {
         let mut copy_l = SoftmaxLossLayer::new(self.size);
         copy_l.set_learn_params(self.lr_params.copy());
@@ -162,7 +167,8 @@ impl SoftmaxLossLayer {
     pub fn new(size: usize) -> Self {
         Self {
             size,
-            lr_params: LearnParams::empty()
+            lr_params: LearnParams::empty(),
+            metrics: HashMap::new()
         }
     }
 

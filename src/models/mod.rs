@@ -24,6 +24,9 @@ pub trait Model {
     fn layer(&self, id: usize) -> &Box<dyn AbstractLayer>;
     fn layers_count(&self) -> usize;
     fn last_layer(&self) -> &Box<dyn AbstractLayer >;
+    fn last_layer_metrics(&self) -> Option<&Metrics> {
+        None  // accuracy and another possible types of metrics
+    }
 
     fn optimizer(&self) -> &Box<dyn WithParams>;
     fn optimizer_mut(&mut self) -> &mut Box<dyn WithParams>;

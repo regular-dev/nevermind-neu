@@ -4,6 +4,8 @@ use serde::ser::{Serializer};
 use std::rc::Rc;
 use std::cell::RefCell;
 
+use std::collections::HashMap;
+
 use ndarray::{Array1, Array2};
 
 #[derive(Serialize, Deserialize)]
@@ -21,3 +23,4 @@ pub type WsMat = Array2< Num >;
 pub type WsBlob = Vec< WsMat >;
 pub type WsBlobPtr = Rc<RefCell<WsBlob>>;
 pub type Blob<'a> = Vec< &'a DataVec >;
+pub type Metrics = HashMap<String, f64>;

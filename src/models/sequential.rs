@@ -227,6 +227,10 @@ impl Model for Sequential {
         last_layer_params.clone()
     }
 
+    fn last_layer_metrics(&self) -> Option<&Metrics> {
+        self.last_layer().metrics()
+    }
+
     fn batch_size(&self) -> usize {
         self.batch_size
     }
