@@ -192,7 +192,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .help("Specify optimizer configuration output file")
                 .default_value("optim.cfg"))
             .arg(Arg::new("Ocl")
-                .long("opencl")
+                .long("ocl")
                 .help("Create OpenCL based net")
                 .action(ArgAction::SetTrue)
                 .default_value("false")

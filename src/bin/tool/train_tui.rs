@@ -38,7 +38,7 @@ use crate::train::create_net_from_cmd_args;
 
 pub enum NetMsg {
     InitInfo(usize, usize),    // epoch_size, batch_size
-    StepInfo(usize, f32, f32), // iter, loss, accuracy
+    StepInfo(usize, f32, f64), // iter, loss, accuracy
     // TODO : split message to enum's entries
     Stop,
 }

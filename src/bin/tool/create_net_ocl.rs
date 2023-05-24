@@ -21,7 +21,12 @@ pub fn create_net_ocl(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
 
     println!("Greetings traveller...");
 
-    let seq_mdl = create_layers_ocl(&stdin)?;
+    let mut seq_mdl = create_layers_ocl(&stdin)?;
+
+    println!("Tell me the batch size...");
+    let batch_size: usize = read_from_stdin(&stdin)?;
+    seq_mdl.set_batch_size(batch_size);
+
     info!("Writing model configuration to file {}", out_file);
     seq_mdl.to_file(out_file)?;
 
