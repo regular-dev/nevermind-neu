@@ -167,7 +167,7 @@ where
 
     /// Carefull this method overwrites weights and all other params
     fn set_input_shape(&mut self, sh: &[usize]) {
-        self.lr_params = LearnParams::new_with_const_bias(self.size, sh[0]);
+        self.lr_params = LearnParams::new_with_bias(self.size, sh[0]);
     }
 
     fn size(&self) -> usize {

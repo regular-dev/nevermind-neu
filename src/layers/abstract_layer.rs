@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
-use crate::dataloader::LabeledEntry;
 use crate::learn_params::{LearnParams, ParamsBlob};
-use crate::util::{Array2D, DataVec, DataVecPtr, Variant, WithParams};
+use crate::util::{Array2D, WithParams, Metrics};
 
 #[derive(Debug)]
 pub enum LayerError {
@@ -14,23 +13,26 @@ pub enum LayerError {
 pub type LayerForwardResult = Result<ParamsBlob, LayerError>;
 pub type LayerBackwardResult = Result<ParamsBlob, LayerError>;
 
-
-pub trait AbstractLayer : WithParams {
+pub trait AbstractLayer: WithParams {
     // for signature for input layers
-    fn forward_input(&mut self, input_data: Array2D) -> LayerForwardResult {
+    fn forward_input(&mut self, _input_data: Array2D) -> LayerForwardResult {
         Err(LayerError::NotImpl)
     }
 
-    fn forward(&mut self, input: ParamsBlob) -> LayerForwardResult {
+    fn forward(&mut self, _input: ParamsBlob) -> LayerForwardResult {
         Err(LayerError::NotImpl)
     }
 
     /// returns out_values and array of weights
-    fn backward(&mut self, prev_input: ParamsBlob, input: ParamsBlob) -> LayerBackwardResult {
+    fn backward(&mut self, _prev_input: ParamsBlob, _input: ParamsBlob) -> LayerBackwardResult {
         Err(LayerError::NotImpl)
     }
 
-    fn backward_output(&mut self, prev_input: ParamsBlob, expected: Array2D) -> LayerBackwardResult {
+    fn backward_output(
+        &mut self,
+        _prev_input: ParamsBlob,
+        _expected: Array2D,
+    ) -> LayerBackwardResult {
         Err(LayerError::NotImpl)
     }
 
@@ -41,6 +43,10 @@ pub trait AbstractLayer : WithParams {
     fn set_batch_size(&mut self, batch_size: usize) {
         let mut lr = self.learn_params().unwrap();
         lr.fit_to_batch_size(batch_size);
+    }
+
+    fn metrics(&self) -> Option<&Metrics> {
+        None
     }
 
     fn learn_params(&self) -> Option<LearnParams>;
