@@ -117,6 +117,13 @@ pub fn create_layer_ocl(
             }
             return Some(l);
         }
+        "SoftmaxLossLayerOcl" => {
+            let mut l = Box::new(SoftmaxLossLayerOcl::default());
+            if let Some(cfg_val) = cfg {
+                l.set_cfg(cfg_val);
+            }
+            return Some(l);
+        }
 
         _ => {return None;}
     }
