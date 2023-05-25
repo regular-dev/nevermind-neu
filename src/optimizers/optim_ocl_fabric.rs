@@ -33,7 +33,10 @@ pub fn optimizer_ocl_from_file(filepath: &str, queue: Queue) -> Result<Box<dyn O
         } else if optim_type == "adagrad" {
             todo!()
         } else if optim_type == "adam" {
-            todo!()
+            let mut sgd = Box::new(OptimizerOclAdam::new(0.01, queue.clone()));
+            sgd.set_cfg(&optim_params.0);
+
+            return Ok(sgd);
         } else {
             return Err(Box::new(CustomError::InvalidFormat));
         }

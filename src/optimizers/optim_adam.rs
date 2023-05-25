@@ -6,6 +6,8 @@ use std::ops::Deref;
 use std::collections::HashMap;
 use crate::util::*;
 
+use log::info;
+
 pub struct OptimizerAdam {
     pub learn_rate: f32,
     pub theta: f32,
@@ -57,7 +59,7 @@ impl OptimizerAdam {
                 let cur_ws_idx = [neu_idx, prev_idx];
 
                 // grad is 0.0 when weights is in dropout selection
-                if ws_grad[cur_ws_idx] == 0.0 {
+                if f32::is_nan(ws_grad[cur_ws_idx]) {
                     continue;
                 }
 

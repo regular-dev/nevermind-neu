@@ -18,6 +18,8 @@ pub struct FcLayer<T: Fn(f32) -> f32 + Clone, TD: Fn(f32) -> f32 + Clone> {
     pub lr_params: LearnParams,
     size: usize,
     dropout: f32,
+    dropout_n: usize,
+    dropout_y: usize,
     l2_regul: f32,
     l1_regul: f32,
     pub activation: Activation<T, TD>,
@@ -37,8 +39,8 @@ where
         let bias_out = ws[1].column(0);
 
         let dropout_len = (self.size as f32 * self.dropout) as usize;
-        let dropout_n = self.rng.gen_range(0, self.size - dropout_len as usize);
-        let dropout_y = dropout_n + dropout_len;
+        self.dropout_n = self.rng.gen_range(0, self.size - dropout_len as usize);
+        self.dropout_y = self.dropout_n + dropout_len;
 
         // for each input batch
         Zip::from(inp_m.rows())
@@ -54,7 +56,7 @@ where
                     .and(bias_out)
                     .for_each(|out_el, in_row, bias_el| {
                         // for each "neuron"
-                        if counter_neu >= dropout_n && counter_neu < dropout_y {
+                        if counter_neu >= self.dropout_n && counter_neu < self.dropout_y {
                             // zero neuron
                             *out_el = 0.0;
                             counter_neu += 1;
@@ -92,27 +94,30 @@ where
 
         debug!("[hidden layer] i am here 2");
 
-        // calc per-weight gradient, TODO : refactor code below
+        // calc per-weight gradient
         // for prev_layer :
         let prev_input = prev_input[0].output.borrow();
         let ws = self.lr_params.ws.borrow();
         let mut ws_grad = self.lr_params.ws_grad.borrow_mut();
 
         // This could be done with parallel iterator
-        // But parallel iterator will make value only with big arrays (a lot of ws, big batch size)
-        for w in ws_grad[0].indexed_iter_mut() {
-            let cur_ws_idx = [w.0.0, w.0.1];
+        // But  parallel iterator will make value only with big arrays (a lot of ws, big batch size)
+        for ((self_neu_idx, prev_neu_idx), val) in ws_grad[0].indexed_iter_mut() {
+            let cur_ws_idx = [self_neu_idx, prev_neu_idx];
 
             let mut avg = 0.0;
-            Zip::from(prev_input.column(w.0.1)).and(self_err_vals.column(w.0.0)).for_each(
+            Zip::from(prev_input.column(prev_neu_idx)).and(self_err_vals.column(self_neu_idx)).for_each(
                 |prev_val, err_val| {
                     avg += prev_val * err_val;
                 }
             );
 
-            avg = avg / prev_input.column(w.0.1).len() as f32;
+            if self_neu_idx >= self.dropout_n && self_neu_idx < self.dropout_y {
+                *val = f32::NAN;
+            } else {
+                avg = avg / prev_input.column(prev_neu_idx).len() as f32;
 
-            let mut l2_penalty = 0.0;
+                let mut l2_penalty = 0.0;
                 if self.l2_regul != 0.0 {
                     l2_penalty = self.l2_regul * ws[0][cur_ws_idx];
                 }
@@ -121,7 +126,9 @@ where
                 if self.l1_regul == 0.0 {
                     l1_penalty = self.l1_regul * sign(ws[0][cur_ws_idx]);
                 }
-            *w.1 = avg - l2_penalty - l1_penalty;
+
+                *val = avg - l2_penalty - l1_penalty;
+            }
         }
 
         // bias
@@ -196,6 +203,8 @@ where
             dropout: 0.0,
             lr_params: LearnParams::empty(),
             activation,
+            dropout_n: 0,
+            dropout_y: 0,
             l2_regul: 0.0,
             l1_regul: 0.0,
             rng: thread_rng(),

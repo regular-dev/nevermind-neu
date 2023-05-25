@@ -22,7 +22,7 @@ impl AbstractLayer for InputLayer {
             );
             return Err(LayerError::InvalidSize);
         }
-
+        
         *self.lr_params.output.borrow_mut() = input;
 
         Ok(vec![self.lr_params.clone()])
