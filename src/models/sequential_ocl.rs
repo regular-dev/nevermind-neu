@@ -344,6 +344,10 @@ impl Model for SequentialOcl {
         }
     }
 
+    fn last_layer_metrics(&self) -> Option<&Metrics> {
+        self.last_layer().metrics()
+    }
+
     fn set_batch_size_for_tests(&mut self, batch_size: usize) {
         self.batch_size = batch_size;
 
@@ -360,7 +364,11 @@ impl Model for SequentialOcl {
         self.layers.len()
     }
     fn last_layer(&self) -> &Box<dyn AbstractLayer> {
-        todo!()
+        // https://github.com/rust-lang/rust/issues/65991
+        unsafe {
+            let out = std::mem::transmute::<&Box<dyn AbstractLayerOcl>, &Box<dyn AbstractLayer>>(self.layers.last().unwrap());
+            return out;
+        }
     }
 
     fn save_state(&self, filepath: &str) -> Result<(), Box<dyn Error>> {

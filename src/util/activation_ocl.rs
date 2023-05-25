@@ -6,12 +6,20 @@ pub enum OclActivationFunc {
     Sigmoid,
     Tanh,
     ReLU,
-    LeakyReLU
+    LeakyReLU,
 }
 
 impl fmt::Display for OclActivationFunc {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
+        let act_str = match self {
+            OclActivationFunc::Raw => "raw",
+            OclActivationFunc::Sigmoid => "sigmoid",
+            OclActivationFunc::Tanh => "tanh",
+            OclActivationFunc::ReLU => "relu",
+            OclActivationFunc::LeakyReLU => "leaky_relu",
+        };
+
+        write!(f, "{}", act_str)
     }
 }
 
@@ -25,7 +33,7 @@ impl TryFrom<&str> for OclActivationFunc {
             "relu" => Ok(OclActivationFunc::ReLU),
             "leaky_relu" => Ok(OclActivationFunc::LeakyReLU),
             "raw" => Ok(OclActivationFunc::Raw),
-            _ => Err("Invalid input string")
+            _ => Err("Invalid input string"),
         }
     }
 }

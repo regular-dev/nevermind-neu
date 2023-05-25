@@ -80,7 +80,14 @@ fn handle_optimizer_ocl(
     } else if opt_type == "adagrad" {
         todo!()
     } else if opt_type == "adam" {
-        todo!()
+        let mut optimizer = OptimizerOclAdam::new(0.01, ocl_queue);
+
+        println!("Tell me learning rate [0.01 or 1e-2 format]");
+        let lr: f32 = read_from_stdin(&stdin)?;
+
+        optimizer.set_learn_rate(lr);
+
+        optimizer_ocl_to_file(optimizer, filepath)?;
     }
 
     Ok(())
@@ -123,13 +130,15 @@ fn create_layers_ocl(stdin: &io::Stdin) -> Result<SequentialOcl, Box<dyn Error>>
     let out_l_size: usize = read_from_stdin(stdin)?;
 
     if out_l_type == "softmax_loss" {
-        todo!("Impl Softmax OCL");
+        seq_mdl.add_layer(Box::new(SoftmaxLossLayerOcl::new(out_l_size)));
     } else {
         let out_act = OclActivationFunc::try_from(out_l_type.as_str())?;
         seq_mdl.add_layer(Box::new(EuclideanLossLayerOcl::new_with_activation(
             out_l_size, out_act,
         )));
     }
+
+    seq_mdl.init_layers();
 
     println!("Finally network : {}", seq_mdl);
 
