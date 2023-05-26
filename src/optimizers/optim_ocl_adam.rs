@@ -22,6 +22,10 @@ static SRC_ADAM_KERNEL_WS: &'static str = r#"
             return;
         }
 
+        if ( isnan(ws_grad[idx]) ) {
+            return;
+        }
+
         ws_m[idx] = b1 * ws_m[idx] + (1.0 - b1) * ws_grad[idx];
         ws_v[idx] = b2 * ws_v[idx] + (1.0 - b2) * ws_grad[idx] * ws_grad[idx];
         ws[idx] += learn_rate / sqrt(ws_v[idx] + theta) * ws_m[idx];
@@ -42,6 +46,10 @@ static SRC_ADAM_KERNEL_BIAS: &'static str = r#"
         uint const idx = get_global_id(0);
 
         if ( bias_grad[idx] == 0.0 ) {
+            return;
+        }
+
+        if ( isnan(bias_grad[idx]) ) {
             return;
         }
 

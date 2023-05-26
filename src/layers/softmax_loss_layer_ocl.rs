@@ -58,7 +58,11 @@ static SOFTMAX_LOSS_KERNEL_FWD: &'static str = r#"
             e_sum += exp(sum_i);
         }
 
-        out[idx] = act_val / e_sum;
+        if ( isnan(act_val / e_sum) ) {
+            out[idx] = 0.0;
+        } else {
+            out[idx] = act_val / e_sum;
+        }
     }
 "#;
 
