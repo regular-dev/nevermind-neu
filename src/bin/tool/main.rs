@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .subcommand_required(true)
         .subcommand(Command::new("train").about("Start a new training or continue").arg(
             Arg::new("TrainData")
-                .long("train_dataset")
+                .long("train_data")
                 .help("Provides a file path to train dataset")
                 .action(ArgAction::Set)
                 .require_equals(true)
@@ -31,7 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .arg(
             Arg::new("TestData")
-                .long("test_dataset")
+                .long("test_data")
                 .help("Provides a file path to test dataset")
                 .require_equals(true)
                 .takes_value(true)
@@ -46,7 +46,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .arg(
             Arg::new("ModelCfg")
-                .long("model_cfg")
+                .long("model")
                 .help("Provide model configuration")
                 .required(true)
                 .takes_value(true)
@@ -54,7 +54,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .arg(Arg::new("OptCfg")
                 .short('o')
-                .long("optimizer_cfg")
+                .long("opt")
                 .help("Provide optimizer configuration yaml file")
                 .takes_value(true)
                 .require_equals(true))
