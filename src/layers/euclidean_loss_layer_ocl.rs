@@ -16,6 +16,7 @@ static EUCLIDEAN_LOSS_KERNEL_FWD: &'static str = r#"
                 __private int const prev_shape,
                 __private int const self_shape,
                 __global const float *in,
+                __global const float *bias,
                 __global const float *ws,
                 __global float *out)
     {
@@ -29,7 +30,7 @@ static EUCLIDEAN_LOSS_KERNEL_FWD: &'static str = r#"
             sum += ws[real_idx * prev_shape + j] * in[j + prev_shape * batch_idx];
         }
             
-        out[idx] = activation(sum);
+        out[idx] = activation(sum + bias[real_idx]);
     }
 "#;
 
@@ -230,6 +231,7 @@ impl AbstractLayerOcl for EuclideanLossLayerOcl {
             .arg_named("prev_shape", 0 as i32)
             .arg_named("self_shape", self.size as i32)
             .arg_named("in", None::<&Buffer<f32>>)
+            .arg_named("bias", None::<&Buffer<f32>>)
             .arg_named("ws", None::<&Buffer<f32>>)
             .arg_named("out", None::<&Buffer<f32>>)
             .build()?;
@@ -261,12 +263,16 @@ impl AbstractLayerOcl for EuclideanLossLayerOcl {
         let prev_output = prev_params.output.borrow();
         let self_ws = self.ocl_params.as_ref().unwrap().ws.borrow();
         let self_output = self.ocl_params.as_ref().unwrap().output.borrow();
+        let self_bias = self.ocl_params.as_ref().unwrap().bias.borrow();
 
         let self_kern = self.ocl_kernel.as_mut().unwrap();
 
         self_kern
             .set_arg("in", &*prev_output)
             .expect("[euc_ocl] Setting param IN failure");
+        self_kern
+            .set_arg("bias", &*self_bias)
+            .expect("[euc_ocl] Failed to set BIAS param");
         self_kern
             .set_arg("ws", &*self_ws)
             .expect("[euc_ocl] Setting param WS failure");
