@@ -5,11 +5,11 @@ use crate::util::*;
 
 use log::{debug, warn};
 
-use ndarray::Zip;
-
 use ndarray_stats::QuantileExt;
 use ocl::MemFlags;
 use ocl::{Buffer, Context, Device, Kernel, Program, Queue};
+
+use ndarray::Zip;
 
 use std::collections::HashMap;
 
@@ -26,21 +26,36 @@ static SOFTMAX_LOSS_KERNEL_FWD: &'static str = r#"
         __private uint const real_idx = idx % self_shape;
         __private uint const batch_idx = idx / self_shape;
 
-        __private float e_sum = 0.0;
-        __private float act_val = 0.0;
+        __private double e_sum = 0.0;
+        __private double act_val = 0.0;
+        double max_val = DBL_MIN;
 
         for (int i = 0; i < self_shape; ++i) {
-            __private float sum_i = 0.0;
+            __private double sum_i = 0.0;
 
             for (int j = 0; j < prev_shape; ++j) {
                 sum_i += ws[i * prev_shape + j] * in[j + prev_shape * batch_idx];
             }
 
-            e_sum += exp(sum_i);
+            if (sum_i > max_val) {
+                max_val = sum_i;
+            }
+        }
+
+        for (int i = 0; i < self_shape; ++i) {
+            __private double sum_i = 0.0;
+
+            for (int j = 0; j < prev_shape; ++j) {
+                sum_i += ws[i * prev_shape + j] * in[j + prev_shape * batch_idx];
+            }
+
+            sum_i -= max_val;
 
             if (i == real_idx) {
                 act_val = exp(sum_i);
             }
+
+            e_sum += exp(sum_i);
         }
 
         out[idx] = act_val / e_sum;
