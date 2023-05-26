@@ -7,8 +7,8 @@ use log::debug;
 use rand::{thread_rng, Rng, ThreadRng};
 
 use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
-use crate::util::*;
 use crate::learn_params::{LearnParams, ParamsBlob};
+use crate::util::*;
 
 use crate::util::{Variant, WithParams};
 
@@ -18,8 +18,6 @@ pub struct FcLayer<T: Fn(f32) -> f32 + Clone, TD: Fn(f32) -> f32 + Clone> {
     pub lr_params: LearnParams,
     size: usize,
     dropout: f32,
-    dropout_n: usize,
-    dropout_y: usize,
     l2_regul: f32,
     l1_regul: f32,
     pub activation: Activation<T, TD>,
@@ -39,8 +37,8 @@ where
         let bias_out = ws[1].column(0);
 
         let dropout_len = (self.size as f32 * self.dropout) as usize;
-        self.dropout_n = self.rng.gen_range(0, self.size - dropout_len as usize);
-        self.dropout_y = self.dropout_n + dropout_len;
+        let dropout_n = self.rng.gen_range(0, self.size - dropout_len as usize);
+        let dropout_y = dropout_n + dropout_len;
 
         // for each input batch
         Zip::from(inp_m.rows())
@@ -56,7 +54,7 @@ where
                     .and(bias_out)
                     .for_each(|out_el, in_row, bias_el| {
                         // for each "neuron"
-                        if counter_neu >= self.dropout_n && counter_neu < self.dropout_y {
+                        if counter_neu >= dropout_n && counter_neu < dropout_y {
                             // zero neuron
                             *out_el = 0.0;
                             counter_neu += 1;
@@ -106,53 +104,49 @@ where
             let cur_ws_idx = [self_neu_idx, prev_neu_idx];
 
             let mut avg = 0.0;
-            Zip::from(prev_input.column(prev_neu_idx)).and(self_err_vals.column(self_neu_idx)).for_each(
-                |prev_val, err_val| {
+            Zip::from(prev_input.column(prev_neu_idx))
+                .and(self_err_vals.column(self_neu_idx))
+                .for_each(|prev_val, err_val| {
                     avg += prev_val * err_val;
-                }
-            );
+                });
 
-            if self_neu_idx >= self.dropout_n && self_neu_idx < self.dropout_y {
-                *val = f32::NAN;
-            } else {
-                avg = avg / prev_input.column(prev_neu_idx).len() as f32;
+            avg = avg / prev_input.column(prev_neu_idx).len() as f32;
 
-                let mut l2_penalty = 0.0;
-                if self.l2_regul != 0.0 {
-                    l2_penalty = self.l2_regul * ws[0][cur_ws_idx];
-                }
-
-                let mut l1_penalty = 0.0;
-                if self.l1_regul == 0.0 {
-                    l1_penalty = self.l1_regul * sign(ws[0][cur_ws_idx]);
-                }
-
-                *val = avg - l2_penalty - l1_penalty;
+            let mut l2_penalty = 0.0;
+            if self.l2_regul != 0.0 {
+                l2_penalty = self.l2_regul * ws[0][cur_ws_idx];
             }
+
+            let mut l1_penalty = 0.0;
+            if self.l1_regul == 0.0 {
+                l1_penalty = self.l1_regul * sign(ws[0][cur_ws_idx]);
+            }
+
+            *val = avg - l2_penalty - l1_penalty;
         }
 
         // bias
-        for w in ws_grad[1].indexed_iter_mut() {
-            let cur_ws_idx = [w.0.0, w.0.1];
+        for ((self_neu_idx, prev_neu_idx), val) in ws_grad[1].indexed_iter_mut() {
+            let cur_ws_idx = [self_neu_idx, prev_neu_idx];
 
-                let mut avg = 0.0;
-                Zip::from(self_err_vals.column(w.0.0)).for_each(|err_val| {
-                    avg += err_val;
-                });
+            let mut avg = 0.0;
+            Zip::from(self_err_vals.column(self_neu_idx)).for_each(|err_val| {
+                avg += err_val;
+            });
 
-                avg = avg / self_err_vals.column(w.0.1).len() as f32;
+            avg = avg / self_err_vals.column(prev_neu_idx).len() as f32;
 
-                let mut l2_penalty = 0.0;
-                if self.l2_regul != 0.0 {
-                    l2_penalty = self.l2_regul * ws[1][cur_ws_idx];
-                }
+            let mut l2_penalty = 0.0;
+            if self.l2_regul != 0.0 {
+                l2_penalty = self.l2_regul * ws[1][cur_ws_idx];
+            }
 
-                let mut l1_penalty = 0.0;
-                if self.l1_regul == 0.0 {
-                    l1_penalty = self.l1_regul * sign(ws[1][cur_ws_idx]);
-                }
+            let mut l1_penalty = 0.0;
+            if self.l1_regul == 0.0 {
+                l1_penalty = self.l1_regul * sign(ws[1][cur_ws_idx]);
+            }
 
-                *w.1 = avg - l2_penalty - l1_penalty;
+            *val = avg - l2_penalty - l1_penalty;
         }
 
         debug!("[ok] HiddenLayer backward()");
@@ -203,8 +197,6 @@ where
             dropout: 0.0,
             lr_params: LearnParams::empty(),
             activation,
-            dropout_n: 0,
-            dropout_y: 0,
             l2_regul: 0.0,
             l1_regul: 0.0,
             rng: thread_rng(),

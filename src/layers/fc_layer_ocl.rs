@@ -71,9 +71,9 @@ static FC_LAYER_KERNEL_BWD: &'static str = r#"
             for (int j = 0; j < batch_size; ++j) {
                 avg_grad += neu_grad[j * self_shape + idx] * prev_out[j * prev_shape + i];
             }
-
+    
             avg_grad = avg_grad / batch_size;
-
+    
             ws_grad[idx * prev_shape + i] = avg_grad;
         }
     }
@@ -214,7 +214,6 @@ impl AbstractLayerOcl for FcLayerOcl {
             OclActivationFunc::ReLU => OCL_ACTIVATION_RELU,
             OclActivationFunc::Raw => OCL_ACTIVATION_RAW,
             OclActivationFunc::LeakyReLU => OCL_ACTIVATION_LEAKY_RELU,
-            _ => todo!(),
         };
 
         let bwd_act = match self.ocl_act_func {
@@ -223,7 +222,6 @@ impl AbstractLayerOcl for FcLayerOcl {
             OclActivationFunc::ReLU => OCL_ACTIVATION_RELU_DERIV,
             OclActivationFunc::LeakyReLU => OCL_ACTIVATION_LEAKY_RELU_DERIV,
             OclActivationFunc::Raw => OCL_ACTIVATION_RAW_DERIV,
-            _ => todo!(),
         };
 
         let program_fwd = [fwd_act, FC_LAYER_KERNEL_FWD].join("\n");
@@ -350,7 +348,6 @@ impl AbstractLayerOcl for FcLayerOcl {
             .set_arg("next_grad", &*next_grad)
             .expect("[fc_ocl] Setting param NEXT_GRAD failure");
 
-        // also set next_shape param
         self_kern
             .set_arg("next_shape", next_shape as i32)
             .expect("[fc_ocl] Setting param NEXT_SHAPE failure");
@@ -448,6 +445,7 @@ impl WithParams for FcLayerOcl {
         if let Some(act_f) = args.get("activation") {
             if let Variant::String(act_f) = act_f {
                 let cvt_res = OclActivationFunc::try_from(act_f.as_str());
+
                 if let Ok(cvt) = cvt_res {
                     self.ocl_act_func = cvt;
                 }
