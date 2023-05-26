@@ -15,7 +15,8 @@ pub type LayerOclResult = Result<Vec<OclParams>, LayerError>;
 pub struct OclParams {
     pub output: Rc<RefCell<Buffer<Num>>>,
     pub ws: Rc<RefCell<Buffer<Num>>>,
-    pub neu_grad: Rc<RefCell<Buffer<Num>>>,
+    pub bias: Rc<RefCell<Buffer<Num>>>,
+    pub neu_grad: Rc<RefCell<Buffer<Num>>>, // basically stores bias gradient
     pub ws_grad: Rc<RefCell<Buffer<Num>>>,
     pub ws_shape: [usize; 2],
     pub uuid: Uuid,
@@ -37,6 +38,13 @@ impl OclParams {
         Self {
             output: Rc::new(RefCell::new(buf)),
             ws: Rc::new(RefCell::new(
+                Buffer::builder()
+                    .queue(queue.clone())
+                    .len(1)
+                    .build()
+                    .unwrap(),
+            )),
+            bias: Rc::new(RefCell::new(
                 Buffer::builder()
                     .queue(queue.clone())
                     .len(1)
@@ -101,7 +109,6 @@ pub fn init_ocl_params(
         .flags(MemFlags::new().read_write())
         .len(self_size)
         .build()?;
-    #[cfg(feature = "opencl")]
     let neu_grad = Buffer::builder()
         .queue(queue.clone())
         .flags(MemFlags::new().read_write())
@@ -114,6 +121,7 @@ pub fn init_ocl_params(
         .build()?;
 
     let ws_cpu_vals = WsMat::random((self_size, prev_shape[0]), Uniform::new(-0.1, 0.1));
+    let bias_cpu_vals = ndarray::Array1::<Num>::random(self_size, Uniform::new(-0.1, 0.1));
 
     let ws = Buffer::builder()
         .queue(queue.clone())
@@ -122,9 +130,17 @@ pub fn init_ocl_params(
         .copy_host_slice(ws_cpu_vals.as_slice().unwrap())
         .build()?;
 
+    let bias = Buffer::builder()
+        .queue(queue.clone())
+        .flags(MemFlags::new().read_write())
+        .len(self_size)
+        .copy_host_slice(bias_cpu_vals.as_slice().unwrap())
+        .build()?;
+
     let params = OclParams {
         output: Rc::new(RefCell::new(output)),
         ws: Rc::new(RefCell::new(ws)),
+        bias: Rc::new(RefCell::new(bias)),
         neu_grad: Rc::new(RefCell::new(neu_grad)),
         ws_grad: Rc::new(RefCell::new(ws_grad)),
         ws_shape: [self_size, prev_shape[0]],

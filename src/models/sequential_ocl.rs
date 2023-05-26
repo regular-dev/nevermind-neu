@@ -2,8 +2,8 @@ use std::{cell::RefCell, fmt, fs, fs::File, io::prelude::*, io::ErrorKind, rc::R
 
 use crate::layers::*;
 use crate::learn_params::LearnParams;
-use crate::models::*;
 use crate::models::pb::PbSequentialModel;
+use crate::models::*;
 use crate::optimizers::*;
 use crate::util::*;
 
@@ -74,7 +74,7 @@ impl SequentialOcl {
 
     pub fn from_file(filepath: &str) -> Result<Self, Box<dyn Error>> {
         let cfg_file = File::open(filepath)?;
-        let mdl: SequentialOcl = serde_yaml::from_reader(cfg_file)?;        
+        let mdl: SequentialOcl = serde_yaml::from_reader(cfg_file)?;
         Ok(mdl)
     }
 
@@ -225,8 +225,6 @@ impl Model for SequentialOcl {
     }
 
     fn backpropagate(&mut self, expected: Array2D) {
-        let mut out = None;
-
         let layers_len = self.layers.len();
 
         // for the last layer
@@ -242,8 +240,8 @@ impl Model for SequentialOcl {
                 Err(_reason) => {
                     return;
                 }
-                Ok(val) => {
-                    out = Some(val);
+                Ok(_val) => {
+                    //out = Some(val);
                 }
             }
         }
@@ -266,9 +264,7 @@ impl Model for SequentialOcl {
                 Err(_reason) => {
                     return;
                 }
-                Ok(val) => {
-                    out = Some(val);
-                }
+                Ok(_val) => {}
             }
         }
     }
@@ -282,7 +278,8 @@ impl Model for SequentialOcl {
     fn optimizer(&self) -> &Box<dyn WithParams> {
         // https://github.com/rust-lang/rust/issues/65991
         unsafe {
-            let out = std::mem::transmute::<&Box<dyn OptimizerOcl>, &Box<dyn WithParams>>(&self.optim);
+            let out =
+                std::mem::transmute::<&Box<dyn OptimizerOcl>, &Box<dyn WithParams>>(&self.optim);
             return out;
         }
     }
@@ -290,7 +287,9 @@ impl Model for SequentialOcl {
     fn optimizer_mut(&mut self) -> &mut Box<dyn WithParams> {
         // https://github.com/rust-lang/rust/issues/65991
         unsafe {
-            let out = std::mem::transmute::<&mut Box<dyn OptimizerOcl>, &mut Box<dyn WithParams>>(&mut self.optim);
+            let out = std::mem::transmute::<&mut Box<dyn OptimizerOcl>, &mut Box<dyn WithParams>>(
+                &mut self.optim,
+            );
             return out;
         }
     }
@@ -366,7 +365,9 @@ impl Model for SequentialOcl {
     fn last_layer(&self) -> &Box<dyn AbstractLayer> {
         // https://github.com/rust-lang/rust/issues/65991
         unsafe {
-            let out = std::mem::transmute::<&Box<dyn AbstractLayerOcl>, &Box<dyn AbstractLayer>>(self.layers.last().unwrap());
+            let out = std::mem::transmute::<&Box<dyn AbstractLayerOcl>, &Box<dyn AbstractLayer>>(
+                self.layers.last().unwrap(),
+            );
             return out;
         }
     }
