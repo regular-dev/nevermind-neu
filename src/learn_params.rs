@@ -30,7 +30,7 @@ impl LearnParams {
         Self {
             ws: Arc::new(RefCell::new(vec![WsMat::random(
                 (size, prev_size),
-                Uniform::new(-0.9, 0.9),
+                Uniform::new(-0.1, 0.1),
             )])),
             ws_grad: Arc::new(RefCell::new(vec![WsMat::zeros((size, prev_size))])),
             neu_grad: Arc::new(RefCell::new(Array2D::zeros((1, size)))),
@@ -60,8 +60,8 @@ impl LearnParams {
     }
 
     pub fn new_with_bias(size: usize, prev_size: usize) -> Self {
-        let ws = WsMat::random((size, prev_size), Uniform::new(-0.9, 0.9));
-        let ws_bias = WsMat::random((size, 1), Uniform::new(-0.8, 0.8));
+        let ws = WsMat::random((size, prev_size), Uniform::new(-0.1, 0.1));
+        let ws_bias = WsMat::random((size, 1), Uniform::new(-0.1, 0.1));
 
         Self {
             ws: Arc::new(RefCell::new(vec![ws, ws_bias])),
@@ -76,7 +76,7 @@ impl LearnParams {
     }
 
     pub fn new_with_const_bias(size: usize, prev_size: usize, bias_val: f32) -> Self {
-        let ws = WsMat::random((size, prev_size), Uniform::new(-0.9, 0.9));
+        let ws = WsMat::random((size, prev_size), Uniform::new(-0.1, 0.1));
         let ws_bias = WsMat::from_elem((size, 1), bias_val);
 
         Self {

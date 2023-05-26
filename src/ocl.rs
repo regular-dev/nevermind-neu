@@ -113,7 +113,7 @@ pub fn init_ocl_params(
         .len(self_size * prev_shape[0])
         .build()?;
 
-    let ws_cpu_vals = WsMat::random((self_size, prev_shape[0]), Uniform::new(-0.9, 0.9));
+    let ws_cpu_vals = WsMat::random((self_size, prev_shape[0]), Uniform::new(-0.1, 0.1));
 
     let ws = Buffer::builder()
         .queue(queue.clone())
