@@ -398,7 +398,13 @@ impl Model for SequentialOcl {
                 continue;
             }
             let mut ocl_prms = self_l.ocl_params().unwrap();
+
             ocl_prms.set_ws_from_vec(&mut dec_l.ws[0].vals, q.clone());
+
+            if dec_l.ws.len() > 1 {
+                ocl_prms.set_bias_from_vec(&mut dec_l.ws[1].vals, q.clone());
+            }
+
             self_l.set_ocl_params(ocl_prms);
         }
 

@@ -69,11 +69,18 @@ impl OclParams {
     pub fn serialize_ws_to_pb(&self) -> PbWsBlob {
         let mut pb_ws = PbWsBlob::default();
         let ws_b = self.ws.borrow();
+        let bias_b = self.bias.borrow();
+
         let mut vec_ws = vec![0.0; ws_b.len()];
+        let mut vec_bias = vec![0.0; bias_b.len()];
 
         ws_b.read(&mut vec_ws)
             .enq()
-            .expect("Failed to serialize weights");
+            .expect("Failed to read weights from ocl buffer");
+        bias_b
+            .read(&mut vec_bias)
+            .enq()
+            .expect("Failed to read bias from ocl buffer");
 
         let pb_vec = PbFloatVec {
             vals: vec_ws,
@@ -81,12 +88,19 @@ impl OclParams {
             shape_prev_size: self.ws_shape[1] as i32,
         };
 
+        let pb_bias_vec = PbFloatVec {
+            vals: vec_bias,
+            shape_size: bias_b.len() as i32,
+            shape_prev_size: 1,
+        };
+
         pb_ws.ws.push(pb_vec);
+        pb_ws.ws.push(pb_bias_vec);
 
         pb_ws
     }
 
-    pub fn set_ws_from_vec(&mut self, v: &mut Vec<f32>, q: Queue) {
+    pub fn set_ws_from_vec(&mut self, v: &mut Vec<Num>, q: Queue) {
         let ws = Buffer::builder()
             .queue(q)
             .flags(MemFlags::new().read_write())
@@ -96,6 +110,18 @@ impl OclParams {
             .expect("Failed to create ws buffer from vec");
 
         self.ws = Rc::new(RefCell::new(ws));
+    }
+
+    pub fn set_bias_from_vec(&mut self, v: &mut Vec<Num>, q: Queue) {
+        let bias = Buffer::builder()
+            .queue(q)
+            .flags(MemFlags::new().read_write())
+            .len(v.len())
+            .copy_host_slice(v.as_slice())
+            .build()
+            .expect("Failed to create bias buffer from vec");
+
+        self.bias = Rc::new(RefCell::new(bias));
     }
 }
 
