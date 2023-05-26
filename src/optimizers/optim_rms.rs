@@ -49,7 +49,7 @@ impl OptimizerRMS {
         for w in ws.indexed_iter_mut() {
             let cur_ws_idx = [w.0.0, w.0.1]; // neu_idx, prev_idx
 
-            if f32::is_nan(ws_grad[cur_ws_idx]) {
+            if ws_grad[cur_ws_idx] == 0.0 {
                 continue;
             }
 

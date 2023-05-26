@@ -16,6 +16,10 @@ static SRC_SGD_KERNEL: &'static str = r#"
     {
         uint const idx = get_global_id(0);
         
+        if (ws_grad[idx] == 0.0) {
+            return;
+        }
+
         ws[idx] += momentum * ws_optim[idx];
         ws_optim[idx] = learn_rate * ws_grad[idx];
         ws[idx] += ws_optim[idx];

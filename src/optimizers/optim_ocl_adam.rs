@@ -18,8 +18,8 @@ static SRC_ADAM_KERNEL: &'static str = r#"
                 __global float *ws_m)
     {
         uint const idx = get_global_id(0);
-        
-        if (ws_grad[idx] == 0.0) {
+
+        if ( ws_grad[idx] == 0.0 ) {
             return;
         }
 
@@ -157,7 +157,7 @@ impl WithParams for OptimizerOclAdam {
     fn cfg(&self) -> HashMap<String, Variant> {
         let mut out = HashMap::new();
 
-        out.insert("type".to_string(), Variant::String("rmsprop".to_string()));
+        out.insert("type".to_string(), Variant::String("adam".to_string()));
         out.insert("learning_rate".to_string(), Variant::Float(self.learn_rate));
         out.insert("b1".to_string(), Variant::Float(self.b1));
         out.insert("b2".to_string(), Variant::Float(self.b2));

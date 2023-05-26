@@ -1,6 +1,6 @@
 use std::fmt::{self, Debug};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum OclActivationFunc {
     Raw,
     Sigmoid,

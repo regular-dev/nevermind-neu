@@ -46,7 +46,7 @@ impl OptimizerAdaGrad {
                 let cur_ws_idx = [neu_idx, prev_idx];
 
                 // grad is 0.0 when weights is in dropout selection
-                if f32::is_nan(ws_grad[cur_ws_idx]) {
+                if ws_grad[cur_ws_idx] == 0.0 {
                     continue;
                 }
 

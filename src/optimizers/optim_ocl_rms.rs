@@ -16,7 +16,7 @@ static SRC_RMS_KERNEL: &'static str = r#"
     {
         uint const idx = get_global_id(0);
         
-        if (ws_grad[idx] == 0.0) {
+        if ( ws_grad[idx] == 0.0 ) {
             return;
         }
 
