@@ -215,7 +215,7 @@ impl OptimizerOcl for OptimizerOclRms {
                 self.kernel_avg
                     .set_arg("buf", buf.deref())
                     .expect("[opt_ocl_rms] Failed to set BUF");
-                self.kernel
+                self.kernel_avg
                     .set_arg("rms", rms_m)
                     .expect("[opt_ocl_rms] Failed to set WS_RMS arg");
 

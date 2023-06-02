@@ -57,14 +57,6 @@ crossterm = "0.25.0"
 rust-mnist = { version = "0.1", optional = true } 
 ocl = { version = "0.19.4", optional = true }
 
-[dependencies.uuid]
-version = "1.1.2"
-features = [
-    "v4",                # Lets you generate random UUIDs
-    "fast-rng",          # Use a faster (but still sufficiently random) RNG
-    "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
-]
-
 [features]
 log_log4rs = []
 log_env_logger = []
