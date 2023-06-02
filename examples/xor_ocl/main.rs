@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut seq_mdl = SequentialOcl::new_simple(&net_cfg);
     seq_mdl.set_batch_size(4);
 
-    let opt = Box::new(OptimizerOclRms::new(0.01, seq_mdl.queue()));
+    let opt = Box::new(OptimizerOclAdam::new(0.01, seq_mdl.queue()));
 
     seq_mdl.set_optim(opt);
 

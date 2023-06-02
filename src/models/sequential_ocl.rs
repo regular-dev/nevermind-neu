@@ -5,11 +5,11 @@ use std::{
     io::prelude::*,
     io::ErrorKind,
     ops::{Deref, DerefMut},
-    rc::Rc
+    rc::Rc,
 };
 
-use crate::layers::*;
 use crate::cpu_params::CpuParams;
+use crate::layers::*;
 use crate::models::pb::PbSequentialModel;
 use crate::models::*;
 use crate::optimizers::*;
@@ -158,39 +158,43 @@ impl SequentialOcl {
             )
             .expect("Init ocl failure");
 
-            // We need to copy weights buffer cause of
+            // Can't use the same buffers for validation model, we need to copy weights buffer cause of
             // https://registry.khronos.org/OpenCL/sdk/1.2/docs/man/xhtml/clSetKernelArg.html#notes
             let train_mdl_params = l.ocl_params().unwrap();
-            let train_mdl_ws = train_mdl_params.get_buf_t(TypeBuffer::Weights);
-            let train_mdl_ws = train_mdl_ws.0.borrow();
-
-            let mut vec_ws = vec![0.0; train_mdl_ws.len()];
-
-            train_mdl_ws
-                .read(&mut vec_ws)
-                .enq()
-                .expect("Failed to read train model weights");
+            let mut new_mdl_params = l.ocl_params().unwrap();
 
             l.set_input_shape(&[prev_size]);
 
-            let mut new_mdl_params = l.ocl_params().unwrap();
-            let new_mdl_ws = Rc::new(RefCell::new(
-                Buffer::builder()
-                    .queue(self.ocl_queue.clone())
-                    .flags(MemFlags::new().read_write())
-                    .len(vec_ws.len())
-                    .copy_host_slice(vec_ws.as_slice())
-                    .build()
-                    .expect("Failed to copy WS buffer"),
-            ));
+            for t in l.trainable_bufs().0.iter() {
+                let train_mdl_buf = train_mdl_params.get_buf(*t);
+                let train_buf_shape = train_mdl_buf.1;
+                let train_buf_bor = train_mdl_buf.0.borrow();
 
-            new_mdl_params.insert_buf(
-                TypeBuffer::Weights as i32,
-                new_mdl_ws,
-                vec![l.size() as i32, prev_size as i32],
-            );
+                let mut vec_buf = vec![0.0; train_buf_bor.len()];
 
-            l.set_ocl_params(new_mdl_params);
+                train_buf_bor
+                    .read(&mut vec_buf)
+                    .enq()
+                    .expect("Failed to read train model weights");
+
+                let new_mdl_buf = Rc::new(RefCell::new(
+                    Buffer::builder()
+                        .queue(self.ocl_queue.clone())
+                        .flags(MemFlags::new().read_write())
+                        .len(vec_buf.len())
+                        .copy_host_slice(vec_buf.as_slice())
+                        .build()
+                        .expect("Failed to copy buffer"),
+                ));
+
+                new_mdl_params.insert_buf(
+                    *t,
+                    new_mdl_buf,
+                    train_buf_shape
+                );
+            }
+
+           l.set_ocl_params(new_mdl_params);
 
             prev_size = l.size();
         }
@@ -314,19 +318,11 @@ impl Model for SequentialOcl {
     }
 
     fn output_params(&self) -> CpuParams {
-        let ocl_params = self
-            .layers
-            .last()
-            .expect("There are no layers in model ocl !!!")
-            .ocl_params()
-            .unwrap();
+        let out_layer = self.layers.last().expect("Couldn't get output layer");
 
-        let cpu_lp = self
-            .layers
-            .last()
-            .expect("There are no layers in ocl model")
-            .cpu_params()
-            .unwrap();
+        let ocl_params = out_layer.ocl_params().unwrap();
+
+        let cpu_lp = out_layer.cpu_params().unwrap();
         let cpu_output = cpu_lp.get_2d_buf_t(TypeBuffer::Output);
         let mut cpu_output = cpu_output.borrow_mut();
 
@@ -350,7 +346,7 @@ impl Model for SequentialOcl {
             .enq()
             .expect("Failed top copy OCL buffer to CPU");
 
-        return cpu_lp.clone();
+        return cpu_lp;
     }
 
     fn batch_size(&self) -> usize {

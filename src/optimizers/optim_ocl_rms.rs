@@ -49,8 +49,8 @@ static SRC_RMS_KERNEL_AVG: &'static str = r#"
             return;
         }
 
-        rms[idx] = alpha * rms[idx] + (1.0 - alpha) * pow(grad[idx], (float)2.0);
-        buf[idx] += (learn_rate / (sqrt(rms[idx] + theta))) * grad[idx];
+        rms[idx] = alpha * rms[idx] + (1.0 - alpha) * pow(avg_grad, (float)2.0);
+        buf[idx] += (learn_rate / (sqrt(rms[idx] + theta))) * avg_grad;
     }
 "#;
 
