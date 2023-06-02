@@ -2,8 +2,7 @@ use crate::ocl::*;
 use crate::optimizers::*;
 
 use ocl::{Buffer, Kernel, MemFlags, Program, Queue};
-use std::collections::HashMap;
-use uuid::Uuid;
+use std::{collections::HashMap, ops::Deref};
 
 static SRC_ADAM_KERNEL_WS: &'static str = r#"
     __kernel void adam_optim_ws(
@@ -22,40 +21,42 @@ static SRC_ADAM_KERNEL_WS: &'static str = r#"
             return;
         }
 
-        if ( isnan(ws_grad[idx]) ) {
-            return;
-        }
-
         ws_m[idx] = b1 * ws_m[idx] + (1.0 - b1) * ws_grad[idx];
         ws_v[idx] = b2 * ws_v[idx] + (1.0 - b2) * ws_grad[idx] * ws_grad[idx];
         ws[idx] += learn_rate / sqrt(ws_v[idx] + theta) * ws_m[idx];
     }
 "#;
 
-static SRC_ADAM_KERNEL_BIAS: &'static str = r#"
-    __kernel void adam_optim_bias(
+static SRC_ADAM_KERNEL_AVG: &'static str = r#"
+    __kernel void adam_optim_avg(
                 __private float const learn_rate,
                 __private float const theta,
                 __private float const b1,
                 __private float const b2,
-                __global const float *bias_grad,
-                __global float *bias,
-                __global float *bias_v,
-                __global float *bias_m)
+                __private int const batch_size,
+                __global const float *grad,
+                __global float *buf,
+                __global float *v,
+                __global float *m)
     {
+        uint const work_size = get_global_size(0);
         uint const idx = get_global_id(0);
 
-        if ( bias_grad[idx] == 0.0 ) {
+        float avg_grad = 0.0;
+
+        for (int i = 0; i < batch_size; ++i) {
+            avg_grad += grad[work_size * i + idx];
+        }
+
+        avg_grad = avg_grad / batch_size;
+
+        if ( avg_grad == 0.0 ) {
             return;
         }
 
-        if ( isnan(bias_grad[idx]) ) {
-            return;
-        }
-
-        bias_m[idx] = b1 * bias_m[idx] + (1.0 - b1) * bias_grad[idx];
-        bias_v[idx] = b2 * bias_v[idx] + (1.0 - b2) * bias_grad[idx] * bias_grad[idx];
-        bias[idx] += learn_rate / sqrt(bias_v[idx] + theta) * bias_m[idx];
+        m[idx] = b1 * m[idx] + (1.0 - b1) * avg_grad;
+        v[idx] = b2 * v[idx] + (1.0 - b2) * avg_grad * avg_grad;
+        buf[idx] += learn_rate / sqrt(v[idx] + theta) * m[idx];
     }
 "#;
 
@@ -64,31 +65,25 @@ pub struct OptimizerOclAdam {
     theta: f32,
     b1: f32,
     b2: f32,
-    ws_v: HashMap<Uuid, (Buffer<f32>, Buffer<f32>)>, // ws, bias
-    ws_m: HashMap<Uuid, (Buffer<f32>, Buffer<f32>)>, // ws, bias
+    v: HashMap<u64, HashMap<i32, Buffer<Float>>>,
+    m: HashMap<u64, HashMap<i32, Buffer<Float>>>,
 
     queue: Queue,
-    kernel_ws: Kernel,
-    kernel_bias: Kernel,
+    kernel: Kernel,
+    kernel_avg: Kernel,
 }
 
 impl OptimizerOclAdam {
     pub fn new(learn_rate: f32, queue: Queue) -> Self {
-        let program_ws = Program::builder()
+        let program_opt = Program::builder()
             .devices(queue.device())
             .src(SRC_ADAM_KERNEL_WS)
             .build(&queue.context())
             .expect("Failed to create Adam optimizer program");
 
-        let program_bias = Program::builder()
-            .devices(queue.device())
-            .src(SRC_ADAM_KERNEL_BIAS)
-            .build(&queue.context())
-            .expect("Failed to create Adam bias optimizer program");
-
-        let kernel_ws = Kernel::builder()
+        let kernel_opt = Kernel::builder()
             .name("adam_optim_ws")
-            .program(&program_ws)
+            .program(&program_opt)
             .queue(queue.clone())
             .arg_named("learn_rate", learn_rate)
             .arg_named("theta", 1e-9 as f32)
@@ -101,38 +96,45 @@ impl OptimizerOclAdam {
             .build()
             .expect("Failed to create Adam optimizer kernel");
 
-        let kernel_bias = Kernel::builder()
-            .name("adam_optim_bias")
-            .program(&program_bias)
+        let program_opt_avg = Program::builder()
+            .devices(queue.device())
+            .src(SRC_ADAM_KERNEL_AVG)
+            .build(&queue.context())
+            .expect("Failed to create Adam optimizer avg program");
+
+        let kernel_opt_avg = Kernel::builder()
+            .name("adam_optim_avg")
+            .program(&program_opt_avg)
             .queue(queue.clone())
             .arg_named("learn_rate", learn_rate)
             .arg_named("theta", 1e-9 as f32)
             .arg_named("b1", 0.9 as f32)
             .arg_named("b2", 0.99 as f32)
-            .arg_named("bias_grad", None::<&Buffer<f32>>)
-            .arg_named("bias", None::<&Buffer<f32>>)
-            .arg_named("bias_v", None::<&Buffer<f32>>)
-            .arg_named("bias_m", None::<&Buffer<f32>>)
+            .arg_named("batch_size", 0 as i32)
+            .arg_named("grad", None::<&Buffer<f32>>)
+            .arg_named("buf", None::<&Buffer<f32>>)
+            .arg_named("v", None::<&Buffer<f32>>)
+            .arg_named("m", None::<&Buffer<f32>>)
             .build()
-            .expect("Failed to create Adam optimizer kernel");
+            .expect("Failed to create Adam optimizer avg kernel");
 
         Self {
             learn_rate,
             b1: 0.9,
             b2: 0.99,
             theta: 1e-7,
-            ws_v: HashMap::new(),
-            ws_m: HashMap::new(),
+            v: HashMap::new(),
+            m: HashMap::new(),
             queue,
-            kernel_ws,
-            kernel_bias,
+            kernel: kernel_opt,
+            kernel_avg: kernel_opt_avg,
         }
     }
 
     pub fn set_learn_rate(&mut self, learn_rate: f32) {
         self.learn_rate = learn_rate;
 
-        self.kernel_ws
+        self.kernel
             .set_arg("learn_rate", learn_rate as f32)
             .expect("[OCL_RMS] Failed to set learning rate");
     }
@@ -140,7 +142,7 @@ impl OptimizerOclAdam {
     pub fn set_theta(&mut self, theta: f32) {
         self.theta = theta;
 
-        self.kernel_ws
+        self.kernel
             .set_arg("theta", self.theta)
             .expect("[OCL_RMS] Failed to set theta");
     }
@@ -152,105 +154,105 @@ impl OptimizerOclAdam {
     pub fn theta(&self) -> f32 {
         self.theta
     }
-
-    fn optimize_ws(&mut self, params: &OclParams) {
-        let ws_v = self.ws_v.get_mut(&params.uuid).unwrap();
-        let ws_m = self.ws_m.get_mut(&params.uuid).unwrap();
-        let ws_buf = params.ws.borrow();
-        let ws_grad_buf = params.ws_grad.borrow();
-
-        self.kernel_ws
-            .set_default_global_work_size(ocl::SpatialDims::One(ws_v.0.len()));
-
-        self.kernel_ws
-            .set_arg("ws", &*ws_buf)
-            .expect("[opt_ocl_adam] Failed to set WS arg");
-        self.kernel_ws
-            .set_arg("ws_grad", &*ws_grad_buf)
-            .expect("[opt_ocl_adam] Failed to set WS_GRAD arg");
-        self.kernel_ws
-            .set_arg("ws_v", &ws_v.0)
-            .expect("[opt_ocl_adam] Failed to set WS_V arg");
-        self.kernel_ws
-            .set_arg("ws_m", &ws_m.0)
-            .expect("[opt_ocl_adam] Failed to set WS_M arg");
-
-        unsafe {
-            self.kernel_ws
-                .enq()
-                .expect("[opt_ocl_adam] Failed to enqueue ws-kernel");
-        }
-    }
-
-    fn optimize_bias(&mut self, params: &OclParams) {
-        let bias_v = self.ws_v.get_mut(&params.uuid).unwrap();
-        let bias_m = self.ws_m.get_mut(&params.uuid).unwrap();
-        let bias_buf = params.bias.borrow();
-        let bias_grad_buf = params.neu_grad.borrow();
-
-        self.kernel_bias
-            .set_default_global_work_size(ocl::SpatialDims::One(bias_v.1.len()));
-
-        self.kernel_bias
-            .set_arg("bias", &*bias_buf)
-            .expect("[opt_ocl_adam] Failed to set BIAS arg");
-        self.kernel_bias
-            .set_arg("bias_grad", &*bias_grad_buf)
-            .expect("[opt_ocl_adam] Failed to set BIAS_GRAD arg");
-        self.kernel_bias
-            .set_arg("bias_v", &bias_v.1)
-            .expect("[opt_ocl_adam] Failed to set BIAS_V arg");
-        self.kernel_bias
-            .set_arg("bias_m", &bias_m.1)
-            .expect("[opt_ocl_adam] Failed to set BIAS_M arg");
-
-        unsafe {
-            self.kernel_bias
-                .enq()
-                .expect("[opt_ocl_adam] Failed to enqueue bias-kernel");
-        }
-    }
 }
 
 impl OptimizerOcl for OptimizerOclAdam {
-    fn optimize_ocl_params(&mut self, params: OclParams) {
-        if !self.ws_v.contains_key(&params.uuid) {
-            let ws_grad = params.ws_grad.borrow();
-            let bias_grad = params.neu_grad.borrow();
-
-            let ws_buf = Buffer::<f32>::builder()
-                .queue(self.queue.clone())
-                .flags(MemFlags::new().read_write())
-                .len(ws_grad.len())
-                .build()
-                .expect("[opt_ocl_adam] Failed to create ws buffer");
-
-            let ws_buf_m = Buffer::<f32>::builder()
-                .queue(self.queue.clone())
-                .flags(MemFlags::new().read_write())
-                .len(ws_grad.len())
-                .build()
-                .expect("[opt_ocl_adam] Failed to create ws buffer");
-
-            let bias_buf = Buffer::<f32>::builder()
-                .queue(self.queue.clone())
-                .flags(MemFlags::new().read_write())
-                .len(bias_grad.len())
-                .build()
-                .expect("[opt_ocl_adam] Failed to create bias buffer");
-            let bias_buf_m = Buffer::<f32>::builder()
-                .queue(self.queue.clone())
-                .flags(MemFlags::new().read_write())
-                .len(bias_grad.len())
-                .build()
-                .expect("[opt_ocl_adam] Failed to create bias buffer");
-
-            self.ws_v.insert(params.uuid, (ws_buf, bias_buf));
-            self.ws_m.insert(params.uuid, (ws_buf_m, bias_buf_m));
+    fn optimize_ocl_params(&mut self, params: OclParams, opt_prms: TrainableBufsIds) {
+        if !self.v.contains_key(&params.id) {
+            self.v.insert(params.id, HashMap::new());
+            self.m.insert(params.id, HashMap::new());
         }
 
-        self.optimize_ws(&params);
-        self.optimize_bias(&params);
+        for (buf_id, buf_grad_id) in opt_prms.0.iter().zip(opt_prms.1.iter()) {
+            let buf_grad = params.get_buf(*buf_grad_id);
+            let buf_grad = buf_grad.0.borrow();
+
+            let v = self.v.get_mut(&params.id).unwrap();
+            let m = self.m.get_mut(&params.id).unwrap();
+
+            if !v.contains_key(buf_grad_id) {
+                let zeroed_param = OclParams::create_empty_buf(
+                    buf_grad.len(),
+                    MemFlags::new().read_write(),
+                    self.queue.clone(),
+                )
+                .expect("[ocl_adam] Failed to create V ocl buffer");
+                v.insert(*buf_grad_id, zeroed_param);
+            }
+
+            if !m.contains_key(buf_grad_id) {
+                let zeroed_param = OclParams::create_empty_buf(
+                    buf_grad.len(),
+                    MemFlags::new().read_write(),
+                    self.queue.clone(),
+                )
+                .expect("[ocl_adam] Failed to create M buffer");
+                m.insert(*buf_grad_id, zeroed_param);
+            }
+
+            let v_m = v.get_mut(buf_grad_id).unwrap();
+            let m_m = m.get_mut(buf_grad_id).unwrap();
+
+            let buf = params.get_buf(*buf_id);
+            let buf = buf.0.borrow();
+
+            if buf.len() == buf_grad.len() {
+                self.kernel
+                    .set_default_global_work_size(ocl::SpatialDims::One(buf.len()));
+
+                self.kernel
+                    .set_arg("ws", buf.deref())
+                    .expect("[opt_ocl_adam] Failed to set WS arg");
+                self.kernel
+                    .set_arg("ws_grad", buf_grad.deref())
+                    .expect("[opt_ocl_adam] Failed to set WS_GRAD arg");
+                self.kernel
+                    .set_arg("ws_v", v_m)
+                    .expect("[opt_ocl_adam] Failed to set WS_V arg");
+                self.kernel
+                    .set_arg("ws_m", m_m)
+                    .expect("[opt_ocl_adam] Failed to set WS_M arg");
+
+                unsafe {
+                    self.kernel
+                        .enq()
+                        .expect("[opt_ocl_adam] Failed to enqueue opt kernel");
+                }
+            } else if buf_grad.len() % buf.len() == 0 {
+                let batch_size = buf_grad.len() / buf.len();
+
+                self.kernel_avg
+                    .set_default_global_work_size(ocl::SpatialDims::One(buf.len()));
+
+                self.kernel_avg
+                    .set_arg("batch_size", batch_size as i32)
+                    .expect("[opt_ocl_adam] Failed to set batch size");
+                self.kernel_avg
+                    .set_arg("grad", buf_grad.deref())
+                    .expect("[opt_ocl_adam] Faield to set GRAD");
+                self.kernel_avg
+                    .set_arg("buf", buf.deref())
+                    .expect("[opt_ocl_adam] Failed to set BUF");
+                self.kernel_avg
+                    .set_arg("v", v_m)
+                    .expect("[opt_ocl_adam] Failed to set WS_V arg");
+                self.kernel_avg
+                    .set_arg("m", m_m)
+                    .expect("[opt_ocl_adam] Failed to set WS_M arg");
+
+                unsafe {
+                    self.kernel_avg
+                        .enq()
+                        .expect("[opt_ocl_adam] Failed to enqueue avg kernel");
+                }
+            } else {
+                panic!(
+                    "[opt_ocl_adam] Invalid buf and grad length : {} | {}",
+                    buf.len(),
+                    buf_grad.len()
+                );
+            }
+        }
     }
 }
 

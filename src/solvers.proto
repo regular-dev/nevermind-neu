@@ -2,38 +2,18 @@ syntax = "proto3";
 
 package mind.serial_pb;
 
-message PbFloatVec {
+message PbBuf {
   repeated float vals = 1;
-  int32 shape_size = 2;
-  int32 shape_prev_size = 3;
+  repeated int32 shape = 2;
+  int32 buf_id = 3;
 }
 
-message PbWsBlob {
-  repeated PbFloatVec ws = 1;
-}
-
-message PbSolverRMS {
-  float learn_rate = 1;
-  float alpha = 2;
-  float theta = 3;
-  uint32 batch_cnt = 4;
-  map< string, PbWsBlob > rms = 5; // uuid - blob
-  //map< string, PbWsBlob > ws_batch = 7;
-
-  repeated PbWsBlob layers = 8;  
-}
-
-message PbSolverSGD {
-  float learn_rate = 1;
-  float momentum = 2;
-  uint32 batch_cnt = 3;
-  map< string, PbWsBlob > ws_delta = 4; // uuid - blob
-
-  repeated PbWsBlob layers = 6;
+message PbBufBlob {
+  repeated PbBuf bufs = 2;
 }
 
 message PbSequentialModel {
-  repeated PbWsBlob layers = 1;  
+  repeated PbBufBlob layers = 1;  
 }
 
 message PbDataBatch {

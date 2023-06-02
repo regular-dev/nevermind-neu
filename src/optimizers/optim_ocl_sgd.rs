@@ -1,10 +1,9 @@
 use crate::ocl::*;
-use crate::util::*;
 use crate::optimizers::*;
+use crate::util::*;
 
 use ocl::{Buffer, Kernel, MemFlags, Program, Queue};
-use std::collections::HashMap;
-use uuid::Uuid;
+use std::{collections::HashMap, ops::Deref};
 
 static SRC_SGD_KERNEL: &'static str = r#"
     __kernel void sgd_optim(
@@ -26,12 +25,44 @@ static SRC_SGD_KERNEL: &'static str = r#"
     }
 "#;
 
+static SRC_SGD_KERNEL_AVG: &'static str = r#"
+    __kernel void sgd_optim_avg(
+                __private float const learn_rate,
+                __private float const alpha,
+                __private float const theta,
+                __private int const batch_size,
+                __global const float *grad,
+                __global float *buf,
+                __global float *delta)
+    {
+        uint const work_size = get_global_size(0);
+        uint const idx = get_global_id(0);
+
+        float avg_grad = 0.0;
+
+        for (int i = 0; i < batch_size; ++i) {
+            avg_grad += grad[work_size * i + idx];
+        }
+
+        avg_grad = avg_grad / batch_size;
+
+        if ( avg_grad == 0.0 ) {
+            return;
+        }
+
+        buf[idx] += momentum * delta[idx];
+        delta[idx] = learn_rate * avg_grad;
+        buf[idx] += delta[idx];
+    }
+"#;
+
 pub struct OptimizerOclSgd {
     pub learn_rate: f32,
     pub momentum: f32,
-    pub ws_delta: HashMap<Uuid, Buffer<f32>>,
+    pub delta: HashMap<u64, HashMap<i32, Buffer<Float>>>,
     pub queue: Queue,
     pub kernel: Kernel,
+    pub kernel_avg: Kernel,
 }
 
 impl OptimizerOclSgd {
@@ -54,54 +85,114 @@ impl OptimizerOclSgd {
             .build()
             .expect("Failed to create SGD optimizer kernel");
 
+        let program_avg = Program::builder()
+            .devices(queue.device())
+            .src(SRC_SGD_KERNEL_AVG)
+            .build(&queue.context())
+            .expect("Failed to create SGD avg program");
+
+        let kernel_avg = Kernel::builder()
+            .name("sgd_optim_avg")
+            .program(&program_avg)
+            .queue(queue.clone())
+            .arg_named("learn_rate", 1e-2)
+            .arg_named("alpha", 0.9 as f32)
+            .arg_named("theta", 1e-7 as f32)
+            .arg_named("batch_size", 0 as i32)
+            .arg_named("grad", None::<&Buffer<f32>>)
+            .arg_named("buf", None::<&Buffer<f32>>)
+            .arg_named("rms", None::<&Buffer<f32>>)
+            .build()
+            .expect("Failed to create SGD opt avg optimizer kernel");
+
         Self {
             learn_rate: 1e-1,
             momentum: 0.9,
-            ws_delta: HashMap::new(),
+            delta: HashMap::new(),
             queue,
             kernel,
+            kernel_avg,
         }
     }
 }
 
 impl OptimizerOcl for OptimizerOclSgd {
-    fn optimize_ocl_params(&mut self, params: OclParams) {
-        if !self.ws_delta.contains_key(&params.uuid) {
-            let ws_grad = params.ws_grad.borrow();
-
-            let ws_buf = Buffer::<f32>::builder()
-                .queue(self.queue.clone())
-                .flags(MemFlags::new().read_write())
-                .len(ws_grad.len())
-                .build()
-                .expect("[opt_ocl_sgd] Failed to create ws buffer");
-
-            self.ws_delta.insert(params.uuid, ws_buf);
+    fn optimize_ocl_params(&mut self, params: OclParams, opt_prms: TrainableBufsIds) {
+        if !self.delta.contains_key(&params.id) {
+            self.delta.insert(params.id, HashMap::new());
         }
 
-        let ws_delta_buf = self.ws_delta.get_mut(&params.uuid).unwrap();
-        let ws_buf = params.ws.borrow();
-        let ws_grad_buf = params.ws_grad.borrow();
+        for (buf_id, buf_grad_id) in opt_prms.0.iter().zip(opt_prms.1.iter()) {
+            let buf_grad = params.get_buf(*buf_grad_id);
+            let buf_grad = buf_grad.0.borrow();
 
-        self.kernel
-            .set_default_global_work_size(ocl::SpatialDims::One(ws_delta_buf.len()));
+            let delta = self.delta.get_mut(&params.id).unwrap();
 
-        // TODO : learn_rate and momentum will be removed from here
-        self.kernel.set_arg("learn_rate", self.learn_rate).unwrap();
-        self.kernel.set_arg("momentum", self.momentum).unwrap();
+            if !delta.contains_key(buf_grad_id) {
+                let zeroed_param = OclParams::create_empty_buf(
+                    buf_grad.len(),
+                    MemFlags::new().read_write(),
+                    self.queue.clone(),
+                )
+                .expect("[ocl_sgd] Failed to create V ocl buffer");
+                delta.insert(*buf_grad_id, zeroed_param);
+            }
 
-        self.kernel
-            .set_arg("ws", &*ws_buf)
-            .expect("[opt_ocl_sgd] Failed to set WS arg");
-        self.kernel
-            .set_arg("ws_grad", &*ws_grad_buf)
-            .expect("[opt_ocl_sgd] Failed to set WS_GRAD arg");
-        self.kernel
-            .set_arg("ws_optim", &*ws_delta_buf)
-            .expect("[opt_ocl_sgd] Failed to set WS_OPTIM arg");
+            let delta_m = delta.get_mut(buf_grad_id).unwrap();
 
-        unsafe {
-            self.kernel.enq().expect("[opt_ocl_sgd] Failed to enqueue kernel");
+            let buf = params.get_buf(*buf_id);
+            let buf = buf.0.borrow();
+
+            if buf.len() == buf_grad.len() {
+                self.kernel
+                    .set_default_global_work_size(ocl::SpatialDims::One(buf.len()));
+
+                self.kernel
+                    .set_arg("ws", buf.deref())
+                    .expect("[opt_ocl_sgd] Failed to set WS arg");
+                self.kernel
+                    .set_arg("ws_grad", buf_grad.deref())
+                    .expect("[opt_ocl_sgd] Failed to set WS_GRAD arg");
+                self.kernel
+                    .set_arg("ws_rms", delta_m)
+                    .expect("[opt_ocl_sgd] Failed to set WS_RMS arg");
+
+                unsafe {
+                    self.kernel
+                        .enq()
+                        .expect("[opt_ocl_sgd] Failed to enqueue kernel");
+                }
+            } else if buf_grad.len() % buf.len() == 0 {
+                let batch_size = buf_grad.len() / buf.len();
+
+                self.kernel_avg
+                    .set_default_global_work_size(ocl::SpatialDims::One(buf.len()));
+
+                self.kernel_avg
+                    .set_arg("batch_size", batch_size as i32)
+                    .expect("[opt_ocl_sgd] Failed to set batch size");
+                self.kernel_avg
+                    .set_arg("grad", buf_grad.deref())
+                    .expect("[opt_ocl_sgd] Faield to set GRAD");
+                self.kernel_avg
+                    .set_arg("buf", buf.deref())
+                    .expect("[opt_ocl_sgd] Failed to set BUF");
+                self.kernel
+                    .set_arg("rms", delta_m)
+                    .expect("[opt_ocl_sgd] Failed to set WS_RMS arg");
+
+                unsafe {
+                    self.kernel_avg
+                        .enq()
+                        .expect("[opt_ocl_sgd] Failed to enqueue avg kernel");
+                }
+            } else {
+                panic!(
+                    "[opt_ocl_sgd] Invalid buf and grad length : {} | {}",
+                    buf.len(),
+                    buf_grad.len()
+                );
+            }
         }
     }
 }

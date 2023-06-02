@@ -32,12 +32,13 @@ pub use optim_ocl::*;
 #[cfg(feature ="opencl")]
 pub use optim_ocl_fabric::*;
 
-use crate::learn_params::*;
+use crate::cpu_params::*;
 use crate::util::*;
 use crate::err::*;
+use crate::layers::*;
 
 pub trait Optimizer : WithParams {
-    fn optimize_params(&mut self, learn_params: &mut LearnParams);
+    fn optimize_params(&mut self, learn_params: &mut CpuParams, opt_prms: TrainableBufsIds);
 }
 
 pub fn optimizer_from_type(opt_type: &str) -> Result<Box<dyn Optimizer>, CustomError> {

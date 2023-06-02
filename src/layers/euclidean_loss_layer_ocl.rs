@@ -1,5 +1,5 @@
 use crate::layers::*;
-use crate::learn_params::*;
+use crate::cpu_params::*;
 use crate::ocl::*;
 use crate::util::*;
 
@@ -8,7 +8,10 @@ use log::{debug, warn};
 use ocl::MemFlags;
 use ocl::{Buffer, Context, Device, Kernel, Program, Queue};
 
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    ops::{Deref, DerefMut},
+};
 
 static EUCLIDEAN_LOSS_KERNEL_FWD: &'static str = r#"
     __kernel void euclidean_loss(
@@ -67,8 +70,8 @@ static EUCLIDEAN_LOSS_KERNEL_BWD: &'static str = r#"
 "#;
 
 pub struct EuclideanLossLayerOcl {
-    cpu_params: LearnParams,
-    ocl_params: Option<OclParams>,
+    cpu_params: CpuParams,
+    ocl_params: OclParams,
     size: usize,
     batch_size: usize,
     ocl_queue: Option<Queue>,
@@ -80,8 +83,8 @@ pub struct EuclideanLossLayerOcl {
 impl EuclideanLossLayerOcl {
     pub fn new(size: usize) -> Self {
         Self {
-            cpu_params: LearnParams::empty(),
-            ocl_params: None,
+            cpu_params: CpuParams::empty(),
+            ocl_params: OclParams::empty(),
             size,
             batch_size: 1,
             ocl_queue: None,
@@ -135,25 +138,30 @@ impl AbstractLayer for EuclideanLossLayerOcl {
             .set_arg("batch_size", batch_size as i32)
             .expect("[euc_ocl] Failed to set batch_size arg");
 
-        self.ocl_params = Some(
-            fit_to_batch_size_ocl(
-                self.ocl_params.as_ref().unwrap().clone(), // TODO : refactor
+        self.ocl_params
+            .fit_to_batch_size_ocl(
                 self.size,
                 batch_size,
                 self.ocl_queue.as_ref().unwrap().clone(),
             )
-            .expect("Fit to batch size ocl failed"),
-        );
+            .expect("[euc_ocl] Failed fit to batch size");
 
         self.cpu_params.fit_to_batch_size(batch_size);
     }
 
-    fn learn_params(&self) -> Option<LearnParams> {
+    fn cpu_params(&self) -> Option<CpuParams> {
         Some(self.cpu_params.clone())
     }
 
-    fn set_learn_params(&mut self, lp: LearnParams) {
+    fn set_cpu_params(&mut self, lp: CpuParams) {
         self.cpu_params = lp;
+    }
+
+    fn trainable_bufs(&self) -> TrainableBufsIds {
+        (
+            &[TypeBuffer::Weights as i32, TypeBuffer::Bias as i32],
+            &[TypeBuffer::WeightsGrad as i32, TypeBuffer::NeuGrad as i32],
+        )
     }
 
     fn set_input_shape(&mut self, sh: &[usize]) {
@@ -169,9 +177,9 @@ impl AbstractLayer for EuclideanLossLayerOcl {
         let queue = self.ocl_queue.as_ref().unwrap();
         // buffer routine
         self.ocl_params =
-            Some(init_ocl_params(queue.clone(), self.size, sh).expect("Buffer create failure"));
+            init_ocl_params(queue.clone(), self.size, sh, true).expect("Buffer create failure");
 
-        self.cpu_params = LearnParams::new(self.size, sh[0]);
+        self.cpu_params = CpuParams::new(self.size, sh[0]);
     }
 
     // Do copy layer memory(ws, output, ...)
@@ -260,24 +268,31 @@ impl AbstractLayerOcl for EuclideanLossLayerOcl {
 
     fn forward_ocl(&mut self, params: OclParamsBlob) -> LayerOclResult {
         let prev_params = params.first().unwrap();
-        let prev_output = prev_params.output.borrow();
-        let self_ws = self.ocl_params.as_ref().unwrap().ws.borrow();
-        let self_output = self.ocl_params.as_ref().unwrap().output.borrow();
-        let self_bias = self.ocl_params.as_ref().unwrap().bias.borrow();
+        let prev_output = prev_params.get_buf_t(TypeBuffer::Output);
+        let prev_output = prev_output.0.borrow();
+
+        let self_ws = self.ocl_params.get_buf_t(TypeBuffer::Weights);
+        let self_ws = self_ws.0.borrow();
+
+        let self_output = self.ocl_params.get_buf_t(TypeBuffer::Output);
+        let self_output = self_output.0.borrow();
+
+        let self_bias = self.ocl_params.get_buf_t(TypeBuffer::Bias);
+        let self_bias = self_bias.0.borrow();
 
         let self_kern = self.ocl_kernel.as_mut().unwrap();
 
         self_kern
-            .set_arg("in", &*prev_output)
+            .set_arg("in", prev_output.deref())
             .expect("[euc_ocl] Setting param IN failure");
         self_kern
-            .set_arg("bias", &*self_bias)
+            .set_arg("bias", self_bias.deref())
             .expect("[euc_ocl] Failed to set BIAS param");
         self_kern
-            .set_arg("ws", &*self_ws)
+            .set_arg("ws", self_ws.deref())
             .expect("[euc_ocl] Setting param WS failure");
         self_kern
-            .set_arg("out", &*self_output)
+            .set_arg("out", self_output.deref())
             .expect("[euc_ocl] Setting param OUT failure");
 
         unsafe {
@@ -288,7 +303,7 @@ impl AbstractLayerOcl for EuclideanLossLayerOcl {
 
         debug!("[euc_ocl] forward");
 
-        Ok(vec![self.ocl_params.as_ref().unwrap().clone()])
+        Ok(vec![self.ocl_params.clone()])
     }
 
     fn backward_output_ocl(
@@ -306,27 +321,34 @@ impl AbstractLayerOcl for EuclideanLossLayerOcl {
             .build()
             .expect("[euc_ocl] Couldn't create label buffer");
 
-        let self_out = self.ocl_params.as_ref().unwrap().output.borrow();
-        let self_neu_grad = self.ocl_params.as_ref().unwrap().neu_grad.borrow_mut();
-        let self_ws_grad = self.ocl_params.as_ref().unwrap().ws_grad.borrow_mut();
-        let prev_out = prev_input.first().unwrap().output.borrow();
+        let self_out = self.ocl_params.get_buf_t(TypeBuffer::Output);
+        let self_out = self_out.0.borrow();
+
+        let self_neu_grad = self.ocl_params.get_buf_t(TypeBuffer::NeuGrad);
+        let self_neu_grad = self_neu_grad.0.borrow_mut();
+
+        let self_ws_grad = self.ocl_params.get_buf_t(TypeBuffer::WeightsGrad);
+        let self_ws_grad = self_ws_grad.0.borrow_mut();
+
+        let prev_out = prev_input.first().unwrap().get_buf_t(TypeBuffer::Output);
+        let prev_out = prev_out.0.borrow();
 
         let self_kern = self.ocl_kernel_grad.as_ref().unwrap();
 
         self_kern
-            .set_arg("self_out", &*self_out)
+            .set_arg("self_out", self_out.deref())
             .expect("[euc_ocl] Setting param SELF_OUT failure");
         self_kern
-            .set_arg("prev_out", &*prev_out)
+            .set_arg("prev_out", prev_out.deref())
             .expect("[euc_ocl] Setting param PREV_OUT failure");
         self_kern
             .set_arg("labels", &lbl_buf)
             .expect("[euc_ocl] Setting param LABELS failure");
         self_kern
-            .set_arg("neu_grad", &*self_neu_grad)
+            .set_arg("neu_grad", self_neu_grad.deref())
             .expect("[euc_ocl] Setting param NEU_GRAD failure");
         self_kern
-            .set_arg("ws_grad", &*self_ws_grad)
+            .set_arg("ws_grad", self_ws_grad.deref())
             .expect("[euc_ocl] Setting param WS_GRAD failure");
 
         unsafe {
@@ -335,15 +357,15 @@ impl AbstractLayerOcl for EuclideanLossLayerOcl {
                 .expect("[euc_ocl] Enqueue backward kernel failure");
         }
 
-        Ok(vec![self.ocl_params.as_ref().unwrap().clone()])
+        Ok(vec![self.ocl_params.clone()])
     }
 
     fn ocl_params(&self) -> Option<OclParams> {
-        Some(self.ocl_params.as_ref().unwrap().clone())
+        Some(self.ocl_params.clone())
     }
 
     fn set_ocl_params(&mut self, params: OclParams) {
-        self.ocl_params = Some(params);
+        self.ocl_params = params;
     }
 
     fn copy_layer_ocl(&self) -> Box<dyn AbstractLayerOcl> {
@@ -358,8 +380,8 @@ impl AbstractLayerOcl for EuclideanLossLayerOcl {
 impl Default for EuclideanLossLayerOcl {
     fn default() -> Self {
         Self {
-            cpu_params: LearnParams::empty(),
-            ocl_params: None,
+            cpu_params: CpuParams::empty(),
+            ocl_params: OclParams::empty(),
             size: 0,
             batch_size: 1,
             ocl_queue: None,

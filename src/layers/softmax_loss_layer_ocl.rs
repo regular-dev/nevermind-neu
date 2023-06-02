@@ -1,5 +1,5 @@
 use crate::layers::*;
-use crate::learn_params::*;
+use crate::cpu_params::*;
 use crate::ocl::*;
 use crate::util::*;
 
@@ -10,7 +10,6 @@ use ocl::MemFlags;
 use ocl::{Buffer, Context, Device, Kernel, Program, Queue};
 
 use ndarray::Zip;
-
 use std::collections::HashMap;
 
 static SOFTMAX_LOSS_KERNEL_FWD: &'static str = r#"
@@ -99,8 +98,8 @@ static SOFTMAX_LOSS_KERNEL_BWD: &'static str = r#"
 "#;
 
 pub struct SoftmaxLossLayerOcl {
-    cpu_params: LearnParams,
-    ocl_params: Option<OclParams>,
+    cpu_params: CpuParams,
+    ocl_params: OclParams,
     size: usize,
     batch_size: usize,
     metrics: Metrics,
@@ -113,8 +112,8 @@ pub struct SoftmaxLossLayerOcl {
 impl SoftmaxLossLayerOcl {
     pub fn new(size: usize) -> Self {
         Self {
-            cpu_params: LearnParams::empty(),
-            ocl_params: None,
+            cpu_params: CpuParams::empty(),
+            ocl_params: OclParams::empty(),
             size,
             metrics: Metrics::new(),
             batch_size: 1,
@@ -132,6 +131,14 @@ impl AbstractLayer for SoftmaxLossLayerOcl {
 
     fn size(&self) -> usize {
         self.size
+    }
+
+    fn trainable_bufs(&self) -> TrainableBufsIds {
+        (&[TypeBuffer::Weights as i32], &[TypeBuffer::WeightsGrad as i32])
+    }
+
+    fn serializable_bufs(&self) -> &[i32] {
+        &[TypeBuffer::Weights as i32]
     }
 
     fn set_batch_size(&mut self, batch_size: usize) {
@@ -153,24 +160,22 @@ impl AbstractLayer for SoftmaxLossLayerOcl {
             .set_arg("batch_size", batch_size as i32)
             .expect("[euc_ocl] Failed to set batch_size arg");
 
-        self.ocl_params = Some(
-            fit_to_batch_size_ocl(
-                self.ocl_params.as_ref().unwrap().clone(), // TODO : refactor
+        self.ocl_params
+            .fit_to_batch_size_ocl(
                 self.size,
                 batch_size,
                 self.ocl_queue.as_ref().unwrap().clone(),
             )
-            .expect("Fit to batch size ocl failed"),
-        );
+            .expect("Fit to batch size ocl failed");
 
         self.cpu_params.fit_to_batch_size(batch_size);
     }
 
-    fn learn_params(&self) -> Option<LearnParams> {
+    fn cpu_params(&self) -> Option<CpuParams> {
         Some(self.cpu_params.clone())
     }
 
-    fn set_learn_params(&mut self, lp: LearnParams) {
+    fn set_cpu_params(&mut self, lp: CpuParams) {
         self.cpu_params = lp;
     }
 
@@ -191,9 +196,9 @@ impl AbstractLayer for SoftmaxLossLayerOcl {
         let queue = self.ocl_queue.as_ref().unwrap();
         // buffer routine
         self.ocl_params =
-            Some(init_ocl_params(queue.clone(), self.size, sh).expect("Buffer create failure"));
+            init_ocl_params(queue.clone(), self.size, sh, false).expect("Buffer create failure");
 
-        self.cpu_params = LearnParams::new(self.size, sh[0]);
+        self.cpu_params = CpuParams::new(self.size, sh[0]);
     }
 
     // Do copy layer memory(ws, output, ...)
@@ -260,9 +265,14 @@ impl AbstractLayerOcl for SoftmaxLossLayerOcl {
 
     fn forward_ocl(&mut self, params: OclParamsBlob) -> LayerOclResult {
         let prev_params = params.first().unwrap();
-        let prev_output = prev_params.output.borrow();
-        let self_ws = self.ocl_params.as_ref().unwrap().ws.borrow();
-        let self_output = self.ocl_params.as_ref().unwrap().output.borrow();
+        let prev_output = prev_params.get_buf_t(TypeBuffer::Output);
+        let prev_output = prev_output.0.borrow();
+
+        let self_ws = self.ocl_params.get_buf_t(TypeBuffer::Weights);
+        let self_ws = self_ws.0.borrow();
+
+        let self_output = self.ocl_params.get_buf_t(TypeBuffer::Output);
+        let self_output = self_output.0.borrow();
 
         let self_kern = self.ocl_kernel.as_mut().unwrap();
 
@@ -284,7 +294,7 @@ impl AbstractLayerOcl for SoftmaxLossLayerOcl {
 
         debug!("[euc_ocl] forward");
 
-        Ok(vec![self.ocl_params.as_ref().unwrap().clone()])
+        Ok(vec![self.ocl_params.clone()])
     }
 
     fn backward_output_ocl(
@@ -302,10 +312,17 @@ impl AbstractLayerOcl for SoftmaxLossLayerOcl {
             .build()
             .expect("[euc_ocl] Couldn't create label buffer");
 
-        let self_out = self.ocl_params.as_ref().unwrap().output.borrow();
-        let self_neu_grad = self.ocl_params.as_ref().unwrap().neu_grad.borrow_mut();
-        let self_ws_grad = self.ocl_params.as_ref().unwrap().ws_grad.borrow_mut();
-        let prev_out = prev_input.first().unwrap().output.borrow();
+        let self_out = self.ocl_params.get_buf_t(TypeBuffer::Output);
+        let self_out = self_out.0.borrow();
+
+        let self_neu_grad = self.ocl_params.get_buf_t(TypeBuffer::NeuGrad);
+        let self_neu_grad = self_neu_grad.0.borrow_mut();
+
+        let self_ws_grad = self.ocl_params.get_buf_t(TypeBuffer::WeightsGrad);
+        let self_ws_grad = self_ws_grad.0.borrow_mut();
+
+        let prev_out = prev_input.first().unwrap().get_buf_t(TypeBuffer::Output);
+        let prev_out = prev_out.0.borrow();
 
         let self_kern = self.ocl_kernel_grad.as_ref().unwrap();
 
@@ -319,18 +336,18 @@ impl AbstractLayerOcl for SoftmaxLossLayerOcl {
             .expect("Failed to copy OCL buffer to CPU");
 
         let mut match_cnt = 0;
-        Zip::from(output_vec.rows()).and(expected.rows()).for_each(
-            |out_arr, lbl_arr| {
+        Zip::from(output_vec.rows())
+            .and(expected.rows())
+            .for_each(|out_arr, lbl_arr| {
                 // let (mut arg_max, mut out_max_val) = (-1, 0.0);
                 // let mut acc_idx = 0;
                 let lbl_idx = lbl_arr.argmax();
                 let out_idx = out_arr.argmax();
-                
+
                 if lbl_idx == out_idx {
                     match_cnt += 1;
                 }
-            }
-        );
+            });
 
         let accuracy = match_cnt as f64 / self.batch_size as f64;
         self.metrics.insert("accuracy".to_string(), accuracy);
@@ -357,15 +374,15 @@ impl AbstractLayerOcl for SoftmaxLossLayerOcl {
                 .expect("[euc_ocl] Enqueue backward kernel failure");
         }
 
-        Ok(vec![self.ocl_params.as_ref().unwrap().clone()])
+        Ok(vec![self.ocl_params.clone()])
     }
 
     fn ocl_params(&self) -> Option<OclParams> {
-        Some(self.ocl_params.as_ref().unwrap().clone())
+        Some(self.ocl_params.clone())
     }
 
     fn set_ocl_params(&mut self, params: OclParams) {
-        self.ocl_params = Some(params);
+        self.ocl_params = params;
     }
 
     fn copy_layer_ocl(&self) -> Box<dyn AbstractLayerOcl> {
@@ -380,8 +397,8 @@ impl AbstractLayerOcl for SoftmaxLossLayerOcl {
 impl Default for SoftmaxLossLayerOcl {
     fn default() -> Self {
         Self {
-            cpu_params: LearnParams::empty(),
-            ocl_params: None,
+            cpu_params: CpuParams::empty(),
+            ocl_params: OclParams::empty(),
             size: 0,
             metrics: Metrics::new(),
             batch_size: 1,

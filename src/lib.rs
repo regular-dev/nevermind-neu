@@ -8,7 +8,7 @@ pub mod models;
 /// Files
 pub mod layer_fabric;
 pub mod layers_storage;
-pub mod learn_params;
+pub mod cpu_params;
 pub mod orchestra;
 pub mod err;
 #[cfg(feature = "opencl")]

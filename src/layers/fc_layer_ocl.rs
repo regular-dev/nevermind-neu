@@ -1,5 +1,5 @@
 use crate::layers::*;
-use crate::learn_params::LearnParams;
+use crate::cpu_params::*;
 use crate::ocl::*;
 use crate::util::*;
 
@@ -8,7 +8,6 @@ use log::{debug, warn};
 use rand::{thread_rng, Rng, ThreadRng};
 
 use ocl::{Buffer, Context, Device, Kernel, MemFlags, Program, Queue};
-
 use std::{collections::HashMap, error::Error};
 
 static FC_LAYER_KERNEL_FWD: &'static str = r#"
@@ -81,8 +80,8 @@ static FC_LAYER_KERNEL_BWD: &'static str = r#"
 "#;
 
 pub struct FcLayerOcl {
-    cpu_params: LearnParams,
-    ocl_params: Option<OclParams>,
+    cpu_params: CpuParams,
+    ocl_params: OclParams,
     size: usize,
     batch_size: usize,
 
@@ -98,8 +97,8 @@ pub struct FcLayerOcl {
 impl FcLayerOcl {
     pub fn new(size: usize, act: OclActivationFunc) -> Self {
         Self {
-            cpu_params: LearnParams::empty(),
-            ocl_params: None,
+            cpu_params: CpuParams::empty(),
+            ocl_params: OclParams::empty(),
             size,
             batch_size: 1,
             ocl_kernel: None,
@@ -138,11 +137,18 @@ impl AbstractLayer for FcLayerOcl {
         self.size
     }
 
-    fn learn_params(&self) -> Option<LearnParams> {
+    fn cpu_params(&self) -> Option<CpuParams> {
         None
     }
 
-    fn set_learn_params(&mut self, lp: LearnParams) {}
+    fn set_cpu_params(&mut self, lp: CpuParams) {}
+
+    fn trainable_bufs(&self) -> TrainableBufsIds {
+        (
+            &[TypeBuffer::Weights as i32, TypeBuffer::Bias as i32],
+            &[TypeBuffer::WeightsGrad as i32, TypeBuffer::NeuGrad as i32],
+        )
+    }
 
     fn set_input_shape(&mut self, sh: &[usize]) {
         let kern = self.ocl_kernel.as_mut().unwrap();
@@ -156,7 +162,7 @@ impl AbstractLayer for FcLayerOcl {
         let queue = self.ocl_queue.as_ref().unwrap();
         // buffer routine
         self.ocl_params =
-            Some(init_ocl_params(queue.clone(), self.size, sh).expect("Buffer create failure"));
+            init_ocl_params(queue.clone(), self.size, sh, true).expect("Buffer create failure");
     }
 
     fn set_batch_size(&mut self, batch_size: usize) {
@@ -180,15 +186,13 @@ impl AbstractLayer for FcLayerOcl {
             .set_arg("batch_size", batch_size as i32)
             .expect("[fc_ocl] Failed to set batch_size arg");
 
-        self.ocl_params = Some(
-            fit_to_batch_size_ocl(
-                self.ocl_params.as_ref().unwrap().clone(), // TODO : refactor
+        self.ocl_params
+            .fit_to_batch_size_ocl(
                 self.size,
                 batch_size,
                 self.ocl_queue.as_ref().unwrap().clone(),
             )
-            .expect("Fit to batch size ocl failed"),
-        );
+            .expect("Fit to batch size ocl failed");
     }
 
     // Do copy layer memory(ws, output, ...)
@@ -279,10 +283,17 @@ impl AbstractLayerOcl for FcLayerOcl {
 
     fn forward_ocl(&mut self, params: OclParamsBlob) -> LayerOclResult {
         let prev_params = params.first().unwrap();
-        let prev_output = prev_params.output.borrow();
-        let self_ws = self.ocl_params.as_ref().unwrap().ws.borrow();
-        let self_output = self.ocl_params.as_ref().unwrap().output.borrow();
-        let self_bias = self.ocl_params.as_ref().unwrap().bias.borrow();
+        let prev_output = prev_params.get_buf_t(TypeBuffer::Output);
+        let prev_output = prev_output.0.borrow();
+
+        let self_ws = self.ocl_params.get_buf_t(TypeBuffer::Weights);
+        let self_ws = self_ws.0.borrow();
+
+        let self_output = self.ocl_params.get_buf_t(TypeBuffer::Output);
+        let self_output = self_output.0.borrow();
+
+        let self_bias = self.ocl_params.get_buf_t(TypeBuffer::Bias);
+        let self_bias = self_bias.0.borrow();
 
         let self_kern = self.ocl_kernel.as_ref().unwrap();
 
@@ -317,7 +328,7 @@ impl AbstractLayerOcl for FcLayerOcl {
 
         debug!("[fc_ocl] forward");
 
-        Ok(vec![self.ocl_params.as_ref().unwrap().clone()])
+        Ok(vec![self.ocl_params.clone()])
     }
 
     fn backward_ocl(
@@ -325,12 +336,24 @@ impl AbstractLayerOcl for FcLayerOcl {
         prev_input: OclParamsBlob,
         next_input: OclParamsBlob,
     ) -> LayerOclResult {
-        let self_out = self.ocl_params.as_ref().unwrap().output.borrow();
-        let self_neu_grad = self.ocl_params.as_ref().unwrap().neu_grad.borrow_mut();
-        let self_ws_grad = self.ocl_params.as_ref().unwrap().ws_grad.borrow_mut();
-        let prev_out = prev_input.first().unwrap().output.borrow();
-        let next_ws = next_input.first().unwrap().ws.borrow();
-        let next_grad = next_input.first().unwrap().neu_grad.borrow();
+        let self_out = self.ocl_params.get_buf_t(TypeBuffer::Output);
+        let self_out = self_out.0.borrow();
+
+        let self_neu_grad = self.ocl_params.get_buf_t(TypeBuffer::NeuGrad);
+        let self_neu_grad = self_neu_grad.0.borrow();
+
+        let self_ws_grad = self.ocl_params.get_buf_t(TypeBuffer::WeightsGrad);
+        let self_ws_grad = self_ws_grad.0.borrow_mut();
+
+        let prev_out = prev_input.first().unwrap().get_buf_t(TypeBuffer::Output);
+        let prev_out = prev_out.0.borrow();
+
+        let next_ws = next_input.first().unwrap().get_buf_t(TypeBuffer::Weights);
+        let next_ws = next_ws.0.borrow();
+
+        let next_grad = next_input.first().unwrap().get_buf_t(TypeBuffer::NeuGrad);
+        let next_grad = next_grad.0.borrow();
+
         let next_shape = next_grad.len() / self.batch_size;
 
         let self_kern = self.ocl_kernel_grad.as_ref().unwrap();
@@ -366,15 +389,15 @@ impl AbstractLayerOcl for FcLayerOcl {
 
         debug!("[fc_ocl] backward done");
 
-        Ok(vec![self.ocl_params.as_ref().unwrap().clone()])
+        Ok(vec![self.ocl_params.clone()])
     }
 
     fn ocl_params(&self) -> Option<OclParams> {
-        Some(self.ocl_params.as_ref().unwrap().clone())
+        Some(self.ocl_params.clone())
     }
 
     fn set_ocl_params(&mut self, params: OclParams) {
-        self.ocl_params = Some(params);
+        self.ocl_params = params;
     }
 
     fn copy_layer_ocl(&self) -> Box<dyn AbstractLayerOcl> {
@@ -389,8 +412,8 @@ impl AbstractLayerOcl for FcLayerOcl {
 impl Default for FcLayerOcl {
     fn default() -> Self {
         Self {
-            cpu_params: LearnParams::empty(),
-            ocl_params: None,
+            cpu_params: CpuParams::empty(),
+            ocl_params: OclParams::empty(),
             size: 0,
             batch_size: 1,
             ocl_kernel: None,

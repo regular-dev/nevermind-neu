@@ -3,7 +3,7 @@ use ocl::{Buffer, Context, Device, MemFlags, Queue};
 use log::{debug, error};
 
 use crate::layers::*;
-use crate::learn_params::LearnParams;
+use crate::cpu_params::CpuParams;
 use crate::ocl::*;
 use crate::util::*;
 
@@ -41,11 +41,19 @@ impl AbstractLayer for InputLayerOcl {
         self.batch_size = batch_size;
     }
 
-    fn learn_params(&self) -> Option<LearnParams> {
+    fn cpu_params(&self) -> Option<CpuParams> {
         None
     }
 
-    fn set_learn_params(&mut self, lp: LearnParams) {}
+    fn trainable_bufs(&self) -> TrainableBufsIds {
+        (&[], &[])
+    }
+
+    fn serializable_bufs(&self) -> &[i32] {
+        &[]
+    }
+
+    fn set_cpu_params(&mut self, lp: CpuParams) {}
 
     fn set_input_shape(&mut self, sh: &[usize]) {}
 

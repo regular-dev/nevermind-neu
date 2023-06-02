@@ -6,8 +6,10 @@ use log::debug;
 
 use rand::{thread_rng, Rng, ThreadRng};
 
+use std::ops::{Deref, DerefMut};
+
 use super::abstract_layer::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
-use crate::learn_params::{LearnParams, ParamsBlob};
+use crate::cpu_params::*;
 use crate::util::*;
 
 use crate::util::{Variant, WithParams};
@@ -15,7 +17,7 @@ use crate::util::{Variant, WithParams};
 // Fully-connected layer
 #[derive(Clone)]
 pub struct FcLayer<T: Fn(f32) -> f32 + Clone, TD: Fn(f32) -> f32 + Clone> {
-    pub lr_params: LearnParams,
+    pub lr_params: CpuParams,
     size: usize,
     dropout: f32,
     l2_regul: f32,
@@ -30,11 +32,27 @@ where
     TD: Fn(f32) -> f32 + Sync + Clone + 'static,
 {
     fn forward(&mut self, input: ParamsBlob) -> LayerForwardResult {
-        let inp_m = input[0].output.borrow();
-        let mut out_m = self.lr_params.output.borrow_mut();
-        let ws = self.lr_params.ws.borrow();
-        let ws0 = &ws[0];
-        let bias_out = ws[1].column(0);
+        let inp_m = input[0].get_2d_buf_t(TypeBuffer::Output);
+        let inp_m = inp_m.borrow();
+        let inp_m = inp_m.deref();
+
+        let out_m = self
+            .lr_params
+            .get_2d_buf_t(TypeBuffer::Output);
+        let mut out_m = out_m.borrow_mut();
+        let out_m = out_m.deref_mut();
+
+        let ws = self
+            .lr_params
+            .get_2d_buf_t(TypeBuffer::Weights);
+        let ws = ws.borrow();
+        let ws = ws.deref();
+
+        let bias_out = self
+            .lr_params
+            .get_1d_buf_t(TypeBuffer::Bias);
+        let bias_out = bias_out.borrow();
+        let bias_out = bias_out.deref();
 
         let dropout_len = (self.size as f32 * self.dropout) as usize;
         let dropout_n = self.rng.gen_range(0, self.size - dropout_len as usize);
@@ -45,14 +63,13 @@ where
             .and(out_m.rows_mut())
             .par_for_each(|inp_b, out_b| {
                 // for each batch
-                let mul_res = ws0.dot(&inp_b);
+                let mul_res = ws.dot(&inp_b);
 
                 let mut counter_neu = 0;
+
                 // for each neuron
-                Zip::from(out_b)
-                    .and(&mul_res)
-                    .and(bias_out)
-                    .for_each(|out_el, in_row, bias_el| {
+                Zip::from(out_b).and(&mul_res).and(bias_out).for_each(
+                    |out_el, in_row, bias_el| {
                         // for each "neuron"
                         if counter_neu >= dropout_n && counter_neu < dropout_y {
                             // zero neuron
@@ -62,7 +79,8 @@ where
                             *out_el = (self.activation.func)(in_row + bias_el);
                             counter_neu += 1;
                         }
-                    });
+                    },
+                );
             });
 
         debug!("[ok] HiddenLayer forward()");
@@ -71,17 +89,45 @@ where
     }
 
     fn backward(&mut self, prev_input: ParamsBlob, next_input: ParamsBlob) -> LayerBackwardResult {
-        let next_err_vals = next_input[0].neu_grad.borrow();
-        let next_ws = next_input[0].ws.borrow();
-        let mut self_err_vals = self.lr_params.neu_grad.borrow_mut();
-        let self_output = self.lr_params.output.borrow();
-        let next_ws0 = &next_ws[0];
+        let next_err_vals = next_input[0]
+            .get_2d_buf_t(TypeBuffer::NeuGrad);
+        let next_err_vals = next_err_vals.borrow();
+        let next_err_vals = next_err_vals.deref();
+
+        let next_ws = next_input[0]
+            .get_2d_buf_t(TypeBuffer::Weights);
+        let next_ws = next_ws.borrow();
+        let next_ws = next_ws.deref();
+
+        let self_err_vals = self
+            .lr_params
+            .get_2d_buf_t(TypeBuffer::NeuGrad);
+        let mut self_err_vals = self_err_vals.borrow_mut();
+        let self_err_vals = self_err_vals.deref_mut();
+
+        let self_output = self
+            .lr_params
+            .get_2d_buf_t(TypeBuffer::Output);
+        let self_output = self_output.borrow();
+        let self_output = self_output.deref();
+
+        let self_bias_grad = self
+            .lr_params
+            .get_1d_buf_t(TypeBuffer::BiasGrad);
+        let mut self_bias_grad = self_bias_grad.borrow_mut();
+        let self_bias_grad = self_bias_grad.deref_mut();
+
+        let self_bias = self
+            .lr_params
+            .get_1d_buf_t(TypeBuffer::Bias);
+        let mut self_bias = self_bias.borrow_mut();
+        let self_bias = self_bias.deref_mut();
 
         Zip::from(self_err_vals.rows_mut())
             .and(next_err_vals.rows())
             .and(self_output.rows())
             .par_for_each(|err_val_r, next_err_val_r, output_r| {
-                let mul_res = next_ws0.t().dot(&next_err_val_r);
+                let mul_res = next_ws.t().dot(&next_err_val_r);
 
                 Zip::from(err_val_r).and(output_r).and(&mul_res).for_each(
                     |err_val, output, col| {
@@ -94,16 +140,30 @@ where
 
         // calc per-weight gradient
         // for prev_layer :
-        let prev_input = prev_input[0].output.borrow();
-        let ws = self.lr_params.ws.borrow();
-        let mut ws_grad = self.lr_params.ws_grad.borrow_mut();
+        let prev_input = prev_input[0]
+            .get_2d_buf_t(TypeBuffer::Output);
+        let prev_input = prev_input.borrow();
+        let prev_input = prev_input.deref();
+
+        let ws = self
+            .lr_params
+            .get_2d_buf_t(TypeBuffer::Weights);
+        let ws = ws.borrow();
+        let ws = ws.deref();
+
+        let ws_grad = self
+            .lr_params
+            .get_2d_buf_t(TypeBuffer::WeightsGrad);
+        let mut ws_grad = ws_grad.borrow_mut();
+        let ws_grad = ws_grad.deref_mut();
 
         // This could be done with parallel iterator
         // But  parallel iterator will make value only with big arrays (a lot of ws, big batch size)
-        for ((self_neu_idx, prev_neu_idx), val) in ws_grad[0].indexed_iter_mut() {
+        for ((self_neu_idx, prev_neu_idx), val) in ws_grad.indexed_iter_mut() {
             let cur_ws_idx = [self_neu_idx, prev_neu_idx];
 
             let mut avg = 0.0;
+            
             Zip::from(prev_input.column(prev_neu_idx))
                 .and(self_err_vals.column(self_neu_idx))
                 .for_each(|prev_val, err_val| {
@@ -114,51 +174,45 @@ where
 
             let mut l2_penalty = 0.0;
             if self.l2_regul != 0.0 {
-                l2_penalty = self.l2_regul * ws[0][cur_ws_idx];
+                l2_penalty = self.l2_regul * ws[cur_ws_idx];
             }
 
             let mut l1_penalty = 0.0;
             if self.l1_regul == 0.0 {
-                l1_penalty = self.l1_regul * sign(ws[0][cur_ws_idx]);
+                l1_penalty = self.l1_regul * sign(ws[cur_ws_idx]);
             }
 
             *val = avg - l2_penalty - l1_penalty;
         }
 
-        // bias
-        for ((self_neu_idx, prev_neu_idx), val) in ws_grad[1].indexed_iter_mut() {
-            let cur_ws_idx = [self_neu_idx, prev_neu_idx];
+        Zip::from(self_err_vals.columns()).and(self_bias_grad).and(self_bias).for_each(
+            |err_vals, bias_grad, bias| {
+                let grad = err_vals.mean().unwrap();
 
-            let mut avg = 0.0;
-            Zip::from(self_err_vals.column(self_neu_idx)).for_each(|err_val| {
-                avg += err_val;
-            });
+                let mut l2_penalty = 0.0;
+                if self.l2_regul != 0.0 {
+                    l2_penalty = self.l2_regul * *bias;
+                }
 
-            avg = avg / self_err_vals.column(prev_neu_idx).len() as f32;
+                let mut l1_penalty = 0.0;
+                if self.l1_regul == 0.0 {
+                    l1_penalty = self.l1_regul * sign(*bias);
+                }
 
-            let mut l2_penalty = 0.0;
-            if self.l2_regul != 0.0 {
-                l2_penalty = self.l2_regul * ws[1][cur_ws_idx];
+                *bias_grad = grad - l2_penalty - l1_penalty;
             }
-
-            let mut l1_penalty = 0.0;
-            if self.l1_regul == 0.0 {
-                l1_penalty = self.l1_regul * sign(ws[1][cur_ws_idx]);
-            }
-
-            *val = avg - l2_penalty - l1_penalty;
-        }
+        );
 
         debug!("[ok] HiddenLayer backward()");
 
         Ok(vec![self.lr_params.clone()])
     }
 
-    fn learn_params(&self) -> Option<LearnParams> {
+    fn cpu_params(&self) -> Option<CpuParams> {
         Some(self.lr_params.clone())
     }
 
-    fn set_learn_params(&mut self, lp: LearnParams) {
+    fn set_cpu_params(&mut self, lp: CpuParams) {
         self.lr_params = lp;
     }
 
@@ -168,7 +222,7 @@ where
 
     /// Carefull this method overwrites weights and all other params
     fn set_input_shape(&mut self, sh: &[usize]) {
-        self.lr_params = LearnParams::new_with_bias(self.size, sh[0]);
+        self.lr_params = CpuParams::new_with_bias(self.size, sh[0]);
     }
 
     fn size(&self) -> usize {
@@ -177,7 +231,7 @@ where
 
     fn copy_layer(&self) -> Box<dyn AbstractLayer> {
         let mut copy_l = Box::new(FcLayer::new(self.size, self.activation.clone()));
-        copy_l.set_learn_params(self.lr_params.copy());
+        copy_l.set_cpu_params(self.lr_params.copy());
         copy_l
     }
 
@@ -195,7 +249,7 @@ where
         Self {
             size,
             dropout: 0.0,
-            lr_params: LearnParams::empty(),
+            lr_params: CpuParams::empty(),
             activation,
             l2_regul: 0.0,
             l1_regul: 0.0,
@@ -267,7 +321,7 @@ where
 
         if size > 0 {
             self.size = size;
-            self.lr_params = LearnParams::empty();
+            self.lr_params = CpuParams::empty();
         }
 
         if let Some(dropout) = cfg.get("dropout") {

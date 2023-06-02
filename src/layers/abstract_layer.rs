@@ -1,7 +1,7 @@
-use std::collections::HashMap;
+use std::fmt;
 
-use crate::learn_params::{LearnParams, ParamsBlob};
-use crate::util::{Array2D, WithParams, Metrics};
+use crate::cpu_params::{CpuParams, ParamsBlob, TypeBuffer};
+use crate::util::{Array2D, Metrics, WithParams};
 
 #[derive(Debug)]
 pub enum LayerError {
@@ -10,8 +10,26 @@ pub enum LayerError {
     NotImpl,
 }
 
+impl fmt::Display for LayerError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            LayerError::InvalidSize => {
+                write!(f, "{}", "Invalid size")
+            },
+            LayerError::OtherError => {
+                write!(f, "{}", "OtherError")
+            }
+            _ => {
+                write!(f, "{}", "Other")
+            },
+        }
+    }
+}
+
+
 pub type LayerForwardResult = Result<ParamsBlob, LayerError>;
 pub type LayerBackwardResult = Result<ParamsBlob, LayerError>;
+pub type TrainableBufsIds<'a> = (&'a[i32], &'a[i32]);
 
 pub trait AbstractLayer: WithParams {
     // for signature for input layers
@@ -41,7 +59,7 @@ pub trait AbstractLayer: WithParams {
     fn size(&self) -> usize;
 
     fn set_batch_size(&mut self, batch_size: usize) {
-        let mut lr = self.learn_params().unwrap();
+        let mut lr = self.cpu_params().unwrap();
         lr.fit_to_batch_size(batch_size);
     }
 
@@ -49,8 +67,19 @@ pub trait AbstractLayer: WithParams {
         None
     }
 
-    fn learn_params(&self) -> Option<LearnParams>;
-    fn set_learn_params(&mut self, lp: LearnParams);
+    fn serializable_bufs(&self) -> &[i32] {
+        return &[TypeBuffer::Weights as i32, TypeBuffer::Bias as i32];
+    }
+
+    fn trainable_bufs(&self) -> TrainableBufsIds {
+        (
+            &[TypeBuffer::Weights as i32, TypeBuffer::Bias as i32],
+            &[TypeBuffer::WeightsGrad as i32, TypeBuffer::BiasGrad as i32],
+        )
+    }
+
+    fn cpu_params(&self) -> Option<CpuParams>;
+    fn set_cpu_params(&mut self, lp: CpuParams);
 
     fn set_input_shape(&mut self, sh: &[usize]);
 

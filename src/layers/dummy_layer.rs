@@ -1,6 +1,6 @@
 use std::option::Option;
 
-use crate::learn_params::{LearnParams, ParamsBlob};
+use crate::cpu_params::{CpuParams, ParamsBlob};
 use crate::util::{DataVec, WithParams};
 use crate::layers::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
 
@@ -8,7 +8,7 @@ use crate::layers::{AbstractLayer, LayerBackwardResult, LayerForwardResult};
 #[derive(Default, Clone)]
 pub struct DummyLayer {
     output: DataVec,
-    fake_lr: LearnParams,
+    fake_lr: CpuParams,
 }
 
 impl AbstractLayer for DummyLayer {
@@ -24,7 +24,7 @@ impl AbstractLayer for DummyLayer {
         Ok( vec![self.fake_lr.clone()] )
     }
 
-    fn learn_params(&self) -> Option<LearnParams> {
+    fn cpu_params(&self) -> Option<CpuParams> {
         Some(self.fake_lr.clone())
     }
 
@@ -47,7 +47,7 @@ impl AbstractLayer for DummyLayer {
         self.copy_layer()
     }
 
-    fn set_learn_params(&mut self, lp: LearnParams) {
+    fn set_cpu_params(&mut self, lp: CpuParams) {
         self.fake_lr = lp;
     }
 }
@@ -56,7 +56,7 @@ impl DummyLayer {
     pub fn new() -> Self {
         DummyLayer {
             output: DataVec::zeros(0),
-            fake_lr: LearnParams::new(0, 0),
+            fake_lr: CpuParams::new(0, 0),
         }
     }
 }

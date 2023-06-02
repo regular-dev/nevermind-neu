@@ -9,7 +9,8 @@ use crate::optimizers::{Optimizer, OptimizerRMS};
 
 use std::fs::File;
 use std::io::prelude::*;
-use std::{cell::RefCell, fs, rc::Rc};
+use std::sync::Arc;
+use std::{cell::RefCell, fs};
 
 use log::{debug, error, info};
 use std::io::ErrorKind;
@@ -21,6 +22,8 @@ use crate::layer_fabric::*;
 use crate::layers::*;
 use crate::models::*;
 use crate::util::*;
+
+use super::pb::PbBufBlob;
 
 #[derive(Clone)]
 pub struct Sequential {
@@ -119,7 +122,8 @@ impl Model for Sequential {
             let result_out = l_first.forward_input(train_data);
 
             match result_out {
-                Err(_reason) => {
+                Err(reason) => {
+                    error!("[seq_mdl] {} error backpropagate : {}", l_first.layer_type(), reason);
                     return;
                 }
                 Ok(val) => {
@@ -145,22 +149,20 @@ impl Model for Sequential {
     fn backpropagate(&mut self, expected: Array2D) {
         let expected_data = expected;
 
-        let mut out = None;
-
         // for the last layer
         {
-            let prev_out = self.ls.at_mut(self.ls.len() - 2).learn_params();
+            let prev_out = self.ls.at_mut(self.ls.len() - 2).cpu_params();
             let result_out = self
                 .ls
                 .at_mut(self.ls.len() - 1)
                 .backward_output(vec![prev_out.unwrap()], expected_data);
 
             match result_out {
-                Err(_reason) => {
+                Err(reason) => {
+                    error!("[seq_mdl] Error backpropagate : {}", reason);
                     return;
                 }
-                Ok(val) => {
-                    out = Some(val);
+                Ok(_val) => {
                 }
             }
         }
@@ -170,8 +172,8 @@ impl Model for Sequential {
                 continue;
             }
 
-            let prev_out = self.ls.at_mut(self.ls.len() - 2 - idx).learn_params();
-            let next_out = self.ls.at_mut(self.ls.len() - idx).learn_params();
+            let prev_out = self.ls.at_mut(self.ls.len() - 2 - idx).cpu_params();
+            let next_out = self.ls.at_mut(self.ls.len() - idx).cpu_params();
 
             let result_out = self
                 .ls
@@ -179,19 +181,20 @@ impl Model for Sequential {
                 .backward(vec![prev_out.unwrap()], vec![next_out.unwrap()]);
 
             match result_out {
-                Err(_reason) => {
+                Err(reason) => {
+                    error!("[seq_mdl] Error backpropagate : {}", reason);
                     return;
                 }
-                Ok(val) => {
-                    out = Some(val);
+                Ok(_val) => {
                 }
             }
         }
     }
 
     fn optimize(&mut self) {
-        for l in self.ls.iter_mut().skip(1) {
-            self.optim.optimize_params(&mut l.learn_params().unwrap());
+        for l in self.ls.iter_mut() {
+            self.optim
+                .optimize_params(&mut l.cpu_params().unwrap(), l.trainable_bufs());
         }
     }
 
@@ -217,12 +220,12 @@ impl Model for Sequential {
         "mdl_sequential_cpu"
     }
 
-    fn output_params(&self) -> LearnParams {
+    fn output_params(&self) -> CpuParams {
         let last_layer_params = self
             .ls
             .last()
             .expect("There is no layers in model !!!")
-            .learn_params()
+            .cpu_params()
             .unwrap();
         last_layer_params.clone()
     }
@@ -260,10 +263,37 @@ impl Model for Sequential {
     fn save_state(&self, filepath: &str) -> Result<(), Box<dyn std::error::Error>> {
         // create vector of layers learn_params
         let mut vec_lr = Vec::with_capacity(self.ls.len());
-        for l in 0..self.ls.len() {
-            let lr_params = self.ls.at(l).learn_params().unwrap();
-            let ws = lr_params.ws.borrow();
-            vec_lr.push(model_helper::convert_ws_blob_to_pb(ws.deref()));
+
+        for l in self.ls.iter() {
+            let mut pb_buf_blob = PbBufBlob::default(); // layer's buffers
+
+            let bufs_ids = l.serializable_bufs();
+
+            for i in bufs_ids.iter() {
+                let buf = l.cpu_params().unwrap().get_param(*i);
+
+                match buf {
+                    VariantParamArc::Array2(arr2) => {
+                        let arr2_bor = arr2.borrow();
+                        let arr2_bor = arr2_bor.deref();
+
+                        let pb_blob = model_helper::convert_buf_2d_to_pb(arr2_bor, *i);
+                        pb_buf_blob.bufs.push(pb_blob);
+                    }
+                    VariantParamArc::Array1(arr1) => {
+                        let arr1_bor = arr1.borrow();
+                        let arr1_bor = arr1_bor.deref();
+
+                        let pb_blob = model_helper::convert_buf_1d_to_pb(arr1_bor, *i);
+                        pb_buf_blob.bufs.push(pb_blob);
+                    }
+                    _ => {
+                        todo!()
+                    }
+                }
+            }
+
+            vec_lr.push(pb_buf_blob);
         }
 
         let pb_model = PbSequentialModel { layers: vec_lr };
@@ -281,22 +311,18 @@ impl Model for Sequential {
 
         let mut pb_model = PbSequentialModel::decode(buf.as_slice())?;
 
-        for (self_l, l) in self.ls.iter_mut().zip(&mut pb_model.layers) {
+        for (self_l, l_pb) in self.ls.iter_mut().zip(&mut pb_model.layers) {
             if self_l.layer_type() == "InputLayer" {
                 continue;
             }
 
-            let layer_param = self_l.learn_params().unwrap();
-            let mut l_ws = layer_param.ws.borrow_mut();
-            let mut ws_blob = model_helper::convert_pb_to_ws_blob(l);
+            let mut layer_param = self_l.cpu_params().unwrap();
 
-            // if there is no bias -> add empty bias values
-            if ws_blob.len() < 2 {
-                debug!("Added zeroed bias");
-                ws_blob.push(WsMat::zeros((self_l.size(), 1)));
+            for b_i in l_pb.bufs.iter() {
+                layer_param.insert_buf(b_i.buf_id, model_helper::convert_pb_to_param_buf(&b_i))
             }
 
-            *l_ws = ws_blob;
+            self_l.set_cpu_params(layer_param);
         }
 
         Ok(())
@@ -349,7 +375,7 @@ impl<'de> Deserialize<'de> for Sequential {
             }
         }
 
-        seq_mdl.set_batch_size(serde_mdl.batch_size);
+        seq_mdl.batch_size = serde_mdl.batch_size;
 
         Ok(seq_mdl)
     }

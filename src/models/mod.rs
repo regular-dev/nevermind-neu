@@ -4,7 +4,7 @@ mod model_helper;
 mod sequential_ocl;
 
 use std::{error::Error, rc::Rc, cell::RefCell};
-use crate::{util::*, layers::AbstractLayer, learn_params::*, layers_storage::SerdeLayersStorage};
+use crate::{util::*, layers::AbstractLayer, cpu_params::*, layers_storage::SerdeLayersStorage};
 use crate::layers_storage::*;
 
 pub use sequential::*;
@@ -31,7 +31,7 @@ pub trait Model {
     fn optimizer(&self) -> &Box<dyn WithParams>;
     fn optimizer_mut(&mut self) -> &mut Box<dyn WithParams>;
 
-    fn output_params(&self) -> LearnParams;
+    fn output_params(&self) -> CpuParams;
 
     fn model_type(&self) -> &str;
 

@@ -2,6 +2,7 @@ use std::{
     cell::RefCell,
     rc::Rc,
     sync::{atomic::{AtomicU32, Ordering}, Arc}, hash::Hash,
+    ops::{Deref, DerefMut}
 };
 
 use std::collections::HashMap;
@@ -12,28 +13,35 @@ use ndarray::{Array1, Axis, Zip};
 use log::{debug, info, warn};
 
 use crate::layers::*;
-use crate::learn_params::*;
+use crate::cpu_params::*;
 use crate::util::*;
 
 #[derive(Default, Clone)]
 pub struct SoftmaxLossLayer {
     pub size: usize,
-    pub lr_params: LearnParams,
+    pub lr_params: CpuParams,
     metrics: HashMap<String, f64>,
 }
 
 impl AbstractLayer for SoftmaxLossLayer {
     fn forward(&mut self, input: ParamsBlob) -> LayerForwardResult {
-        let inp_m = input[0].output.borrow();
-        let mut out_m = self.lr_params.output.borrow_mut();
-        let ws_mat = self.lr_params.ws.borrow();
-        let ws_mat0 = &ws_mat[0];
+        let inp_m = input[0].get_2d_buf_t(TypeBuffer::Output);
+        let inp_m = inp_m.borrow();
+        let inp_m = inp_m.deref();
+
+        let mut out_m = self.lr_params.get_2d_buf_t(TypeBuffer::Output);
+        let mut out_m = out_m.borrow_mut();
+        let mut out_m = out_m.deref_mut();
+
+        let ws = self.lr_params.get_2d_buf_t(TypeBuffer::Weights);
+        let ws = ws.borrow();
+        let ws = ws.deref();
 
         Zip::from(inp_m.rows())
             .and(out_m.rows_mut())
             .par_for_each(|inp_b, out_b| {
                 // for each batch
-                let mut mul_res = ws_mat0.dot(&inp_b);
+                let mut mul_res = ws.dot(&inp_b);
 
                 // let mut e_rows = mul_res.map_axis(Axis(1), |row| row.sum());
                 let e_rows_max = array_helpers::max(&mul_res);
@@ -57,14 +65,22 @@ impl AbstractLayer for SoftmaxLossLayer {
         prev_input: ParamsBlob,
         expected_vec: Array2D,
     ) -> LayerBackwardResult {
-        let prev_input = &prev_input[0].output.borrow();
-        let mut self_err_vals = self.lr_params.neu_grad.borrow_mut();
-        let self_output = self.lr_params.output.borrow_mut();
+        let prev_input = &prev_input[0].get_2d_buf_t(TypeBuffer::Output);
+        let prev_input = prev_input.borrow();
+        let prev_input = prev_input.deref();
+
+        let mut self_neu_grad = self.lr_params.get_2d_buf_t(TypeBuffer::NeuGrad);
+        let mut self_neu_grad = self_neu_grad.borrow_mut();
+        let mut self_neu_grad = self_neu_grad.deref_mut();
+
+        let self_output = self.lr_params.get_2d_buf_t(TypeBuffer::Output);
+        let mut self_output = self_output.borrow_mut();
+        let self_output = self_output.deref_mut();
 
         let match_cnt = AtomicU32::new(0);
         let batch_len = self_output.len_of(Axis(0)) as f64;
 
-        Zip::from(self_err_vals.rows_mut())
+        Zip::from(self_neu_grad.rows_mut())
             .and(self_output.rows())
             .and(expected_vec.rows())
             .par_for_each(|err_val_b, out_b, expected_b| {
@@ -99,26 +115,27 @@ impl AbstractLayer for SoftmaxLossLayer {
         let accuracy = match_cnt.load(Ordering::SeqCst) as f64 / batch_len;
         self.metrics.insert("accuracy".to_string(), accuracy);
 
+        let mut ws_grad = self
+            .lr_params
+            .get_2d_buf_t(TypeBuffer::WeightsGrad);
+        let mut ws_grad = ws_grad.borrow_mut();
+        let ws_grad = ws_grad.deref_mut();
+
         // calc per-weight gradient, TODO : refactor code below
         // for prev_layer :
-        let ws = self.lr_params.ws.borrow();
-        let mut ws_grad = self.lr_params.ws_grad.borrow_mut();
+        for ((self_neu_idx, prev_neu_idx), val) in ws_grad.indexed_iter_mut() {
+            let cur_ws_idx = [self_neu_idx, prev_neu_idx];
 
-        for neu_idx in 0..ws[0].shape()[0] {
-            for prev_idx in 0..ws[0].shape()[1] {
-                let cur_ws_idx = [neu_idx, prev_idx];
+            let mut avg = 0.0;
+            Zip::from(prev_input.column(prev_neu_idx))
+                .and(self_neu_grad.column(self_neu_idx))
+                .for_each(|prev_val, err_val| {
+                    avg += prev_val * err_val;
+                });
 
-                let mut avg = 0.0;
-                Zip::from(prev_input.column(prev_idx))
-                    .and(self_err_vals.column(neu_idx))
-                    .for_each(|prev_val, err_val| {
-                        avg += prev_val * err_val;
-                    });
+            avg = avg / prev_input.column(prev_neu_idx).len() as f32;
 
-                avg = avg / prev_input.column(prev_idx).len() as f32;
-
-                ws_grad[0][cur_ws_idx] = avg;
-            }
+            *val = avg;
         }
 
         debug!("[ok] SoftmaxLossLayer backward()");
@@ -130,11 +147,11 @@ impl AbstractLayer for SoftmaxLossLayer {
         "SoftmaxLossLayer"
     }
 
-    fn learn_params(&self) -> Option<LearnParams> {
+    fn cpu_params(&self) -> Option<CpuParams> {
         Some(self.lr_params.clone())
     }
 
-    fn set_learn_params(&mut self, lp: LearnParams) {
+    fn set_cpu_params(&mut self, lp: CpuParams) {
         self.lr_params = lp;
     }
 
@@ -146,9 +163,17 @@ impl AbstractLayer for SoftmaxLossLayer {
         Some(&self.metrics)
     }
 
+    fn trainable_bufs(&self) -> TrainableBufsIds {
+        (&[TypeBuffer::Weights as i32], &[TypeBuffer::WeightsGrad as i32])
+    }
+
+    fn serializable_bufs(&self) -> &[i32] {
+        &[TypeBuffer::Weights as i32]
+    }
+
     fn copy_layer(&self) -> Box<dyn AbstractLayer> {
         let mut copy_l = SoftmaxLossLayer::new(self.size);
-        copy_l.set_learn_params(self.lr_params.copy());
+        copy_l.set_cpu_params(self.lr_params.copy());
         Box::new(copy_l)
     }
 
@@ -157,8 +182,8 @@ impl AbstractLayer for SoftmaxLossLayer {
     }
 
     fn set_input_shape(&mut self, sh: &[usize]) {
-        let mut lr_params = LearnParams::new(self.size, sh[0]);
-        lr_params.output = Arc::new(RefCell::new(Array2D::zeros((2, self.size))));
+        let mut lr_params = CpuParams::new(self.size, sh[0]);
+       // lr_params.output = Arc::new(RefCell::new(Array2D::zeros((2, self.size))));
         self.lr_params = lr_params;
     }
 }
@@ -167,7 +192,7 @@ impl SoftmaxLossLayer {
     pub fn new(size: usize) -> Self {
         Self {
             size,
-            lr_params: LearnParams::empty(),
+            lr_params: CpuParams::empty(),
             metrics: HashMap::new()
         }
     }
@@ -197,7 +222,7 @@ impl WithParams for SoftmaxLossLayer {
 
         if size > 0 {
             self.size = size;
-            self.lr_params = LearnParams::empty();
+            self.lr_params = CpuParams::empty();
         }
     }
 }

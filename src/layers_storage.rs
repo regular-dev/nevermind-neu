@@ -75,9 +75,9 @@ impl SequentialLayersStorage {
 
     pub fn prepare_for_tests(&mut self, batch_size: usize) {
         for i in self.layers.iter_mut() {
-            let mut lr = i.learn_params().unwrap();
+            let mut lr = i.cpu_params().unwrap();
             lr.prepare_for_tests(batch_size);
-            i.set_learn_params(lr);
+            i.set_cpu_params(lr);
         }
     }
 
@@ -90,14 +90,6 @@ impl SequentialLayersStorage {
     }
 
     pub fn add_layer(&mut self, l: Box<dyn AbstractLayer>) {
-        // if !self.layers.is_empty() {
-        //     if let Variant::Int(l_prev_size) = l.layer_cfg()["prev_size"] {
-        //         let last_prev_size = self.last().unwrap().size();
-        //         if l_prev_size != last_prev_size as i32 {
-        //             warn!("Previous size {} of new layer doesn't match {}", l_prev_size, last_prev_size);
-        //         }
-        //     }
-        // }
 
         self.layers.push(l);
     }

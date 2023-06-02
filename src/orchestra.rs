@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::vec::Vec;
 
+use ndarray_stats::QuantileExt;
 use serde::Serialize;
 use serde_yaml;
 
@@ -15,17 +16,15 @@ use std::time::Instant;
 
 use ndarray::{Axis, Zip};
 
-use ndarray_stats::QuantileExt;
-
 use std::fs::OpenOptions;
 
 use crossbeam::channel;
 use std::thread;
 
-use super::learn_params::LearnParams;
 use crate::dataloader::*;
 use crate::err::CustomError;
 use crate::util::*;
+use crate::cpu_params::*;
 
 use crate::models::Model;
 
@@ -234,7 +233,8 @@ where
             .feedforward(test_batch.input);
 
         let lr = self.test_model.as_ref().unwrap().output_params();
-        let out = lr.output.borrow();
+        let out = lr.get_2d_buf_t(TypeBuffer::Output);
+        let out = out.borrow();
 
         let mut accuracy_cnt = 0.0;
 
@@ -279,7 +279,7 @@ where
 
             let last_lp = test_model.output_params();
 
-            return Ok(last_lp.output.clone());
+            return Ok(last_lp.get_2d_buf_t(TypeBuffer::Output));
         }
 
         return Err(Box::new(CustomError::Other));
@@ -294,7 +294,7 @@ where
 
             let last_lp = test_model.output_params();
 
-            return Ok(last_lp.output.clone());
+            return Ok(last_lp.get_2d_buf_t(TypeBuffer::Output));
         }
 
         if let Some(train_model) = self.train_model.as_mut() {
@@ -302,7 +302,7 @@ where
 
             let last_lp = train_model.output_params();
 
-            return Ok(last_lp.output.clone());
+            return Ok(last_lp.get_2d_buf_t(TypeBuffer::Output));
         }
 
         error!("Error evaluation !!!");
@@ -310,8 +310,9 @@ where
         return Err(Box::new(CustomError::Other));
     }
 
-    fn calc_avg_err(last_layer_lr: &LearnParams) -> f32 {
-        let err = last_layer_lr.neu_grad.borrow();
+    fn calc_avg_err(last_layer_lr: &CpuParams) -> f32 {
+        let err = last_layer_lr.get_2d_buf_t(TypeBuffer::NeuGrad);
+        let err = err.borrow();
 
         let sq_sum = err.fold(0.0, |mut sq_sum, el| {
             sq_sum += el.powf(2.0);

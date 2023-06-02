@@ -1,7 +1,15 @@
-use std::{cell::RefCell, fmt, fs, fs::File, io::prelude::*, io::ErrorKind, rc::Rc};
+use std::{
+    cell::RefCell,
+    fmt, fs,
+    fs::File,
+    io::prelude::*,
+    io::ErrorKind,
+    ops::{Deref, DerefMut},
+    rc::Rc
+};
 
 use crate::layers::*;
-use crate::learn_params::LearnParams;
+use crate::cpu_params::CpuParams;
 use crate::models::pb::PbSequentialModel;
 use crate::models::*;
 use crate::optimizers::*;
@@ -153,7 +161,9 @@ impl SequentialOcl {
             // We need to copy weights buffer cause of
             // https://registry.khronos.org/OpenCL/sdk/1.2/docs/man/xhtml/clSetKernelArg.html#notes
             let train_mdl_params = l.ocl_params().unwrap();
-            let train_mdl_ws = train_mdl_params.ws.borrow();
+            let train_mdl_ws = train_mdl_params.get_buf_t(TypeBuffer::Weights);
+            let train_mdl_ws = train_mdl_ws.0.borrow();
+
             let mut vec_ws = vec![0.0; train_mdl_ws.len()];
 
             train_mdl_ws
@@ -174,7 +184,11 @@ impl SequentialOcl {
                     .expect("Failed to copy WS buffer"),
             ));
 
-            new_mdl_params.ws = new_mdl_ws;
+            new_mdl_params.insert_buf(
+                TypeBuffer::Weights as i32,
+                new_mdl_ws,
+                vec![l.size() as i32, prev_size as i32],
+            );
 
             l.set_ocl_params(new_mdl_params);
 
@@ -270,8 +284,9 @@ impl Model for SequentialOcl {
     }
 
     fn optimize(&mut self) {
-        for l in self.layers.iter_mut().skip(1) {
-            self.optim.optimize_ocl_params(l.ocl_params().unwrap());
+        for l in self.layers.iter_mut() {
+            self.optim
+                .optimize_ocl_params(l.ocl_params().unwrap(), l.trainable_bufs());
         }
     }
 
@@ -298,7 +313,7 @@ impl Model for SequentialOcl {
         "mdl_sequential_ocl"
     }
 
-    fn output_params(&self) -> LearnParams {
+    fn output_params(&self) -> CpuParams {
         let ocl_params = self
             .layers
             .last()
@@ -310,19 +325,26 @@ impl Model for SequentialOcl {
             .layers
             .last()
             .expect("There are no layers in ocl model")
-            .learn_params()
+            .cpu_params()
             .unwrap();
-        let mut cpu_output = cpu_lp.output.borrow_mut();
-        let mut cpu_neu_grad = cpu_lp.neu_grad.borrow_mut();
+        let cpu_output = cpu_lp.get_2d_buf_t(TypeBuffer::Output);
+        let mut cpu_output = cpu_output.borrow_mut();
+
+        let cpu_neu_grad = cpu_lp.get_2d_buf_t(TypeBuffer::NeuGrad);
+        let mut cpu_neu_grad = cpu_neu_grad.borrow_mut();
 
         // Fetch data from OCL Buffer to cpu memory
-        let ocl_params_output = ocl_params.output.borrow();
+        let ocl_params_output = ocl_params.get_buf_t(TypeBuffer::Output);
+        let ocl_params_output = ocl_params_output.0.borrow();
+
         ocl_params_output
             .read(cpu_output.as_slice_mut().unwrap())
             .enq()
             .expect("Failed to copy OCL buffer to CPU");
 
-        let ocl_params_neu_grad = ocl_params.neu_grad.borrow();
+        let ocl_params_neu_grad = ocl_params.get_buf_t(TypeBuffer::NeuGrad);
+        let ocl_params_neu_grad = ocl_params_neu_grad.0.borrow();
+
         ocl_params_neu_grad
             .read(cpu_neu_grad.as_slice_mut().unwrap())
             .enq()
@@ -356,7 +378,7 @@ impl Model for SequentialOcl {
     }
 
     // TODO : maybe make return value Option<...>
-    fn layer(&self, id: usize) -> &Box<dyn AbstractLayer> {
+    fn layer(&self, _id: usize) -> &Box<dyn AbstractLayer> {
         todo!()
     }
     fn layers_count(&self) -> usize {
@@ -377,7 +399,9 @@ impl Model for SequentialOcl {
 
         for l in self.layers.iter() {
             let ocl_params = l.ocl_params().unwrap();
-            vec_ws.push(ocl_params.serialize_ws_to_pb());
+            let ser_ids = l.serializable_bufs();
+
+            vec_ws.push(ocl_params.serialize_to_pb(ser_ids));
         }
 
         let pb_model = PbSequentialModel { layers: vec_ws };
@@ -399,12 +423,7 @@ impl Model for SequentialOcl {
             }
             let mut ocl_prms = self_l.ocl_params().unwrap();
 
-            ocl_prms.set_ws_from_vec(&mut dec_l.ws[0].vals, q.clone());
-
-            if dec_l.ws.len() > 1 {
-                ocl_prms.set_bias_from_vec(&mut dec_l.ws[1].vals, q.clone());
-            }
-
+            ocl_prms.set_vals_from_pb(dec_l, q.clone());
             self_l.set_ocl_params(ocl_prms);
         }
 
