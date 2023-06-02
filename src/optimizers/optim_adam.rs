@@ -39,10 +39,6 @@ impl Default for OptimizerAdam {
     }
 }
 
-// m[cur_ws_idx] = b1 * m[cur_ws_idx] + (1.0 - b1) * ws_grad[cur_ws_idx];
-// v[cur_ws_idx] = b2 * v[cur_ws_idx] + (1.0 - b2) * ws_grad[cur_ws_idx].powf(2.0);
-// ws[cur_ws_idx] += learn_rate / (v[cur_ws_idx] + theta).sqrt() * m[cur_ws_idx];
-
 impl OptimizerAdam {
     fn optimize_layer(
         buf: &mut [f32],
