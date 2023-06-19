@@ -49,7 +49,7 @@ impl OptimizerRMS {
             }
 
             *rms_v = *alpha * *rms_v + (1.0 - alpha) * buf_grad_v.powf(2.0);
-            *buf_v = (learn_rate / (*rms_v + theta).sqrt()) / buf_grad_v;
+            *buf_v += (learn_rate / (*rms_v + theta).sqrt()) * buf_grad_v;
         }
     }
 }
