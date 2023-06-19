@@ -84,25 +84,16 @@ where
         let mut self_bias_grad = self_bias_grad.borrow_mut();
         let self_bias_grad = self_bias_grad.deref_mut();
 
-        let batch_size = self_output.nrows() as f32;
-
         // for each batch
         Zip::from(self_neu_grad.rows_mut())
             .and(expected_vec.rows())
-            .and(self_output.rows())
-            .and(self_bias_grad.as_slice_mut().unwrap()) // TODO : slice 
-            .par_for_each(|err_val_r, expected_r, output_r, bias_grad| {
-                let mut avg_err = 0.0;
-
+            .and(self_output.rows()) 
+            .par_for_each(|err_val_r, expected_r, output_r| {
                 Zip::from(err_val_r).and(expected_r).and(output_r).for_each(
                     |err_val, expected, output| {
-                        let grad = (expected - output) * (self.activation.func_deriv)(*output);
-                        avg_err += grad;
-                        *err_val = grad;
+                        *err_val = (expected - output) * (self.activation.func_deriv)(*output);
                     },
                 );
-
-                *bias_grad = avg_err / batch_size;
             });
 
         let ws_grad = self

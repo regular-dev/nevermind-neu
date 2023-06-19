@@ -29,9 +29,9 @@ impl AbstractLayer for SoftmaxLossLayer {
         let inp_m = inp_m.borrow();
         let inp_m = inp_m.deref();
 
-        let mut out_m = self.lr_params.get_2d_buf_t(TypeBuffer::Output);
+        let out_m = self.lr_params.get_2d_buf_t(TypeBuffer::Output);
         let mut out_m = out_m.borrow_mut();
-        let mut out_m = out_m.deref_mut();
+        let out_m = out_m.deref_mut();
 
         let ws = self.lr_params.get_2d_buf_t(TypeBuffer::Weights);
         let ws = ws.borrow();
@@ -69,9 +69,9 @@ impl AbstractLayer for SoftmaxLossLayer {
         let prev_input = prev_input.borrow();
         let prev_input = prev_input.deref();
 
-        let mut self_neu_grad = self.lr_params.get_2d_buf_t(TypeBuffer::NeuGrad);
+        let self_neu_grad = self.lr_params.get_2d_buf_t(TypeBuffer::NeuGrad);
         let mut self_neu_grad = self_neu_grad.borrow_mut();
-        let mut self_neu_grad = self_neu_grad.deref_mut();
+        let self_neu_grad = self_neu_grad.deref_mut();
 
         let self_output = self.lr_params.get_2d_buf_t(TypeBuffer::Output);
         let mut self_output = self_output.borrow_mut();
@@ -115,7 +115,7 @@ impl AbstractLayer for SoftmaxLossLayer {
         let accuracy = match_cnt.load(Ordering::SeqCst) as f64 / batch_len;
         self.metrics.insert("accuracy".to_string(), accuracy);
 
-        let mut ws_grad = self
+        let ws_grad = self
             .lr_params
             .get_2d_buf_t(TypeBuffer::WeightsGrad);
         let mut ws_grad = ws_grad.borrow_mut();
@@ -124,8 +124,6 @@ impl AbstractLayer for SoftmaxLossLayer {
         // calc per-weight gradient, TODO : refactor code below
         // for prev_layer :
         for ((self_neu_idx, prev_neu_idx), val) in ws_grad.indexed_iter_mut() {
-            let cur_ws_idx = [self_neu_idx, prev_neu_idx];
-
             let mut avg = 0.0;
             Zip::from(prev_input.column(prev_neu_idx))
                 .and(self_neu_grad.column(self_neu_idx))

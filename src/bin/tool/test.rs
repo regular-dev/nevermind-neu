@@ -1,4 +1,4 @@
-use log::{error, info};
+use log::{error, info, warn};
 use nevermind_neu::models::Model;
 use nevermind_neu::models::Sequential;
 
@@ -32,25 +32,14 @@ pub fn test_net(
     // TODO : check label impl
     // TODO : add features to display accuracy of testing
     for i in 0..*test_batch {
-        info!("Test {} , evaluating", i);
+        info!("#{} , evaluating...", i);
         let test_batch = test_data.next_batch(1);
 
-        let mut label = -1;
-        for (idx, it) in test_batch.output.iter().enumerate() {
-            if *it == 1.0 {
-                label = idx as i32;
-                break;
-            }
-        }
-        
-        if label != -1 {
-            info!("Below label is : {}", label);
-        }
-        info!("Below output is : {}", test_batch.output);
+        info!("Labels : {}", test_batch.output);
         let out = net.eval(test_batch.input).unwrap();
         let out_b = out.borrow();
-        info!("Neural output is : {}", out_b);
-        info!("==========")
+        info!("Model output : {}", out_b);
+        info!("==========");
     }
 
     Ok(())

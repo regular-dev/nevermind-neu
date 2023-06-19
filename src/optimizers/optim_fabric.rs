@@ -2,7 +2,7 @@ use std::error::Error;
 use std::fs::File;
 use std::io::{Write, ErrorKind};
 
-use log::error;
+use log::{error, debug};
 
 use crate::err::*;
 use crate::optimizers::*;
@@ -22,20 +22,28 @@ pub fn optimizer_from_file(filepath: &str) -> Result<Box<dyn Optimizer>, Box<dyn
             let mut rmsprop = Box::new(OptimizerRMS::default());
             rmsprop.set_cfg(&optim_params.0);
 
+            debug!("Created rmsprop optimizer");
+
             return Ok(rmsprop);
         } else if optim_type == "sgd" {
             let mut sgd = Box::new(OptimizerSGD::default());
             sgd.set_cfg(&optim_params.0);
+
+            debug!("Created sgd optimizer");
 
             return Ok(sgd);
         } else if optim_type == "adagrad" {
             let mut adagrad = Box::new(OptimizerAdaGrad::default());
             adagrad.set_cfg(&optim_params.0);
 
+            debug!("Created adagrad optimizer");
+
             return Ok(adagrad);
         } else if optim_type == "adam" {
             let mut adam = Box::new(OptimizerAdam::default());
             adam.set_cfg(&optim_params.0);
+
+            debug!("Created adam optimizer");
 
             return Ok(adam);
         } else {
