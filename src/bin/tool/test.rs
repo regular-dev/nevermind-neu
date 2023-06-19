@@ -10,9 +10,7 @@ use clap::ArgMatches;
 use nevermind_neu::dataloader::*;
 use nevermind_neu::orchestra::*;
 
-pub fn test_net(
-    args: &ArgMatches,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub fn test_net(args: &ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
     let model_cfg = args.get_one::<String>("ModelCfg").unwrap();
     let mut model = Sequential::from_file(&model_cfg)?;
 
@@ -35,10 +33,10 @@ pub fn test_net(
         info!("#{} , evaluating...", i);
         let test_batch = test_data.next_batch(1);
 
-        info!("Labels : {}", test_batch.output);
+        info!("Labels : {:.3}", test_batch.output);
         let out = net.eval(test_batch.input).unwrap();
         let out_b = out.borrow();
-        info!("Model output : {}", out_b);
+        info!("Model output : {:.3}", out_b);
         info!("==========");
     }
 
