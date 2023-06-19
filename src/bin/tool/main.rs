@@ -95,6 +95,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .value_parser(clap::value_parser!(usize))
         )
         .arg(
+            Arg::new("Epochs")
+                .long("epochs")
+                .help("Specify number of epochs to train, if dataset has length")
+                .require_equals(true)
+                .action(ArgAction::Set)
+                .value_parser(clap::value_parser!(usize))
+        )
+        .arg(
             Arg::new("TestIter")
                 .long("test_iter")
                 .help("Each test_iter network will be tested for satisfying error")
@@ -119,8 +127,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .arg(Arg::new("WriteErrToFile").long("err_to_file").help(
             "Can be true or false, if true test network error will be recorded to file err.log",
         ).action(ArgAction::Set).require_equals(true)))
-        .subcommand(Command::new("test").about("Test net").arg(
-            Arg::new("Data")
+        .subcommand(Command::new("test").about("Test net")
+        .arg(Arg::new("Data")
             .long("dataset")
             .short('d')
             .takes_value(true)
@@ -128,7 +136,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .required(true)
         )
         .arg(Arg::new("ModelCfg")
-                .long("model_cfg")
+                .long("model")
                 .help("Provide model configuration yaml file")
                 .required(true)
                 .takes_value(true)
@@ -142,8 +150,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .required(true)
                 .require_equals(true))
         .arg(Arg::new("TestBatch")
-                .long("test_batch")
+                .long("samples")
                 .short('b')
+                .help("Specifies number of samples from the beginning of dataset")
                 .required(true)
                 .require_equals(true)
                 .takes_value(true)

@@ -1,7 +1,7 @@
 use log::{debug, error, info};
 use signal_hook::consts::SIGKILL;
 
-use std::{error::Error, time::Instant, fs::File};
+use std::{error::Error, fs::File, time::Instant};
 
 use signal_hook::{consts::SIGINT, iterator::Signals};
 
@@ -14,8 +14,8 @@ use crate::train_ocl::*;
 use nevermind_neu::dataloader::*;
 use nevermind_neu::err::*;
 use nevermind_neu::models::*;
-use nevermind_neu::orchestra::*;
 use nevermind_neu::optimizers::*;
+use nevermind_neu::orchestra::*;
 
 /// Starts train a network with required net configuration
 /// and train dataset
@@ -33,17 +33,25 @@ pub fn train_net(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
 
     set_train_dataset_to_net(&mut net, args)?;
 
-    let mut opt_err = None;
-    let mut opt_max_iter = None;
+    let mut opt_err: Option<f64> = None;
+    let mut opt_max_iter: Option<usize> = None;
 
     if let Some(err) = args.get_one::<f64>("Err") {
         info!("Satisfying error : {}", err);
-        opt_err = Some(err);
+        opt_err = Some(*err);
     }
 
     if let Some(max_iter) = args.get_one::<usize>("MaxIter") {
         info!("Iteration limit : {}", max_iter);
-        opt_max_iter = Some(max_iter);
+        opt_max_iter = Some(*max_iter);
+    }
+
+    if let Some(epochs_num) = args.get_one::<usize>("Epochs") {
+        info!("Epochs : {}", epochs_num);
+        opt_max_iter = Some(
+            epochs_num * net.train_dl.as_ref().unwrap().len().unwrap()
+                / net.train_batch_size().unwrap(),
+        );
     }
 
     let now_time = Instant::now();
@@ -54,19 +62,19 @@ pub fn train_net(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
 
         info!(
             "Start train till the err {} or max iteration {}",
-            *err, *max_iter
+            err, max_iter
         );
-        net.train_for_error_or_iter(*err, *max_iter)?;
+        net.train_for_error_or_iter(err, max_iter)?;
     } else if opt_err.is_some() {
         let err = opt_err.unwrap();
 
-        info!("Start train till the err {}", *err);
-        net.train_for_error(*err)?;
+        info!("Start train till the err {}", err);
+        net.train_for_error(err)?;
     } else if opt_max_iter.is_some() {
         let max_iter = opt_max_iter.unwrap();
 
-        info!("Start train max iteration {}", *max_iter);
-        net.train_for_n_times(*max_iter)?;
+        info!("Start train max iteration {}", max_iter);
+        net.train_for_n_times(max_iter)?;
     } else {
         error!("Error and max iteration for training wasn't set (--max_iter , -err)");
         return Err(Box::new(CustomError::WrongArg));
@@ -91,7 +99,9 @@ pub fn set_train_dataset_to_net(
     Ok(())
 }
 
-pub fn create_net_from_cmd_args(args: &ArgMatches) -> Result<Orchestra<Sequential>, Box<dyn Error>> {
+pub fn create_net_from_cmd_args(
+    args: &ArgMatches,
+) -> Result<Orchestra<Sequential>, Box<dyn Error>> {
     let model_cfg = args.get_one::<String>("ModelCfg").unwrap();
     let mut model = Sequential::from_file(&model_cfg)?;
 
@@ -180,7 +190,7 @@ pub fn create_net_from_cmd_args(args: &ArgMatches) -> Result<Orchestra<Sequentia
 fn check_model_type(mdl_cfg: &str) -> Result<String, Box<dyn Error>> {
     let mdl_file = File::open(mdl_cfg)?;
     let mdl: SerdeSequentialModel = serde_yaml::from_reader(mdl_file)?;
-    return Ok(mdl.mdl_type)
+    return Ok(mdl.mdl_type);
 }
 
 pub fn gen_init_state(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
