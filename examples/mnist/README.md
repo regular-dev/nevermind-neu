@@ -30,6 +30,8 @@ On successfull execution you will get two serialized protobuf files.
 
 You can omit the ocl flag if you don't want your model use OpenCL
 
+![mnist_net_example](https://github.com/regular-dev/nevermind-neu/blob/master/doc/mnist_net.png?raw=true)
+
 4) Train network
 
 `cargo run --release  train --train_data=mnist_train.proto --model=net.cfg --epochs=5 --opt=optim.cfg`
@@ -37,3 +39,5 @@ You can omit the ocl flag if you don't want your model use OpenCL
 5) Test network
 
 `cargo run --release test --dataset=mnist_test.proto --model=net.cfg --state=network_9375_final.state --samples=32`
+
+![mnist_tests](https://github.com/regular-dev/nevermind-neu/blob/master/doc/mnist_net_test.png?raw=true)
