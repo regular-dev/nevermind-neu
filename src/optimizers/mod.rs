@@ -39,6 +39,7 @@ use crate::layers::*;
 
 pub trait Optimizer : WithParams {
     fn optimize_params(&mut self, learn_params: &mut CpuParams, opt_prms: TrainableBufsIds);
+    fn parallel_optimize(&mut self, _learn_params: Vec<(CpuParams, TrainableBufsIds)>) { todo!("filler, default impl will be removed") }
 }
 
 pub fn optimizer_from_type(opt_type: &str) -> Result<Box<dyn Optimizer>, CustomError> {
