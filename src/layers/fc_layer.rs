@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ndarray::Zip;
+use ndarray::{indices, Zip};
 
 use log::debug;
 
@@ -36,21 +36,15 @@ where
         let inp_m = inp_m.borrow();
         let inp_m = inp_m.deref();
 
-        let out_m = self
-            .lr_params
-            .get_2d_buf_t(TypeBuffer::Output);
+        let out_m = self.lr_params.get_2d_buf_t(TypeBuffer::Output);
         let mut out_m = out_m.borrow_mut();
         let out_m = out_m.deref_mut();
 
-        let ws = self
-            .lr_params
-            .get_2d_buf_t(TypeBuffer::Weights);
+        let ws = self.lr_params.get_2d_buf_t(TypeBuffer::Weights);
         let ws = ws.borrow();
         let ws = ws.deref();
 
-        let bias_out = self
-            .lr_params
-            .get_1d_buf_t(TypeBuffer::Bias);
+        let bias_out = self.lr_params.get_1d_buf_t(TypeBuffer::Bias);
         let bias_out = bias_out.borrow();
         let bias_out = bias_out.deref();
 
@@ -68,8 +62,10 @@ where
                 let mut counter_neu = 0;
 
                 // for each neuron
-                Zip::from(out_b).and(&mul_res).and(bias_out).for_each(
-                    |out_el, in_row, bias_el| {
+                Zip::from(out_b)
+                    .and(&mul_res)
+                    .and(bias_out)
+                    .for_each(|out_el, in_row, bias_el| {
                         // for each "neuron"
                         if counter_neu >= dropout_n && counter_neu < dropout_y {
                             // zero neuron
@@ -79,8 +75,7 @@ where
                             *out_el = (self.activation.func)(in_row + bias_el);
                             counter_neu += 1;
                         }
-                    },
-                );
+                    });
             });
 
         debug!("[ok] HiddenLayer forward()");
@@ -89,37 +84,27 @@ where
     }
 
     fn backward(&mut self, prev_input: ParamsBlob, next_input: ParamsBlob) -> LayerBackwardResult {
-        let next_err_vals = next_input[0]
-            .get_2d_buf_t(TypeBuffer::NeuGrad);
+        let next_err_vals = next_input[0].get_2d_buf_t(TypeBuffer::NeuGrad);
         let next_err_vals = next_err_vals.borrow();
         let next_err_vals = next_err_vals.deref();
 
-        let next_ws = next_input[0]
-            .get_2d_buf_t(TypeBuffer::Weights);
+        let next_ws = next_input[0].get_2d_buf_t(TypeBuffer::Weights);
         let next_ws = next_ws.borrow();
         let next_ws = next_ws.deref();
 
-        let self_err_vals = self
-            .lr_params
-            .get_2d_buf_t(TypeBuffer::NeuGrad);
+        let self_err_vals = self.lr_params.get_2d_buf_t(TypeBuffer::NeuGrad);
         let mut self_err_vals = self_err_vals.borrow_mut();
         let self_err_vals = self_err_vals.deref_mut();
 
-        let self_output = self
-            .lr_params
-            .get_2d_buf_t(TypeBuffer::Output);
+        let self_output = self.lr_params.get_2d_buf_t(TypeBuffer::Output);
         let self_output = self_output.borrow();
         let self_output = self_output.deref();
 
-        let self_bias_grad = self
-            .lr_params
-            .get_1d_buf_t(TypeBuffer::BiasGrad);
+        let self_bias_grad = self.lr_params.get_1d_buf_t(TypeBuffer::BiasGrad);
         let mut self_bias_grad = self_bias_grad.borrow_mut();
         let self_bias_grad = self_bias_grad.deref_mut();
 
-        let self_bias = self
-            .lr_params
-            .get_1d_buf_t(TypeBuffer::Bias);
+        let self_bias = self.lr_params.get_1d_buf_t(TypeBuffer::Bias);
         let mut self_bias = self_bias.borrow_mut();
         let self_bias = self_bias.deref_mut();
 
@@ -140,53 +125,55 @@ where
 
         // calc per-weight gradient
         // for prev_layer :
-        let prev_input = prev_input[0]
-            .get_2d_buf_t(TypeBuffer::Output);
+        let prev_input = prev_input[0].get_2d_buf_t(TypeBuffer::Output);
         let prev_input = prev_input.borrow();
         let prev_input = prev_input.deref();
 
-        let ws = self
-            .lr_params
-            .get_2d_buf_t(TypeBuffer::Weights);
+        let ws = self.lr_params.get_2d_buf_t(TypeBuffer::Weights);
         let ws = ws.borrow();
         let ws = ws.deref();
 
-        let ws_grad = self
-            .lr_params
-            .get_2d_buf_t(TypeBuffer::WeightsGrad);
+        let ws_grad = self.lr_params.get_2d_buf_t(TypeBuffer::WeightsGrad);
         let mut ws_grad = ws_grad.borrow_mut();
         let ws_grad = ws_grad.deref_mut();
 
-        // This could be done with parallel iterator
-        // But  parallel iterator will make value only with big arrays (a lot of ws, big batch size)
-        for ((self_neu_idx, prev_neu_idx), val) in ws_grad.indexed_iter_mut() {
-            let cur_ws_idx = [self_neu_idx, prev_neu_idx];
+        // calc grad for weights
+        let ws_idxs = indices(ws_grad.dim());
+        Zip::from(ws_grad)
+            .and(ws)
+            .and(ws_idxs)
+            .par_for_each(|val_ws_grad, val_ws, ws_idx| {
+                let self_neu_idx = ws_idx.0;
+                let prev_neu_idx = ws_idx.1;
 
-            let mut avg = 0.0;
-            
-            Zip::from(prev_input.column(prev_neu_idx))
-                .and(self_err_vals.column(self_neu_idx))
-                .for_each(|prev_val, err_val| {
-                    avg += prev_val * err_val;
-                });
+                let mut avg = 0.0;
 
-            avg = avg / prev_input.column(prev_neu_idx).len() as f32;
+                Zip::from(prev_input.column(prev_neu_idx))
+                    .and(self_err_vals.column(self_neu_idx))
+                    .for_each(|prev_val, err_val| {
+                        avg += prev_val * err_val;
+                    });
 
-            let mut l2_penalty = 0.0;
-            if self.l2_regul != 0.0 {
-                l2_penalty = self.l2_regul * ws[cur_ws_idx];
-            }
+                avg = avg / prev_input.column(prev_neu_idx).len() as f32;
 
-            let mut l1_penalty = 0.0;
-            if self.l1_regul == 0.0 {
-                l1_penalty = self.l1_regul * sign(ws[cur_ws_idx]);
-            }
+                let mut l2_penalty = 0.0;
+                if self.l2_regul != 0.0 {
+                    l2_penalty = self.l2_regul * val_ws;
+                }
 
-            *val = avg - l2_penalty - l1_penalty;
-        }
+                let mut l1_penalty = 0.0;
+                if self.l1_regul == 0.0 {
+                    l1_penalty = self.l1_regul * sign(*val_ws);
+                }
 
-        Zip::from(self_err_vals.columns()).and(self_bias_grad).and(self_bias).for_each(
-            |err_vals, bias_grad, bias| {
+                *val_ws_grad = avg - l2_penalty - l1_penalty;
+            });
+
+        // calc grad for bias
+        Zip::from(self_err_vals.columns())
+            .and(self_bias_grad)
+            .and(self_bias)
+            .for_each(|err_vals, bias_grad, bias| {
                 let grad = err_vals.mean().unwrap();
 
                 let mut l2_penalty = 0.0;
@@ -200,8 +187,7 @@ where
                 }
 
                 *bias_grad = grad - l2_penalty - l1_penalty;
-            }
-        );
+            });
 
         debug!("[ok] HiddenLayer backward()");
 

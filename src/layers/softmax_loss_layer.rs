@@ -1,19 +1,19 @@
 use std::{
-    cell::RefCell,
-    rc::Rc,
-    sync::{atomic::{AtomicU32, Ordering}, Arc}, hash::Hash,
-    ops::{Deref, DerefMut}
+    ops::{Deref, DerefMut},
+    sync::{
+        atomic::{AtomicU32, Ordering},
+    },
 };
 
 use std::collections::HashMap;
 use std::f32::consts::E;
 
-use ndarray::{Array1, Axis, Zip};
+use ndarray::{Array1, Axis, Zip, indices};
 
 use log::{debug, info, warn};
 
-use crate::layers::*;
 use crate::cpu_params::*;
+use crate::layers::*;
 use crate::util::*;
 
 #[derive(Default, Clone)]
@@ -115,26 +115,30 @@ impl AbstractLayer for SoftmaxLossLayer {
         let accuracy = match_cnt.load(Ordering::SeqCst) as f64 / batch_len;
         self.metrics.insert("accuracy".to_string(), accuracy);
 
-        let ws_grad = self
-            .lr_params
-            .get_2d_buf_t(TypeBuffer::WeightsGrad);
+        let ws_grad = self.lr_params.get_2d_buf_t(TypeBuffer::WeightsGrad);
         let mut ws_grad = ws_grad.borrow_mut();
         let ws_grad = ws_grad.deref_mut();
 
-        // calc per-weight gradient, TODO : refactor code below
-        // for prev_layer :
-        for ((self_neu_idx, prev_neu_idx), val) in ws_grad.indexed_iter_mut() {
-            let mut avg = 0.0;
-            Zip::from(prev_input.column(prev_neu_idx))
-                .and(self_neu_grad.column(self_neu_idx))
-                .for_each(|prev_val, err_val| {
-                    avg += prev_val * err_val;
-                });
+        // calc grad for weights
+        let ws_idxs = indices(ws_grad.dim());
+        Zip::from(ws_grad)
+            .and(ws_idxs)
+            .for_each(|val_ws_grad, ws_idx| {
+                let self_neu_idx = ws_idx.0;
+                let prev_neu_idx = ws_idx.1;
 
-            avg = avg / prev_input.column(prev_neu_idx).len() as f32;
+                let mut avg = 0.0;
 
-            *val = avg;
-        }
+                Zip::from(prev_input.column(prev_neu_idx))
+                    .and(self_neu_grad.column(self_neu_idx))
+                    .for_each(|prev_val, err_val| {
+                        avg += prev_val * err_val;
+                    });
+
+                avg = avg / prev_input.column(prev_neu_idx).len() as f32;
+
+                *val_ws_grad = avg;
+            });
 
         debug!("[ok] SoftmaxLossLayer backward()");
 
@@ -162,7 +166,10 @@ impl AbstractLayer for SoftmaxLossLayer {
     }
 
     fn trainable_bufs(&self) -> TrainableBufsIds {
-        (&[TypeBuffer::Weights as i32], &[TypeBuffer::WeightsGrad as i32])
+        (
+            &[TypeBuffer::Weights as i32],
+            &[TypeBuffer::WeightsGrad as i32],
+        )
     }
 
     fn serializable_bufs(&self) -> &[i32] {
@@ -180,9 +187,7 @@ impl AbstractLayer for SoftmaxLossLayer {
     }
 
     fn set_input_shape(&mut self, sh: &[usize]) {
-        let mut lr_params = CpuParams::new(self.size, sh[0]);
-       // lr_params.output = Arc::new(RefCell::new(Array2D::zeros((2, self.size))));
-        self.lr_params = lr_params;
+        self.lr_params = CpuParams::new(self.size, sh[0]);
     }
 }
 
@@ -191,7 +196,7 @@ impl SoftmaxLossLayer {
         Self {
             size,
             lr_params: CpuParams::empty(),
-            metrics: HashMap::new()
+            metrics: HashMap::new(),
         }
     }
 

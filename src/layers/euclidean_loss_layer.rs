@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 
-use ndarray::Zip;
+use ndarray::{Zip, indices};
 
 use log::{debug, info};
 
@@ -114,33 +114,37 @@ where
         let mut self_bias = self_bias.borrow_mut();
         let self_bias = self_bias.deref_mut();
 
-        // This could be done with parallel iterator
-        // But  parallel iterator will make value only with big arrays (a lot of ws, big batch size)
-        for ((self_neu_idx, prev_neu_idx), val) in ws_grad.indexed_iter_mut() {
-            let cur_ws_idx = [self_neu_idx, prev_neu_idx];
+        // calc grad for weights
+        let ws_idxs = indices(ws_grad.dim());
+        Zip::from(ws_grad)
+            .and(ws)
+            .and(ws_idxs)
+            .par_for_each(|val_ws_grad, val_ws, ws_idx| {
+                let self_neu_idx = ws_idx.0;
+                let prev_neu_idx = ws_idx.1;
 
-            let mut avg = 0.0;
-            
-            Zip::from(prev_input.column(prev_neu_idx))
-                .and(self_neu_grad.column(self_neu_idx))
-                .for_each(|prev_val, err_val| {
-                    avg += prev_val * err_val;
-                });
+                let mut avg = 0.0;
 
-            avg = avg / prev_input.column(prev_neu_idx).len() as f32;
+                Zip::from(prev_input.column(prev_neu_idx))
+                    .and(self_neu_grad.column(self_neu_idx))
+                    .for_each(|prev_val, err_val| {
+                        avg += prev_val * err_val;
+                    });
 
-            let mut l2_penalty = 0.0;
-            if self.l2_regul != 0.0 {
-                l2_penalty = self.l2_regul * ws[cur_ws_idx];
-            }
+                avg = avg / prev_input.column(prev_neu_idx).len() as f32;
 
-            let mut l1_penalty = 0.0;
-            if self.l1_regul == 0.0 {
-                l1_penalty = self.l1_regul * sign(ws[cur_ws_idx]);
-            }
+                let mut l2_penalty = 0.0;
+                if self.l2_regul != 0.0 {
+                    l2_penalty = self.l2_regul * val_ws;
+                }
 
-            *val = avg - l2_penalty - l1_penalty;
-        }
+                let mut l1_penalty = 0.0;
+                if self.l1_regul == 0.0 {
+                    l1_penalty = self.l1_regul * sign(*val_ws);
+                }
+
+                *val_ws_grad = avg - l2_penalty - l1_penalty;
+            });
 
         Zip::from(self_neu_grad.columns()).and(self_bias_grad).and(self_bias).for_each(
             |err_vals, bias_grad, bias| {
